@@ -10,7 +10,12 @@ export type NumberingType =
   | "pr"              // ขอซื้อขอจ้าง (เช่น PR-69/001)
   | "loan"            // สัญญายืมเงิน (เช่น ยม 01/2569)
   | "memo"            // บันทึกข้อความ (เช่น บข 001/2569)
-  | "project";        // รหัสโครงการ (เช่น 69-ART-001)
+  | "project"         // รหัสโครงการ (เช่น 69-ART-001)
+  | "leave_vacation"  // ใบลาพักผ่อน (เช่น ลพ 001/2569)
+  | "leave_sick"      // ใบลาป่วย (เช่น ลป 001/2569)
+  | "leave_personal"  // ใบลากิจ (เช่น ลก 001/2569)
+  | "leave_duty"      // ใบไปราชการ (เช่น ลร 001/2569)
+  | "contract";       // สัญญาจ้าง (เช่น สจ 001/2569)
 
 export async function getNextAtomicNumber(
   type: NumberingType, 
@@ -82,6 +87,16 @@ function formatDocumentNumber(
       return `บข ${pad3}/${fiscalYear}`;
     case "project":
       return `${year2}-FLAS-${pad3}`;
+    case "leave_vacation":
+      return `${prefix || "ลพ."} ${pad3}/${fiscalYear}`;
+    case "leave_sick":
+      return `${prefix || "ลป."} ${pad3}/${fiscalYear}`;
+    case "leave_personal":
+      return `${prefix || "ลก."} ${pad3}/${fiscalYear}`;
+    case "leave_duty":
+      return `${prefix || "ลร."} ${pad3}/${fiscalYear}`;
+    case "contract":
+      return `${prefix || "สจ."} ${pad3}/${fiscalYear}`;
     default:
       return `${pad3}/${fiscalYear}`;
   }

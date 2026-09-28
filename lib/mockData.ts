@@ -9,7 +9,10 @@ import {
   RoomBooking,
   BudgetLedgerItem,
   LedgerTransaction,
-  TeachingDisbursement
+  TeachingDisbursement,
+  UserLeaveQuota,
+  FacultyPortfolio,
+  EmploymentContract
 } from "./types";
 
 export const MOCK_USERS: UserProfile[] = [
@@ -492,18 +495,325 @@ export const MOCK_PURCHASE_REQ: PurchaseRequisition[] = [
 export const MOCK_LEAVE_REQUESTS: LeaveRequest[] = [
   {
     id: "lv-001",
+    requestNumber: "ลพ. 001/2569",
     staffName: "อ.ฤทธิชัย ภาระวิเศษ",
-    position: "อาจารย์ประจำสาขาวิชารัฐศาสตร์",
-    department: "สาขาวิชารัฐศาสตร์",
+    staffId: "u-teacher",
+    position: "อาจารย์ประจำสาขาวิชารัฐศาสตร์และรัฐประศาสนศาสตร์",
+    department: "สาขาวิชารัฐศาสตร์และรัฐประศาสนศาสตร์",
+    employeeType: "contract_academic",
     leaveType: "vacation",
     startDate: "2026-10-05",
     endDate: "2026-10-07",
+    isHalfDay: false,
     totalDays: 3,
-    reason: "ลาพักผ่อนประจำปี",
-    substitutePerson: "อ.สมบัติ วิชาการ",
-    contactAddress: "123 ม.2 ต.ในเมือง อ.เมือง จ.ชัยภูมิ โทร 081-xxxxxxx",
+    reason: "ลาพักผ่อนประจำปีเพื่อฟื้นฟูสุขภาพและดูแลครอบครัว",
+    substitutePerson: "ผศ.ดร. นฤมล อนันตโชค",
+    substitutePersonId: "u-dean",
+    substituteStatus: "acknowledged",
+    contactAddress: "123 ม.2 ต.ในเมือง อ.เมือง จ.ชัยภูมิ",
+    contactPhone: "081-234-5678",
+    accumulatedDays: 5,
+    currentYearQuota: 10,
+    usedDaysBefore: 0,
+    remainingDaysAfter: 12,
     status: "approved",
-    createdAt: "2026-09-25T00:00:00Z"
+    verifiedByName: "นางสาวมณีรัตน์ การเงิน (เจ้าหน้าที่บุคคล)",
+    verifiedDate: "2026-09-26",
+    approverName: "ผศ.ดร.สานนท์ ด่านภักดี",
+    approverPosition: "คณบดีคณะศิลปศาสตร์และวิทยาศาสตร์",
+    approverComment: "อนุมัติให้ลาได้ตามระเบียบ",
+    approvalDate: "2026-09-27",
+    createdAt: "2026-09-25T08:30:00Z"
+  },
+  {
+    id: "lv-002",
+    requestNumber: "ลป. 001/2569",
+    staffName: "ดร.สุรชัย นวัตกร",
+    staffId: "u-teacher2",
+    position: "อาจารย์ประจำสาขาวิชาวิศวกรรมการผลิต",
+    department: "สาขาวิชาวิศวกรรมการผลิตและระบบอัตโนมัติ",
+    employeeType: "university_staff",
+    leaveType: "sick",
+    startDate: "2026-09-20",
+    endDate: "2026-09-21",
+    isHalfDay: false,
+    totalDays: 2,
+    reason: "มีไข้หวัดใหญ่และแพทย์สั่งให้พักรักษาตัว",
+    substitutePerson: "อ.สมบัติ วิชาการ",
+    substituteStatus: "acknowledged",
+    contactAddress: "88/1 ถ.บรรณาการ ต.ในเมือง อ.เมือง จ.ชัยภูมิ",
+    contactPhone: "089-876-5432",
+    medicalCertificateUrl: "https://example.com/med-cert-01.pdf",
+    accumulatedDays: 0,
+    currentYearQuota: 60,
+    usedDaysBefore: 0,
+    remainingDaysAfter: 58,
+    status: "approved",
+    approverName: "ผศ.ดร.สานนท์ ด่านภักดี",
+    approverPosition: "คณบดีคณะศิลปศาสตร์และวิทยาศาสตร์",
+    approvalDate: "2026-09-20",
+    createdAt: "2026-09-20T07:15:00Z"
+  },
+  {
+    id: "lv-003",
+    requestNumber: "ลก. 001/2569",
+    staffName: "นายสมเกียรติ วงศ์สารบรรณ",
+    staffId: "u-admin",
+    position: "เจ้าหน้าที่ธุรการและสารบรรณ",
+    department: "สำนักงานคณบดี",
+    employeeType: "university_staff",
+    leaveType: "personal",
+    startDate: "2026-10-12",
+    endDate: "2026-10-12",
+    isHalfDay: true,
+    halfDayPeriod: "afternoon",
+    totalDays: 0.5,
+    reason: "ติดต่อธุระส่วนตัวที่สำนักงานที่ดินจังหวัดชัยภูมิ",
+    substitutePerson: "นางสาวมณีรัตน์ การเงิน",
+    substituteStatus: "acknowledged",
+    contactAddress: "45 ม.3 ต.บ้านเล่า อ.เมือง จ.ชัยภูมิ",
+    contactPhone: "086-112-2334",
+    accumulatedDays: 0,
+    currentYearQuota: 45,
+    usedDaysBefore: 0,
+    remainingDaysAfter: 44.5,
+    status: "submitted",
+    createdAt: "2026-09-28T10:00:00Z"
+  }
+];
+
+export const MOCK_USER_QUOTAS: UserLeaveQuota[] = [
+  {
+    id: "quota-001",
+    userId: "u-teacher",
+    employeeId: "CPRU-65042",
+    staffName: "อ.ฤทธิชัย ภาระวิเศษ",
+    department: "สาขาวิชารัฐศาสตร์และรัฐประศาสนศาสตร์",
+    position: "อาจารย์ประจำสาขาวิชารัฐศาสตร์",
+    employeeType: "contract_academic",
+    fiscalYear: 2569,
+    vacationQuota: {
+      accumulated: 5,
+      currentYear: 10,
+      used: 3,
+      remaining: 12
+    },
+    personalQuota: {
+      currentYear: 45,
+      used: 0,
+      remaining: 45
+    },
+    sickQuota: {
+      currentYear: 60,
+      used: 0,
+      remaining: 60
+    },
+    dutyQuota: {
+      used: 2
+    },
+    updatedAt: "2026-09-28T00:00:00Z"
+  },
+  {
+    id: "quota-002",
+    userId: "u-admin",
+    employeeId: "CPRU-60012",
+    staffName: "นายสมเกียรติ วงศ์สารบรรณ",
+    department: "สำนักงานคณบดี",
+    position: "เจ้าหน้าที่ธุรการและสารบรรณ",
+    employeeType: "university_staff",
+    fiscalYear: 2569,
+    vacationQuota: {
+      accumulated: 10,
+      currentYear: 10,
+      used: 0,
+      remaining: 20
+    },
+    personalQuota: {
+      currentYear: 45,
+      used: 0.5,
+      remaining: 44.5
+    },
+    sickQuota: {
+      currentYear: 60,
+      used: 0,
+      remaining: 60
+    },
+    dutyQuota: {
+      used: 0
+    },
+    updatedAt: "2026-09-28T00:00:00Z"
+  }
+];
+
+export const MOCK_FACULTY_PORTFOLIOS: FacultyPortfolio[] = [
+  {
+    id: "port-001",
+    userId: "u-teacher",
+    employeeId: "CPRU-65042",
+    prefix: "อาจารย์",
+    fullName: "ฤทธิชัย ภาระวิเศษ",
+    academicRank: "อาจารย์",
+    department: "สาขาวิชารัฐศาสตร์และรัฐประศาสนศาสตร์",
+    contactEmail: "ritthichai.p@cpru.ac.th",
+    contactPhone: "081-234-5678",
+    contractType: "พนักงานจ้างตามภารกิจ (ประเภทวิชาการ)",
+    degrees: [
+      {
+        level: "master",
+        degreeName: "รัฐศาสตรมหาบัณฑิต (ร.ม.)",
+        fieldOfStudy: "การปกครองและนโยบายสาธารณะ",
+        institution: "จุฬาลงกรณ์มหาวิทยาลัย",
+        country: "ประเทศไทย",
+        yearGraduated: 2562
+      },
+      {
+        level: "bachelor",
+        degreeName: "รัฐศาสตรบัณฑิต (ร.บ.) เกียรตินิยมอันดับสอง",
+        fieldOfStudy: "การปกครอง",
+        institution: "มหาวิทยาลัยธรรมศาสตร์",
+        country: "ประเทศไทย",
+        yearGraduated: 2558
+      }
+    ],
+    currentTeachingLoad: [
+      {
+        term: "1/2569",
+        academicYear: 2569,
+        courseCode: "POL1101",
+        courseName: "ความรู้เบื้องต้นทางรัฐศาสตร์",
+        credits: "3(3-0-6)",
+        hoursPerWeek: 4,
+        program: "bachelor_regular",
+        studentCount: 45
+      },
+      {
+        term: "1/2569",
+        academicYear: 2569,
+        courseCode: "PAD2203",
+        courseName: "การบริหารนโยบายสาธารณะและการวางแผน",
+        credits: "3(3-0-6)",
+        hoursPerWeek: 4,
+        program: "bachelor_regular",
+        studentCount: 38
+      },
+      {
+        term: "1/2569",
+        academicYear: 2569,
+        courseCode: "PAD3301",
+        courseName: "การบริหารราชการไทยและกฎหมายปกครอง",
+        credits: "3(3-0-6)",
+        hoursPerWeek: 4,
+        program: "bachelor_gspch",
+        studentCount: 28
+      }
+    ],
+    researchWorks: [
+      {
+        id: "res-01",
+        title: "การพัฒนานโยบายสาธารณะแบบมีส่วนร่วมเพื่อเสริมสร้างความเข้มแข็งของชุมชนท้องถิ่นในจังหวัดชัยภูมิ",
+        publicationYear: 2568,
+        journalName: "วารสารวิชาการคณะมนุษยศาสตร์และสังคมศาสตร์ มหาวิทยาลัยราชภัฏชัยภูมิ",
+        volume: "12",
+        issue: "2",
+        pages: "45-58",
+        indexing: "TCI_1",
+        authorRole: "first_author"
+      },
+      {
+        id: "res-02",
+        title: "การประยุกต์ใช้ปัญญาประดิษฐ์ (AI) ในการบริการภาครัฐสู่การเป็นพลเมืองดิจิทัลขององค์กรปกครองส่วนท้องถิ่น",
+        publicationYear: 2569,
+        journalName: "วารสารรัฐประศาสนศาสตร์ มหาวิทยาลัยขอนแก่น",
+        volume: "16",
+        issue: "1",
+        pages: "102-118",
+        indexing: "TCI_2",
+        authorRole: "corresponding"
+      }
+    ],
+    academicServices: [
+      {
+        id: "srv-01",
+        title: "วิทยากรบรรยายหัวข้อ 'การจัดทำแผนพัฒนาท้องถิ่นและการมีส่วนร่วมของประชาชน' องค์การบริหารส่วนตำบลเนินสง่า",
+        role: "วิทยากรหลัก",
+        organization: "อบต.เนินสง่า อ.เนินสง่า จ.ชัยภูมิ",
+        serviceDate: "2026-08-15",
+        participantCount: 65,
+        projectCategory: "local_development"
+      },
+      {
+        id: "srv-02",
+        title: "ผู้ทรงคุณวุฒิตรวจประเมินแผนยุทธศาสตร์การพัฒนาเศรษฐกิจฐานราก โครงการศาสตร์พระราชา",
+        role: "กรรมการผู้ทรงคุณวุฒิ",
+        organization: "ศูนย์การเรียนรู้ศาสตร์พระราชา มรภ.ชัยภูมิ",
+        serviceDate: "2026-09-02",
+        participantCount: 40,
+        projectCategory: "kings_philosophy"
+      }
+    ],
+    sarRecords: [
+      {
+        academicYear: 2568,
+        sarStatus: "certified",
+        selfScore: 4.65,
+        evaluatorScore: 4.58,
+        comments: "ผลการประเมินอยู่ในระดับดีมาก มีผลงานวิจัยตีพิมพ์ในฐาน TCI กลุ่ม 1 ครบถ้วน",
+        certifiedBy: "ผศ.ดร.สานนท์ ด่านภักดี",
+        certifiedDate: "2026-06-30"
+      },
+      {
+        academicYear: 2569,
+        sarStatus: "draft",
+        selfScore: 4.70
+      }
+    ],
+    createdAt: "2026-09-01T00:00:00Z"
+  }
+];
+
+export const MOCK_EMPLOYMENT_CONTRACTS: EmploymentContract[] = [
+  {
+    id: "ct-001",
+    contractNumber: "สจ. 012/2568",
+    employeeName: "อ.ฤทธิชัย ภาระวิเศษ",
+    employeeId: "CPRU-65042",
+    position: "อาจารย์ประจำสาขาวิชารัฐศาสตร์และรัฐประศาสนศาสตร์",
+    department: "สาขาวิชารัฐศาสตร์และรัฐประศาสนศาสตร์",
+    contractCategory: "academic_mission",
+    startDate: "2025-10-01",
+    endDate: "2026-09-30",
+    salary: 28500,
+    signatoryFirst: "ผศ.ดร.สานนท์ ด่านภักดี (คณบดี ผู้รับมอบอำนาจ)",
+    signatorySecond: "อ.ฤทธิชัย ภาระวิเศษ (ผู้รับจ้าง)",
+    signedDocumentUrl: "https://example.com/contract_ritthichai_2568.pdf",
+    status: "expiring_soon",
+    renewalHistory: [
+      {
+        renewalDate: "2025-09-15",
+        newEndDate: "2026-09-30",
+        contractNumber: "สจ. 012/2568",
+        approvedBy: "ที่ประชุม ก.บ.ม. มหาวิทยาลัยราชภัฏชัยภูมิ",
+        remarks: "ต่อสัญญาจ้าง 1 ปี ผลการประเมินผ่านเกณฑ์ดีมาก"
+      }
+    ],
+    createdAt: "2025-09-20T00:00:00Z"
+  },
+  {
+    id: "ct-002",
+    contractNumber: "สจ. 005/2569",
+    employeeName: "ดร.สุรชัย นวัตกร",
+    employeeId: "CPRU-63018",
+    position: "อาจารย์ประจำสาขาวิชาวิศวกรรมการผลิต",
+    department: "สาขาวิชาวิศวกรรมการผลิตและระบบอัตโนมัติ",
+    contractCategory: "university_staff",
+    startDate: "2026-01-01",
+    endDate: "2028-12-31",
+    salary: 34200,
+    signatoryFirst: "อธิการบดีมหาวิทยาลัยราชภัฏชัยภูมิ",
+    signatorySecond: "ดร.สุรชัย นวัตกร",
+    signedDocumentUrl: "https://example.com/contract_surachai.pdf",
+    status: "active",
+    createdAt: "2025-12-15T00:00:00Z"
   }
 ];
 

@@ -4,6 +4,7 @@ import { Document, Paragraph, TextRun, HeadingLevel, AlignmentType, Table, Table
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { LeaveRequest, FacultyPortfolio, EmploymentContract } from "./types";
 
 // Helper to trigger browser download of a Blob
 export function downloadBlob(blob: Blob, filename: string) {
@@ -1215,7 +1216,389 @@ export async function exportTeachingDisbursementToWord(batch: {
   downloadBlob(blob, `ใบเบิกค่าสอนพิเศษ_${batch.periodMonth}.docx`);
 }
 
-// 7. Generate Print-Ready PDF
+// 7. Export Leave Request (แบบใบลาพักผ่อน / ใบลาป่วย-ลากิจ มรภ.ชัยภูมิ) to Word (.docx)
+export async function exportLeaveRequestToWord(leave: LeaveRequest) {
+  const isVacation = leave.leaveType === "vacation";
+  const leaveTitle = isVacation 
+    ? "แบบใบลาพักผ่อน" 
+    : leave.leaveType === "sick" 
+    ? "แบบใบลาป่วย" 
+    : leave.leaveType === "personal" 
+    ? "แบบใบลากิจส่วนตัว" 
+    : "แบบใบขออนุมัติไปราชการ";
+
+  // Table of leave quota statistics
+  const quotaTable = isVacation ? new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    rows: [
+      new TableRow({
+        children: ["วันลาสะสม", "สิทธิลาปีนี้", "รวมเป็น", "ลามาแล้ว", "ลาครั้งนี้", "รวมเป็น", "คงเหลือ"].map(h => (
+          new TableCell({
+            children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: h, bold: true, size: 24, font: "TH Sarabun PSK" })] })]
+          })
+        ))
+      }),
+      new TableRow({
+        children: [
+          `${leave.accumulatedDays || 0} วัน`,
+          `${leave.currentYearQuota || 10} วัน`,
+          `${(leave.accumulatedDays || 0) + (leave.currentYearQuota || 10)} วัน`,
+          `${leave.usedDaysBefore || 0} วัน`,
+          `${leave.totalDays} วัน`,
+          `${(leave.usedDaysBefore || 0) + leave.totalDays} วัน`,
+          `${leave.remainingDaysAfter} วัน`
+        ].map(val => (
+          new TableCell({
+            children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: val, size: 24, font: "TH Sarabun PSK" })] })]
+          })
+        ))
+      })
+    ]
+  }) : new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    rows: [
+      new TableRow({
+        children: ["ประเภทการลา", "ลามาแล้ว (วันทำการ)", "ลาครั้งนี้ (วันทำการ)", "รวมเป็น (วันทำการ)"].map(h => (
+          new TableCell({
+            children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: h, bold: true, size: 24, font: "TH Sarabun PSK" })] })]
+          })
+        ))
+      }),
+      new TableRow({
+        children: [
+          leave.leaveType === "sick" ? "ลาป่วย" : leave.leaveType === "personal" ? "ลากิจส่วนตัว" : "ไปราชการ",
+          `${leave.usedDaysBefore || 0} วัน`,
+          `${leave.totalDays} วัน`,
+          `${(leave.usedDaysBefore || 0) + leave.totalDays} วัน`
+        ].map(val => (
+          new TableCell({
+            children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: val, size: 24, font: "TH Sarabun PSK" })] })]
+          })
+        ))
+      })
+    ]
+  });
+
+  const doc = new Document({
+    sections: [
+      {
+        children: [
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [
+              new TextRun({ text: leaveTitle, bold: true, size: 36, font: "TH Sarabun PSK" }),
+            ],
+          }),
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [
+              new TextRun({ text: "มหาวิทยาลัยราชภัฏชัยภูมิ", bold: true, size: 30, font: "TH Sarabun PSK" }),
+            ],
+          }),
+          new Paragraph({ text: "" }),
+          new Paragraph({
+            alignment: AlignmentType.RIGHT,
+            children: [
+              new TextRun({ text: `เขียนที่: คณะศิลปศาสตร์และวิทยาศาสตร์\n`, size: 28, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `วันที่: ${new Date().toLocaleDateString("th-TH", { year: "numeric", month: "long", day: "numeric" })}\n`, size: 28, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `เลขที่คำขอ: ${leave.requestNumber || "ลพ. -/2569"}`, size: 26, font: "TH Sarabun PSK" }),
+            ],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: `เรื่อง: `, bold: true, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `ขอ${leaveTitle.replace("แบบใบ", "")}`, size: 30, font: "TH Sarabun PSK" }),
+            ],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: `เรียน: `, bold: true, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `คณบดีคณะศิลปศาสตร์และวิทยาศาสตร์`, size: 30, font: "TH Sarabun PSK" }),
+            ],
+          }),
+          new Paragraph({ text: "" }),
+          new Paragraph({
+            indent: { firstLine: 720 },
+            children: [
+              new TextRun({ 
+                text: `ข้าพเจ้า ${leave.staffName} ตำแหน่ง ${leave.position} สังกัด ${leave.department} ${isVacation ? `มีวันลาพักผ่อนสะสม ${leave.accumulatedDays || 0} วันทำการ มีสิทธิลาพักผ่อนประจำปีนี้อีก ${leave.currentYearQuota || 10} วันทำการ รวมเป็น ${(leave.accumulatedDays || 0) + (leave.currentYearQuota || 10)} วันทำการ ` : ""}ขอ${leaveTitle.replace("แบบใบ", "")}ตั้งแต่วันที่ ${leave.startDate} ถึงวันที่ ${leave.endDate} มีกำหนด ${leave.totalDays} วัน ${leave.isHalfDay ? `(${leave.halfDayPeriod === "morning" ? "ช่วงเช้า" : "ช่วงบ่าย"})` : ""} เนื่องจาก ${leave.reason}`, 
+                size: 30, 
+                font: "TH Sarabun PSK" 
+              }),
+            ],
+          }),
+          new Paragraph({
+            indent: { firstLine: 720 },
+            children: [
+              new TextRun({ 
+                text: `ในระหว่างลาจะติดต่อข้าพเจ้าได้ที่: ${leave.contactAddress} โทรศัพท์: ${leave.contactPhone || "-"}${leave.substitutePerson ? ` และขอมอบหมายงานในหน้าที่ให้แก่ ${leave.substitutePerson} เป็นผู้ปฏิบัติหน้าที่แทน` : ""}`, 
+                size: 30, 
+                font: "TH Sarabun PSK" 
+              }),
+            ],
+          }),
+          new Paragraph({ text: "" }),
+          new Paragraph({
+            alignment: AlignmentType.RIGHT,
+            children: [
+              new TextRun({ text: `(ลงชื่อ)........................................................\n`, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `(${leave.staffName})\n`, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `ผู้ขอลา`, size: 30, font: "TH Sarabun PSK" }),
+            ],
+          }),
+          new Paragraph({ text: "" }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: `สถิติการลา (ตรวจสอบโดยงานบริหารทรัพยากรมนุษย์)`, bold: true, size: 28, font: "TH Sarabun PSK" }),
+            ],
+          }),
+          quotaTable,
+          new Paragraph({ text: "" }),
+          new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            rows: [
+              new TableRow({
+                children: [
+                  new TableCell({
+                    children: [
+                      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "ความเห็นผู้รับมอบหมายงาน", bold: true, size: 26, font: "TH Sarabun PSK" })] }),
+                      new Paragraph({ children: [new TextRun({ text: `\nรับทราบและยินดีปฏิบัติหน้าที่แทน\n\n(ลงชื่อ)........................................................\n(${leave.substitutePerson || "........................................................"})\nผู้รับมอบหมายงาน\nวันที่ ......./......./.......`, size: 24, font: "TH Sarabun PSK" })] })
+                    ]
+                  }),
+                  new TableCell({
+                    children: [
+                      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "คำสั่ง / การพิจารณาอนุมัติ", bold: true, size: 26, font: "TH Sarabun PSK" })] }),
+                      new Paragraph({ children: [new TextRun({ text: `\n[ / ] อนุมัติ      [  ] ไม่อนุมัติ\n\n(ลงชื่อ)........................................................\n(ผู้ช่วยศาสตราจารย์ ดร.สานนท์ ด่านภักดี)\nคณบดีคณะศิลปศาสตร์และวิทยาศาสตร์\nวันที่ ......./......./.......`, size: 24, font: "TH Sarabun PSK" })] })
+                    ]
+                  })
+                ]
+              })
+            ]
+          })
+        ],
+      },
+    ],
+  });
+
+  const blob = await Packer.toBlob(doc);
+  downloadBlob(blob, `ใบลา_${leave.leaveType}_${leave.staffName.replace(/\s+/g, "_")}.docx`);
+}
+
+// 8. Export Faculty Portfolio & SAR to Word (.docx)
+export async function exportFacultyPortfolioToWord(portfolio: FacultyPortfolio) {
+  const degreesTable = new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    rows: [
+      new TableRow({
+        children: ["ระดับการศึกษา", "คุณวุฒิ / สาขาวิชา", "สถาบันการศึกษา", "ปีที่สำเร็จการศึกษา"].map(h => (
+          new TableCell({
+            children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: h, bold: true, size: 24, font: "TH Sarabun PSK" })] })]
+          })
+        ))
+      }),
+      ...portfolio.degrees.map(d => (
+        new TableRow({
+          children: [
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: d.level === "doctoral" ? "ปริญญาเอก" : d.level === "master" ? "ปริญญาโท" : "ปริญญาตรี", size: 24, font: "TH Sarabun PSK" })] })] }),
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: `${d.degreeName} (${d.fieldOfStudy})`, size: 24, font: "TH Sarabun PSK" })] })] }),
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: `${d.institution} ${d.country ? `(${d.country})` : ""}`, size: 24, font: "TH Sarabun PSK" })] })] }),
+            new TableCell({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: d.yearGraduated.toString(), size: 24, font: "TH Sarabun PSK" })] })] })
+          ]
+        })
+      ))
+    ]
+  });
+
+  const teachingTable = new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    rows: [
+      new TableRow({
+        children: ["ภาคเรียน/ปี", "รหัสวิชา - ชื่อวิชา", "หน่วยกิต", "ชม./สัปดาห์", "หลักสูตร"].map(h => (
+          new TableCell({
+            children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: h, bold: true, size: 24, font: "TH Sarabun PSK" })] })]
+          })
+        ))
+      }),
+      ...portfolio.currentTeachingLoad.map(t => (
+        new TableRow({
+          children: [
+            new TableCell({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: `${t.term}`, size: 24, font: "TH Sarabun PSK" })] })] }),
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: `${t.courseCode} ${t.courseName}`, size: 24, font: "TH Sarabun PSK" })] })] }),
+            new TableCell({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: t.credits, size: 24, font: "TH Sarabun PSK" })] })] }),
+            new TableCell({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: `${t.hoursPerWeek} ชม.`, size: 24, font: "TH Sarabun PSK" })] })] }),
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: t.program === "bachelor_regular" ? "ภาคปกติ" : t.program === "bachelor_gspch" ? "กศ.ปช." : "บัณฑิตศึกษา", size: 24, font: "TH Sarabun PSK" })] })] })
+          ]
+        })
+      ))
+    ]
+  });
+
+  const researchTable = new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    rows: [
+      new TableRow({
+        children: ["ลำดับ", "ชื่อผลงานวิจัย / บทความวิชาการ", "วารสาร / แหล่งตีพิมพ์", "ฐานข้อมูล", "ปีที่พิมพ์"].map(h => (
+          new TableCell({
+            children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: h, bold: true, size: 24, font: "TH Sarabun PSK" })] })]
+          })
+        ))
+      }),
+      ...portfolio.researchWorks.map((r, i) => (
+        new TableRow({
+          children: [
+            new TableCell({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: (i + 1).toString(), size: 24, font: "TH Sarabun PSK" })] })] }),
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: r.title, size: 24, font: "TH Sarabun PSK" })] })] }),
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: `${r.journalName} ${r.volume ? `ปีที่ ${r.volume}` : ""} ${r.issue ? `ฉบับที่ ${r.issue}` : ""}`, size: 24, font: "TH Sarabun PSK" })] })] }),
+            new TableCell({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: r.indexing.replace("_", " "), size: 24, font: "TH Sarabun PSK" })] })] }),
+            new TableCell({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: r.publicationYear.toString(), size: 24, font: "TH Sarabun PSK" })] })] })
+          ]
+        })
+      ))
+    ]
+  });
+
+  const doc = new Document({
+    sections: [
+      {
+        children: [
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [
+              new TextRun({ text: "แฟ้มประวัติและผลงานทางวิชาการอาจารย์ (Faculty Portfolio & SAR)", bold: true, size: 36, font: "TH Sarabun PSK" }),
+            ],
+          }),
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [
+              new TextRun({ text: "คณะศิลปศาสตร์และวิทยาศาสตร์ มหาวิทยาลัยราชภัฏชัยภูมิ", bold: true, size: 30, font: "TH Sarabun PSK" }),
+            ],
+          }),
+          new Paragraph({ text: "" }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: "1. ข้อมูลส่วนบุคคลและตำแหน่งทางวิชาการ", bold: true, size: 30, font: "TH Sarabun PSK" }),
+            ],
+          }),
+          new Paragraph({
+            indent: { firstLine: 720 },
+            children: [
+              new TextRun({ text: `ชื่อ-สกุล: ${portfolio.prefix || ""}${portfolio.fullName}\nรหัสบุคลากร: ${portfolio.employeeId}\nตำแหน่งทางวิชาการ: ${portfolio.academicRank}\nสังกัด: ${portfolio.department}\nประเภทสัญญาจ้าง: ${portfolio.contractType}\nอีเมล: ${portfolio.contactEmail || "-"} โทรศัพท์: ${portfolio.contactPhone || "-"}`, size: 28, font: "TH Sarabun PSK" }),
+            ],
+          }),
+          new Paragraph({ text: "" }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: "2. ประวัติการศึกษา", bold: true, size: 30, font: "TH Sarabun PSK" }),
+            ],
+          }),
+          degreesTable,
+          new Paragraph({ text: "" }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: "3. ภาระงานสอนประจำภาคเรียน", bold: true, size: 30, font: "TH Sarabun PSK" }),
+            ],
+          }),
+          teachingTable,
+          new Paragraph({ text: "" }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: "4. ผลงานวิจัยและบทความทางวิชาการที่ได้รับการตีพิมพ์", bold: true, size: 30, font: "TH Sarabun PSK" }),
+            ],
+          }),
+          researchTable,
+          new Paragraph({ text: "" }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: "5. งานบริการวิชาการแก่สังคมและโครงการพัฒนาท้องถิ่น", bold: true, size: 30, font: "TH Sarabun PSK" }),
+            ],
+          }),
+          ...portfolio.academicServices.map((srv, i) => (
+            new Paragraph({
+              indent: { firstLine: 720 },
+              children: [
+                new TextRun({ text: `${i + 1}. ${srv.title} (บทบาท: ${srv.role}) ณ ${srv.organization} วันที่ ${srv.serviceDate}`, size: 28, font: "TH Sarabun PSK" }),
+              ]
+            })
+          )),
+          new Paragraph({ text: "" }),
+          new Paragraph({
+            alignment: AlignmentType.RIGHT,
+            children: [
+              new TextRun({ text: `ขอรับรองว่าข้อมูลและผลงานข้างต้นถูกต้องตามความเป็นจริงทุกประการ\n\n`, size: 28, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `(ลงชื่อ)........................................................\n`, size: 28, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `(${portfolio.prefix || ""}${portfolio.fullName})\n`, size: 28, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `ตำแหน่ง ${portfolio.academicRank}`, size: 28, font: "TH Sarabun PSK" }),
+            ],
+          })
+        ],
+      },
+    ],
+  });
+
+  const blob = await Packer.toBlob(doc);
+  downloadBlob(blob, `Portfolio_SAR_${portfolio.fullName.replace(/\s+/g, "_")}.docx`);
+}
+
+// 9. Export Employment Contract Summary to Word (.docx)
+export async function exportEmploymentContractToWord(contract: EmploymentContract) {
+  const doc = new Document({
+    sections: [
+      {
+        children: [
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [
+              new TextRun({ text: "สรุปสาระสำคัญสัญญาปฏิบัติงานบุคลากร", bold: true, size: 36, font: "TH Sarabun PSK" }),
+            ],
+          }),
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [
+              new TextRun({ text: "มหาวิทยาลัยราชภัฏชัยภูมิ", bold: true, size: 30, font: "TH Sarabun PSK" }),
+            ],
+          }),
+          new Paragraph({ text: "" }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: `สัญญาเลขที่: `, bold: true, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `${contract.contractNumber}\n`, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `ชื่อผู้รับจ้าง: `, bold: true, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `${contract.employeeName} (รหัส: ${contract.employeeId || "-"})\n`, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `ตำแหน่ง: `, bold: true, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `${contract.position}\n`, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `สังกัด: `, bold: true, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `${contract.department}\n`, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `ประเภทสัญญา: `, bold: true, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `${contract.contractCategory === "academic_mission" ? "พนักงานจ้างตามภารกิจ (ประเภทวิชาการ)" : contract.contractCategory === "general_mission" ? "พนักงานจ้างตามภารกิจ (ประเภททั่วไป)" : "พนักงานมหาวิทยาลัย"}\n`, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `ระยะเวลาการจ้าง: `, bold: true, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `ตั้งแต่วันที่ ${contract.startDate} ถึงวันที่ ${contract.endDate}\n`, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `อัตราเงินเดือน / ค่าตอบแทน: `, bold: true, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `${contract.salary.toLocaleString()} บาท/เดือน\n`, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `ผู้ว่าจ้าง: `, bold: true, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `${contract.signatoryFirst}\n`, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `ผู้รับจ้าง: `, bold: true, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `${contract.signatorySecond}\n`, size: 30, font: "TH Sarabun PSK" }),
+            ],
+          }),
+          new Paragraph({ text: "" }),
+          new Paragraph({
+            alignment: AlignmentType.RIGHT,
+            children: [
+              new TextRun({ text: `(ลงชื่อ)........................................................\n`, size: 28, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `(เจ้าหน้าที่งานบริหารทรัพยากรมนุษย์)\n`, size: 28, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `ผู้ตรวจสอบทะเบียนสัญญาจ้าง`, size: 28, font: "TH Sarabun PSK" }),
+            ],
+          })
+        ],
+      },
+    ],
+  });
+
+  const blob = await Packer.toBlob(doc);
+  downloadBlob(blob, `สัญญาจ้าง_${contract.contractNumber.replace(/[\/\s]/g, "_")}.docx`);
+}
+
+// 10. Generate Print-Ready PDF
 export function printDocumentView() {
   if (typeof window !== "undefined") {
     window.print();

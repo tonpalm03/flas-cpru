@@ -33,6 +33,9 @@ import {
   LedgerTransaction,
   TeachingDisbursement,
   LeaveRequest,
+  UserLeaveQuota,
+  FacultyPortfolio,
+  EmploymentContract,
   MasterSystemConfig,
   UserProfile
 } from "./types";
@@ -45,7 +48,11 @@ import {
   MOCK_LEDGER_TRANSACTIONS,
   MOCK_LOANS,
   MOCK_DISBURSEMENTS,
-  MOCK_PURCHASE_REQ
+  MOCK_PURCHASE_REQ,
+  MOCK_LEAVE_REQUESTS,
+  MOCK_USER_QUOTAS,
+  MOCK_FACULTY_PORTFOLIOS,
+  MOCK_EMPLOYMENT_CONTRACTS
 } from "./mockData";
 import { getNextAtomicNumber } from "./numberingService";
 import { logAuditEvent } from "./auditService";
@@ -1157,8 +1164,10 @@ export async function updateFinanceDisbursementStatus(
 }
 
 // ==========================================
-// 7. HR LEAVES (ระบบ e-Leave)
+// 7. HR LEAVES, PORTFOLIO & CONTRACTS (ระบบ e-Leave & ทะเบียนบุคลากร)
 // ==========================================
+
+// 7.1 e-Leave Requests
 export async function getHRLeaves(): Promise<LeaveRequest[]> {
   if (isConfigured) {
     try {
@@ -1170,16 +1179,27 @@ export async function getHRLeaves(): Promise<LeaveRequest[]> {
       console.warn("Firestore getHRLeaves fallback:", e);
     }
   }
-  return getLocalData("hr_leaves", []);
+  return getLocalData("hr_leaves", MOCK_LEAVE_REQUESTS);
 }
 
 export async function createLeaveRequest(
-  data: Omit<LeaveRequest, "id" | "createdAt">,
+  data: Omit<LeaveRequest, "id" | "createdAt" | "requestNumber">,
   actor?: UserProfile | null
 ): Promise<LeaveRequest> {
+  const numberingType = data.leaveType === "vacation" 
+    ? "leave_vacation" 
+    : data.leaveType === "sick" 
+    ? "leave_sick" 
+    : data.leaveType === "personal" 
+    ? "leave_personal" 
+    : "leave_duty";
+  const prefix = data.leaveType === "vacation" ? "ลพ." : data.leaveType === "sick" ? "ลป." : data.leaveType === "personal" ? "ลก." : "ลร.";
+  const requestNumber = await getNextAtomicNumber(numberingType, 2569, prefix);
+
   const newLeave: Omit<LeaveRequest, "id"> = {
     ...data,
-    staffId: actor?.id,
+    requestNumber,
+    staffId: actor?.id || data.staffId,
     createdById: actor?.id,
     createdAt: new Date().toISOString()
   };
@@ -1191,7 +1211,12 @@ export async function createLeaveRequest(
         timestamp: serverTimestamp()
       });
       const created: LeaveRequest = { id: ref.id, ...newLeave };
-      await logAuditEvent(actor || null, "CREATE_LEAVE_REQUEST", "hr_leaves", ref.id, { staffName: data.staffName, leaveType: data.leaveType, totalDays: data.totalDays });
+      await logAuditEvent(actor || null, "CREATE_LEAVE_REQUEST", "hr_leaves", ref.id, { 
+        requestNumber, 
+        staffName: data.staffName, 
+        leaveType: data.leaveType, 
+        totalDays: data.totalDays 
+      });
       return created;
     } catch (e) {
       console.error("Firestore createLeaveRequest failed:", e);
@@ -1199,10 +1224,258 @@ export async function createLeaveRequest(
     }
   }
 
-  const list = getLocalData<LeaveRequest>("hr_leaves", []);
+  const list = getLocalData<LeaveRequest>("hr_leaves", MOCK_LEAVE_REQUESTS);
   const created: LeaveRequest = { id: `leave-${Date.now()}`, ...newLeave };
   setLocalData("hr_leaves", [created, ...list]);
   return created;
+}
+
+export async function updateLeaveRequestStatus(
+  id: string,
+  status: LeaveRequest["status"],
+  updates?: Partial<LeaveRequest>,
+  actor?: UserProfile | null
+): Promise<void> {
+  const updatePayload = {
+    status,
+    ...updates,
+    updatedAt: new Date().toISOString()
+  };
+
+  if (isConfigured) {
+    try {
+      const docRef = doc(db, "hr_leaves", id);
+      await updateDoc(docRef, {
+        ...updatePayload,
+        timestamp: serverTimestamp()
+      });
+      await logAuditEvent(actor || null, "UPDATE_LEAVE_STATUS", "hr_leaves", id, { status, ...updates });
+      return;
+    } catch (e) {
+      console.error("Firestore updateLeaveRequestStatus failed:", e);
+      throw e;
+    }
+  }
+
+  const list = getLocalData<LeaveRequest>("hr_leaves", MOCK_LEAVE_REQUESTS);
+  const updated = list.map(item => item.id === id ? { ...item, ...updatePayload } : item);
+  setLocalData("hr_leaves", updated);
+}
+
+// 7.2 User Leave Quotas
+export async function getUserLeaveQuota(
+  userId: string, 
+  staffName?: string, 
+  fiscalYear: number = 2569
+): Promise<UserLeaveQuota> {
+  if (isConfigured) {
+    try {
+      const q = query(
+        collection(db, "hr_quotas"), 
+        where("userId", "==", userId), 
+        where("fiscalYear", "==", fiscalYear)
+      );
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        const d = snap.docs[0];
+        return { id: d.id, ...d.data() } as UserLeaveQuota;
+      }
+    } catch (e) {
+      console.warn("Firestore getUserLeaveQuota fallback:", e);
+    }
+  }
+
+  const localQuotas = getLocalData<UserLeaveQuota>("hr_quotas", MOCK_USER_QUOTAS);
+  const found = localQuotas.find(q => q.userId === userId && q.fiscalYear === fiscalYear);
+  if (found) return found;
+
+  // Default quota if none found
+  const defaultQuota: UserLeaveQuota = {
+    id: `quota-${userId}-${fiscalYear}`,
+    userId,
+    staffName: staffName || "บุคลากร",
+    department: "คณะศิลปศาสตร์และวิทยาศาสตร์",
+    position: "อาจารย์",
+    employeeType: "contract_academic",
+    fiscalYear,
+    vacationQuota: { accumulated: 0, currentYear: 10, used: 0, remaining: 10 },
+    personalQuota: { currentYear: 45, used: 0, remaining: 45 },
+    sickQuota: { currentYear: 60, used: 0, remaining: 60 },
+    dutyQuota: { used: 0 },
+    updatedAt: new Date().toISOString()
+  };
+
+  return defaultQuota;
+}
+
+export async function getAllUserLeaveQuotas(fiscalYear: number = 2569): Promise<UserLeaveQuota[]> {
+  if (isConfigured) {
+    try {
+      const snap = await getDocs(collection(db, "hr_quotas"));
+      if (!snap.empty) {
+        return snap.docs.map(d => ({ id: d.id, ...d.data() } as UserLeaveQuota));
+      }
+    } catch (e) {
+      console.warn("Firestore getAllUserLeaveQuotas fallback:", e);
+    }
+  }
+  return getLocalData<UserLeaveQuota>("hr_quotas", MOCK_USER_QUOTAS);
+}
+
+export async function saveUserLeaveQuota(
+  quota: UserLeaveQuota,
+  actor?: UserProfile | null
+): Promise<void> {
+  const payload = {
+    ...quota,
+    updatedAt: new Date().toISOString()
+  };
+
+  if (isConfigured) {
+    try {
+      await setDoc(doc(db, "hr_quotas", quota.id), {
+        ...payload,
+        timestamp: serverTimestamp()
+      }, { merge: true });
+      await logAuditEvent(actor || null, "SAVE_LEAVE_QUOTA", "hr_quotas", quota.id, { userId: quota.userId, fiscalYear: quota.fiscalYear });
+      return;
+    } catch (e) {
+      console.error("Firestore saveUserLeaveQuota failed:", e);
+      throw e;
+    }
+  }
+
+  const list = getLocalData<UserLeaveQuota>("hr_quotas", MOCK_USER_QUOTAS);
+  const exists = list.some(q => q.id === quota.id);
+  const updated = exists ? list.map(q => q.id === quota.id ? payload : q) : [payload, ...list];
+  setLocalData("hr_quotas", updated);
+}
+
+// 7.3 Faculty Portfolio & SAR
+export async function getFacultyPortfolios(): Promise<FacultyPortfolio[]> {
+  if (isConfigured) {
+    try {
+      const snap = await getDocs(collection(db, "hr_portfolios"));
+      if (!snap.empty) {
+        return snap.docs.map(d => ({ id: d.id, ...d.data() } as FacultyPortfolio));
+      }
+    } catch (e) {
+      console.warn("Firestore getFacultyPortfolios fallback:", e);
+    }
+  }
+  return getLocalData("hr_portfolios", MOCK_FACULTY_PORTFOLIOS);
+}
+
+export async function saveFacultyPortfolio(
+  portfolio: FacultyPortfolio,
+  actor?: UserProfile | null
+): Promise<FacultyPortfolio> {
+  const payload = {
+    ...portfolio,
+    updatedAt: new Date().toISOString()
+  };
+
+  if (isConfigured) {
+    try {
+      await setDoc(doc(db, "hr_portfolios", portfolio.id), {
+        ...payload,
+        timestamp: serverTimestamp()
+      }, { merge: true });
+      await logAuditEvent(actor || null, "SAVE_FACULTY_PORTFOLIO", "hr_portfolios", portfolio.id, { 
+        fullName: portfolio.fullName, 
+        department: portfolio.department 
+      });
+      return payload;
+    } catch (e) {
+      console.error("Firestore saveFacultyPortfolio failed:", e);
+      throw e;
+    }
+  }
+
+  const list = getLocalData<FacultyPortfolio>("hr_portfolios", MOCK_FACULTY_PORTFOLIOS);
+  const exists = list.some(p => p.id === portfolio.id);
+  const updated = exists ? list.map(p => p.id === portfolio.id ? payload : p) : [payload, ...list];
+  setLocalData("hr_portfolios", updated);
+  return payload;
+}
+
+// 7.4 Employment Contracts
+export async function getEmploymentContracts(): Promise<EmploymentContract[]> {
+  if (isConfigured) {
+    try {
+      const snap = await getDocs(collection(db, "hr_contracts"));
+      if (!snap.empty) {
+        return snap.docs.map(d => ({ id: d.id, ...d.data() } as EmploymentContract));
+      }
+    } catch (e) {
+      console.warn("Firestore getEmploymentContracts fallback:", e);
+    }
+  }
+  return getLocalData("hr_contracts", MOCK_EMPLOYMENT_CONTRACTS);
+}
+
+export async function createEmploymentContract(
+  data: Omit<EmploymentContract, "id" | "createdAt">,
+  actor?: UserProfile | null
+): Promise<EmploymentContract> {
+  const newContract: Omit<EmploymentContract, "id"> = {
+    ...data,
+    createdById: actor?.id,
+    createdAt: new Date().toISOString()
+  };
+
+  if (isConfigured) {
+    try {
+      const ref = await addDoc(collection(db, "hr_contracts"), {
+        ...newContract,
+        timestamp: serverTimestamp()
+      });
+      const created: EmploymentContract = { id: ref.id, ...newContract };
+      await logAuditEvent(actor || null, "CREATE_EMPLOYMENT_CONTRACT", "hr_contracts", ref.id, { 
+        contractNumber: data.contractNumber, 
+        employeeName: data.employeeName 
+      });
+      return created;
+    } catch (e) {
+      console.error("Firestore createEmploymentContract failed:", e);
+      throw e;
+    }
+  }
+
+  const list = getLocalData<EmploymentContract>("hr_contracts", MOCK_EMPLOYMENT_CONTRACTS);
+  const created: EmploymentContract = { id: `ct-${Date.now()}`, ...newContract };
+  setLocalData("hr_contracts", [created, ...list]);
+  return created;
+}
+
+export async function updateEmploymentContract(
+  id: string,
+  updates: Partial<EmploymentContract>,
+  actor?: UserProfile | null
+): Promise<void> {
+  const payload = {
+    ...updates,
+    updatedAt: new Date().toISOString()
+  };
+
+  if (isConfigured) {
+    try {
+      const docRef = doc(db, "hr_contracts", id);
+      await updateDoc(docRef, {
+        ...payload,
+        timestamp: serverTimestamp()
+      });
+      await logAuditEvent(actor || null, "UPDATE_EMPLOYMENT_CONTRACT", "hr_contracts", id, updates);
+      return;
+    } catch (e) {
+      console.error("Firestore updateEmploymentContract failed:", e);
+      throw e;
+    }
+  }
+
+  const list = getLocalData<EmploymentContract>("hr_contracts", MOCK_EMPLOYMENT_CONTRACTS);
+  const updated = list.map(item => item.id === id ? { ...item, ...payload } : item);
+  setLocalData("hr_contracts", updated);
 }
 
 // ==========================================

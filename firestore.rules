@@ -126,11 +126,29 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // 8. HR e-Leaves & Records
+    // 8. HR e-Leaves, Portfolios, Contracts & Quotas
     match /hr_leaves/{leaveId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated();
       allow update: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    match /hr_portfolios/{portfolioId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    match /hr_contracts/{contractId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    match /hr_quotas/{quotaId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
       allow delete: if isAdmin();
     }
 

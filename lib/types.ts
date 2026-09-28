@@ -490,22 +490,184 @@ export interface PurchaseRequisition {
   updatedAt?: string;
 }
 
-// 5. งานบุคคล
+// 5. งานบุคคลและบริหารทรัพยากรมนุษย์ (HR & e-Leave, Portfolio, Contracts)
 export interface LeaveRequest {
   id: string;
+  requestNumber?: string;      // เลขที่ใบลา เช่น ลพ. 001/2569, ลป. 001/2569
   staffName: string;
   staffId?: string;
   position: string;
   department: string;
+  employeeType?: "civil_servant" | "university_staff" | "contract_academic" | "temporary_employee"; // ประเภทบุคลากร
   leaveType: "vacation" | "sick" | "personal" | "duty"; // พักผ่อน, ป่วย, กิจ, ไปราชการ
   startDate: string;
   endDate: string;
+  isHalfDay?: boolean;
+  halfDayPeriod?: "morning" | "afternoon";
   totalDays: number;
   reason: string;
-  substitutePerson: string;  // ผู้ปฏิบัติหน้าที่แทน
+  substitutePerson: string;    // ผู้ปฏิบัติหน้าที่แทน
+  substitutePersonId?: string;
+  substituteStatus?: "pending" | "acknowledged" | "declined";
+  substituteComment?: string;
   contactAddress: string;
-  status: "draft" | "submitted" | "pending" | "approved" | "rejected" | "cancelled";
+  contactPhone?: string;
+  medicalCertificateUrl?: string; // ใบรับรองแพทย์ (กรณีลาป่วย >= 3 วัน หรือตามระเบียบ)
+  accumulatedDays: number;     // วันลาสะสมจากปีก่อน
+  currentYearQuota: number;    // สิทธิลาปีปัจจุบัน
+  usedDaysBefore: number;      // ลามาแล้วในปีนี้
+  remainingDaysAfter: number;  // วันลาคงเหลือหลังการลาครั้งนี้
+  status: "draft" | "submitted" | "substitute_acknowledged" | "verified" | "approved" | "rejected" | "cancelled";
+  verifiedByName?: string;
+  verifiedDate?: string;
+  approverName?: string;
+  approverPosition?: string;
+  approverComment?: string;
+  approvalDate?: string;
+  rejectionReason?: string;
+  cancelledAt?: string;
+  cancelledReason?: string;
   createdById?: string;
   createdAt: string;
+  updatedAt?: string;
+}
+
+export interface UserLeaveQuota {
+  id: string;
+  userId: string;
+  employeeId?: string;
+  staffName: string;
+  department: string;
+  position: string;
+  employeeType: "civil_servant" | "university_staff" | "contract_academic" | "temporary_employee";
+  fiscalYear: number;
+  vacationQuota: {
+    accumulated: number;       // สะสมจากปีก่อน
+    currentYear: number;       // สิทธิปีนี้ (ปกติ 10 วัน)
+    used: number;              // ใช้ไปแล้ว
+    remaining: number;         // คงเหลือ
+  };
+  personalQuota: {
+    currentYear: number;       // สิทธิปีนี้ (ปกติ 45 วัน)
+    used: number;
+    remaining: number;
+  };
+  sickQuota: {
+    currentYear: number;       // สิทธิปีนี้ (ปกติ 60 วัน)
+    used: number;
+    remaining: number;
+  };
+  dutyQuota: {
+    used: number;
+  };
+  updatedAt: string;
+}
+
+export interface FacultyPortfolioDegree {
+  level: "bachelor" | "master" | "doctoral" | "other";
+  degreeName: string;
+  fieldOfStudy: string;
+  institution: string;
+  country?: string;
+  yearGraduated: number;
+}
+
+export interface FacultyTeachingLoadItem {
+  term: string;                // เช่น 1/2568, 2/2568, 1/2569
+  academicYear: number;
+  courseCode: string;
+  courseName: string;
+  credits: string;             // 3(2-2-5)
+  hoursPerWeek: number;
+  program: "bachelor_regular" | "bachelor_gspch" | "graduate";
+  studentCount?: number;
+}
+
+export interface FacultyResearchPublication {
+  id: string;
+  title: string;
+  publicationYear: number;
+  journalName: string;
+  volume?: string;
+  issue?: string;
+  pages?: string;
+  indexing: "TCI_1" | "TCI_2" | "Scopus" | "WoS" | "National_Conf" | "International_Conf";
+  authorRole: "first_author" | "corresponding" | "co_author";
+  coAuthors?: string;
+  evidenceUrl?: string;
+}
+
+export interface FacultyAcademicService {
+  id: string;
+  title: string;
+  role: string;                // วิทยากร, กรรมการ, ผู้ทรงคุณวุฒิ, ที่ปรึกษา
+  organization: string;
+  serviceDate: string;
+  participantCount?: number;
+  evidenceUrl?: string;
+  projectCategory?: "kings_philosophy" | "local_development" | "academic_workshop" | "community_empowerment";
+}
+
+export interface FacultySARRecord {
+  academicYear: number;
+  sarStatus: "draft" | "submitted" | "verified" | "certified";
+  selfScore?: number;
+  evaluatorScore?: number;
+  comments?: string;
+  certifiedBy?: string;
+  certifiedDate?: string;
+}
+
+export interface FacultyPortfolio {
+  id: string;
+  userId?: string;
+  employeeId: string;
+  prefix?: string;
+  fullName: string;
+  academicRank: string;        // อาจารย์, ผู้ช่วยศาสตราจารย์, รองศาสตราจารย์, ศาสตราจารย์
+  department: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  contractType: string;        // พนักงานจ้างตามภารกิจ (ประเภทวิชาการ), พนักงานมหาวิทยาลัย, ข้าราชการ
+  degrees: FacultyPortfolioDegree[];
+  currentTeachingLoad: FacultyTeachingLoadItem[];
+  researchWorks: FacultyResearchPublication[];
+  academicServices: FacultyAcademicService[];
+  sarRecords: FacultySARRecord[];
+  evidenceFiles?: Array<{
+    name: string;
+    url: string;
+    category: string;
+    uploadedAt: string;
+  }>;
+  createdById?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface EmploymentContract {
+  id: string;
+  contractNumber: string;      // เลขที่สัญญา เช่น สจ. 012/2568
+  employeeName: string;
+  employeeId?: string;
+  position: string;
+  department: string;
+  contractCategory: "academic_mission" | "general_mission" | "university_staff" | "temporary_employee"; // ประเภทสัญญา
+  startDate: string;           // วันเริ่มสัญญา
+  endDate: string;             // วันสิ้นสุดสัญญา
+  salary: number;              // อัตราเงินเดือน / ค่าตอบแทน
+  signatoryFirst: string;      // ผู้ว่าจ้าง (อธิการบดี / คณบดีผู้รับมอบอำนาจ)
+  signatorySecond: string;     // ผู้รับจ้าง
+  signedDocumentUrl?: string;  // แนบไฟล์สัญญาลงนาม (.pdf)
+  status: "active" | "expiring_soon" | "renewed" | "terminated";
+  renewalHistory?: Array<{
+    renewalDate: string;
+    newEndDate: string;
+    contractNumber: string;
+    approvedBy?: string;
+    remarks?: string;
+  }>;
+  createdById?: string;
+  createdAt?: string;
   updatedAt?: string;
 }
