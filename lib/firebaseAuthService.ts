@@ -11,40 +11,70 @@ import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "./firebase";
 import { UserProfile, UserRole } from "./types";
 
-// 1. Sign In with Email & Password
-export async function loginWithEmail(email: string, pass: string): Promise<UserProfile> {
-  const userCredential = await signInWithEmailAndPassword(auth, email, pass);
-  const user = userCredential.user;
-  
-  // Fetch user profile from Firestore
-  const userDocRef = doc(db, "users", user.uid);
-  const userDoc = await getDoc(userDocRef);
-
-  if (userDoc.exists()) {
-    return userDoc.data() as UserProfile;
+// Helper to normalize username (e.g. "tonpalm03" -> "tonpalm03@cpru.ac.th")
+export function normalizeUserEmail(input: string): string {
+  const trimmed = input.trim();
+  if (trimmed.includes("@")) {
+    return trimmed;
   }
+  return `${trimmed}@cpru.ac.th`;
+}
 
-  // Fallback default profile if not yet created in Firestore
-  const defaultProfile: UserProfile = {
-    id: user.uid,
-    name: user.displayName || email.split("@")[0],
-    email: user.email || email,
-    role: "admin",
-    roleTitle: "เจ้าหน้าที่ธุรการและสารบรรณ",
-    department: "สำนักงานคณบดี คณะศิลปศาสตร์และวิทยาศาสตร์"
-  };
-  await setDoc(userDocRef, { ...defaultProfile, createdAt: serverTimestamp() });
-  return defaultProfile;
+// 1. Sign In (Supports both username e.g. "tonpalm03" and email e.g. "tonpalm03@cpru.ac.th")
+export async function loginWithEmail(identifier: string, pass: string): Promise<UserProfile> {
+  const email = normalizeUserEmail(identifier);
+  
+  try {
+    const userCredential = await signInWithEmailAndPassword(auth, email, pass);
+    const user = userCredential.user;
+    
+    // Fetch user profile from Firestore
+    const userDocRef = doc(db, "users", user.uid);
+    const userDoc = await getDoc(userDocRef);
+
+    if (userDoc.exists()) {
+      return userDoc.data() as UserProfile;
+    }
+
+    // Default profile if first time
+    const defaultProfile: UserProfile = {
+      id: user.uid,
+      name: identifier === "tonpalm03" ? "ผู้ดูแลระบบ (แอดมินธุรการ)" : user.displayName || identifier,
+      email: user.email || email,
+      role: "admin",
+      roleTitle: "แอดมิน / เจ้าหน้าที่ธุรการและสารบรรณ",
+      department: "สำนักงานคณบดี คณะศิลปศาสตร์และวิทยาศาสตร์"
+    };
+    await setDoc(userDocRef, { ...defaultProfile, createdAt: serverTimestamp() });
+    return defaultProfile;
+  } catch (err: any) {
+    // If user is tonpalm03 and doesn't exist yet, auto-register seamless admin
+    if (identifier.toLowerCase() === "tonpalm03" && pass === "palm2334" && (err.code === "auth/invalid-credential" || err.code === "auth/user-not-found")) {
+      try {
+        return await registerWithEmail(
+          "ผู้ดูแลระบบ (แอดมินธุรการ)",
+          email,
+          pass,
+          "admin",
+          "สำนักงานคณบดี คณะศิลปศาสตร์และวิทยาศาสตร์"
+        );
+      } catch (regErr) {
+        console.warn("Auto admin create:", regErr);
+      }
+    }
+    throw err;
+  }
 }
 
 // 2. Register New User with Role
 export async function registerWithEmail(
   name: string, 
-  email: string, 
+  identifier: string, 
   pass: string, 
   role: UserRole, 
   department: string
 ): Promise<UserProfile> {
+  const email = normalizeUserEmail(identifier);
   const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
   const user = userCredential.user;
 

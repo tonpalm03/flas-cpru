@@ -70,15 +70,15 @@ export default function FacultyPortalDashboard() {
         <div className="space-y-1.5">
           <div className="flex items-center gap-2">
             <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-900">
-              {currentUser.department}
+              {currentUser?.department || "สำนักงานคณบดี คณะศิลปศาสตร์และวิทยาศาสตร์"}
             </span>
             <span className="text-xs text-slate-400">• ปีงบประมาณ 2569</span>
           </div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-            สวัสดี, {currentUser.name}
+            สวัสดี, {currentUser?.name || "ผู้ใช้งานระบบ"}
           </h1>
           <p className="text-sm text-slate-600">
-            {currentUser.roleTitle} — ยินดีต้อนรับสู่ระบบบริหารจัดการคณะแบบครบวงจร
+            {currentUser?.roleTitle || "บุคลากรคณะ"} — ยินดีต้อนรับสู่ระบบบริหารจัดการคณะแบบครบวงจร
           </p>
         </div>
 

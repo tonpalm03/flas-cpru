@@ -4,20 +4,22 @@ import React, { useState } from "react";
 import { 
   Search, 
   Bell, 
-  UserCheck, 
   ChevronDown, 
-  ShieldCheck, 
   Calendar,
+  LogOut,
+  User,
   Building2,
-  Check
+  Mail
 } from "lucide-react";
 import { useRole } from "./RoleContext";
 import { UserRole } from "@/lib/types";
 
 export default function Navbar() {
-  const { currentUser, switchRole, allUsers } = useRole();
-  const [showRoleDropdown, setShowRoleDropdown] = useState(false);
+  const { currentUser, logout } = useRole();
+  const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+
+  if (!currentUser) return null;
 
   const getRoleBadge = (role: UserRole) => {
     switch (role) {
@@ -29,6 +31,8 @@ export default function Navbar() {
         return { label: "อาจารย์", style: "bg-slate-100 text-slate-800 border-slate-300" };
       case "gov_officer":
         return { label: "พนักงานราชการ", style: "bg-slate-100 text-slate-800 border-slate-300" };
+      default:
+        return { label: "บุคลากร", style: "bg-slate-100 text-slate-800 border-slate-300" };
     }
   };
 
@@ -49,7 +53,7 @@ export default function Navbar() {
       </div>
 
       {/* Right Controls */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3">
         {/* Fiscal Year Badge */}
         <div className="hidden md:flex items-center gap-1.5 px-3 py-1 bg-slate-50 border border-slate-200 rounded-full text-xs font-medium text-slate-700">
           <Calendar className="w-3.5 h-3.5 text-blue-700" />
@@ -91,11 +95,11 @@ export default function Navbar() {
           )}
         </div>
 
-        {/* Role Switcher (แอดมิน, คณบดี, อาจารย์, พนักงานราชการ) */}
+        {/* User Profile Button (No Role Switcher - Pure Real Profile & Logout) */}
         <div className="relative">
           <button
             type="button"
-            onClick={() => setShowRoleDropdown(!showRoleDropdown)}
+            onClick={() => setShowProfileDropdown(!showProfileDropdown)}
             className="flex items-center gap-2.5 pl-2 pr-3 py-1.5 rounded-xl border border-slate-200 hover:border-blue-300 hover:bg-slate-50 transition-all text-left"
           >
             <div className="w-8 h-8 rounded-lg bg-blue-900 text-white flex items-center justify-center font-semibold text-xs shadow-sm">
@@ -117,52 +121,27 @@ export default function Navbar() {
             <ChevronDown className="w-3.5 h-3.5 text-slate-400 ml-1" />
           </button>
 
-          {/* Role Selection Menu */}
-          {showRoleDropdown && (
-            <div className="absolute right-0 mt-2 w-72 bg-white border border-slate-200 rounded-xl shadow-float p-2 z-50 animate-in fade-in zoom-in-95">
-              <div className="px-3 py-2 border-b border-slate-100 mb-1">
-                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                  สลับบทบาทผู้ใช้งาน (RBAC)
-                </p>
-                <p className="text-[10px] text-slate-400">
-                  เลือกบทบาทเพื่อทดสอบสิทธิ์และหน้าจอของแต่ละฝ่าย
-                </p>
+          {/* Profile Dropdown */}
+          {showProfileDropdown && (
+            <div className="absolute right-0 mt-2 w-64 bg-white border border-slate-200 rounded-xl shadow-float p-3 z-50 animate-in fade-in zoom-in-95 space-y-3">
+              <div className="pb-2 border-b border-slate-100">
+                <p className="text-xs font-bold text-slate-900">{currentUser.name}</p>
+                <p className="text-[11px] text-slate-500">{currentUser.roleTitle}</p>
+                <p className="text-[10px] text-slate-400 mt-1">{currentUser.email}</p>
               </div>
 
-              <div className="space-y-1">
-                {allUsers.map((user) => {
-                  const isSelected = currentUser.id === user.id;
-                  const badge = getRoleBadge(user.role);
-                  return (
-                    <button
-                      key={user.id}
-                      type="button"
-                      onClick={() => {
-                        switchRole(user.role);
-                        setShowRoleDropdown(false);
-                      }}
-                      className={`w-full text-left px-3 py-2 rounded-lg text-xs flex items-center justify-between transition-colors ${
-                        isSelected
-                          ? "bg-blue-50 text-blue-900 font-semibold"
-                          : "hover:bg-slate-50 text-slate-700"
-                      }`}
-                    >
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-medium truncate">{user.name}</span>
-                        </div>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className={`text-[9px] px-1.5 py-0.2 rounded border ${badge.style}`}>
-                            {badge.label}
-                          </span>
-                          <span className="text-[10px] text-slate-400 truncate">{user.department}</span>
-                        </div>
-                      </div>
-                      {isSelected && <Check className="w-4 h-4 text-blue-900 flex-shrink-0" />}
-                    </button>
-                  );
-                })}
-              </div>
+              {/* Logout Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  setShowProfileDropdown(false);
+                  logout();
+                }}
+                className="w-full text-left px-3 py-2 rounded-lg text-xs text-rose-700 hover:bg-rose-50 flex items-center gap-2 font-semibold transition-colors"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>ออกจากระบบ</span>
+              </button>
             </div>
           )}
         </div>

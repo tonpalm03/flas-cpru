@@ -1,34 +1,72 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { useRouter, usePathname } from "next/navigation";
 import { UserProfile, UserRole } from "@/lib/types";
 import { MOCK_USERS } from "@/lib/mockData";
+import { logoutUser } from "@/lib/firebaseAuthService";
 
 export type ViewMode = "admin_only" | "full_suite";
 
 interface RoleContextType {
-  currentUser: UserProfile;
-  setCurrentUser: (user: UserProfile) => void;
+  currentUser: UserProfile | null;
+  setCurrentUser: (user: UserProfile | null) => void;
   switchRole: (role: UserRole) => void;
   allUsers: UserProfile[];
   viewMode: ViewMode;
   setViewMode: (mode: ViewMode) => void;
   toggleViewMode: () => void;
+  logout: () => Promise<void>;
+  isLoggedIn: boolean;
+  isLoading: boolean;
 }
 
 const RoleContext = createContext<RoleContextType | undefined>(undefined);
 
 export function RoleProvider({ children }: { children: React.ReactNode }) {
-  // Default to Admin / ธุรการ
-  const [currentUser, setCurrentUser] = useState<UserProfile>(MOCK_USERS[0]);
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const [currentUser, setCurrentUserState] = useState<UserProfile | null>(null);
   const [viewMode, setViewModeState] = useState<ViewMode>("full_suite");
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    // Check local session
+    const savedUser = localStorage.getItem("faculty_erp_current_user");
     const savedMode = localStorage.getItem("faculty_erp_view_mode") as ViewMode;
+
     if (savedMode) {
       setViewModeState(savedMode);
     }
+
+    if (savedUser) {
+      try {
+        setCurrentUserState(JSON.parse(savedUser));
+      } catch {
+        localStorage.removeItem("faculty_erp_current_user");
+      }
+    }
+    setIsLoading(false);
   }, []);
+
+  // Auth Guard: If not logged in and not on /login page, redirect to /login
+  useEffect(() => {
+    if (!isLoading) {
+      if (!currentUser && pathname !== "/login") {
+        router.replace("/login");
+      }
+    }
+  }, [currentUser, pathname, isLoading, router]);
+
+  const setCurrentUser = (user: UserProfile | null) => {
+    setCurrentUserState(user);
+    if (user) {
+      localStorage.setItem("faculty_erp_current_user", JSON.stringify(user));
+    } else {
+      localStorage.removeItem("faculty_erp_current_user");
+    }
+  };
 
   const setViewMode = (mode: ViewMode) => {
     setViewModeState(mode);
@@ -47,6 +85,12 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const logout = async () => {
+    await logoutUser();
+    setCurrentUser(null);
+    router.replace("/login");
+  };
+
   return (
     <RoleContext.Provider
       value={{
@@ -57,6 +101,9 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
         viewMode,
         setViewMode,
         toggleViewMode,
+        logout,
+        isLoggedIn: Boolean(currentUser),
+        isLoading,
       }}
     >
       {children}
