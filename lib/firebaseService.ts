@@ -44,7 +44,8 @@ import {
   MOCK_BUDGET_ITEMS,
   MOCK_LEDGER_TRANSACTIONS,
   MOCK_LOANS,
-  MOCK_DISBURSEMENTS
+  MOCK_DISBURSEMENTS,
+  MOCK_PURCHASE_REQ
 } from "./mockData";
 import { getNextAtomicNumber } from "./numberingService";
 import { logAuditEvent } from "./auditService";
@@ -731,7 +732,7 @@ export async function createProjectReport(
 }
 
 // ==========================================
-// 5. PROCUREMENT (ใบขอซื้อ/ขอจ้าง พัสดุ)
+// 5. PROCUREMENT (ใบขอซื้อ/ขอจ้าง พัสดุ และการตรวจรับ)
 // ==========================================
 export async function getProcurementPRs(): Promise<PurchaseRequisition[]> {
   if (isConfigured) {
@@ -744,7 +745,7 @@ export async function getProcurementPRs(): Promise<PurchaseRequisition[]> {
       console.warn("Firestore getProcurementPRs fallback:", e);
     }
   }
-  return getLocalData("procurement_prs", []);
+  return getLocalData("procurement_prs", MOCK_PURCHASE_REQ);
 }
 
 export async function createProcurementPR(
@@ -767,7 +768,12 @@ export async function createProcurementPR(
         timestamp: serverTimestamp()
       });
       const created: PurchaseRequisition = { id: ref.id, ...newPR };
-      await logAuditEvent(actor || null, "CREATE_PR", "procurement", ref.id, { prNumber, projectName: data.projectName, grandTotal: data.netTotalAmount });
+      await logAuditEvent(actor || null, "CREATE_PR", "procurement", ref.id, { 
+        prNumber, 
+        projectName: data.projectName, 
+        grandTotal: data.netTotalAmount,
+        procurementType: data.procurementType
+      });
       return created;
     } catch (e) {
       console.error("Firestore createProcurementPR failed:", e);
@@ -775,10 +781,50 @@ export async function createProcurementPR(
     }
   }
 
-  const list = getLocalData<PurchaseRequisition>("procurement_prs", []);
+  const list = getLocalData<PurchaseRequisition>("procurement_prs", MOCK_PURCHASE_REQ);
   const created: PurchaseRequisition = { id: `pr-${Date.now()}`, ...newPR };
   setLocalData("procurement_prs", [created, ...list]);
   return created;
+}
+
+export async function updateProcurementPRStatus(
+  id: string,
+  status: PurchaseRequisition["status"],
+  extraData?: Partial<PurchaseRequisition>,
+  actor?: UserProfile | null
+) {
+  if (isConfigured) {
+    try {
+      const docRef = doc(db, "procurement", id);
+      await updateDoc(docRef, {
+        status,
+        ...(extraData && extraData),
+        updatedAt: serverTimestamp()
+      });
+      await logAuditEvent(actor || null, "UPDATE_PR_STATUS", "procurement", id, { status, ...extraData });
+      return;
+    } catch (e) {
+      console.error("Firestore updateProcurementPRStatus failed:", e);
+      throw e;
+    }
+  }
+
+  const list = getLocalData<PurchaseRequisition>("procurement_prs", MOCK_PURCHASE_REQ);
+  const updated = list.map(item => item.id === id ? { ...item, status, ...(extraData && extraData), updatedAt: new Date().toISOString() } : item);
+  setLocalData("procurement_prs", updated);
+}
+
+export async function inspectProcurementPR(
+  id: string,
+  inspection: {
+    inspectionDate: string;
+    inspectionResult: "passed" | "failed";
+    inspectionRemarks?: string;
+  },
+  actor?: UserProfile | null
+) {
+  const newStatus: PurchaseRequisition["status"] = inspection.inspectionResult === "passed" ? "inspected" : "purchasing";
+  return updateProcurementPRStatus(id, newStatus, inspection, actor);
 }
 
 // ==========================================

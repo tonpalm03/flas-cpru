@@ -446,17 +446,37 @@ export interface TeachingDisbursement {
 export interface PurchaseRequisition {
   id: string;
   prNumber: string;          // ขอซื้อ-ขอจ้าง เลขที่ เช่น พด. 008/2569
+  procurementType: "purchase" | "hire"; // ขอซื้อ / ขอจ้าง
+  itemCategory: "materials" | "equipment" | "service"; // วัสดุ / ครุภัณฑ์ / จ้างเหมา
   projectName: string;       // เพื่อใช้ในโครงการ/งาน
   projectId?: string;
+  projectCode?: string;
+  activityName?: string;
   requesterName: string;     // ผู้ขอซื้อ
+  requesterPosition?: string;
   requesterId?: string;
   department: string;
   requestDate: string;
-  budgetSource: string;      // งบรายได้คณะ / งบยุทธศาสตร์
+  requiredDeliveryDate: string; // วันที่ต้องการใช้พัสดุ (ยื่นล่วงหน้า 10 วันทำการ)
+  budgetSource: "faculty_revenue" | "national_budget" | "external";
+  reason?: string;           // เหตุผลและความจำเป็น
+  supplierName?: string;     // บริษัท/ร้านค้าผู้เสนอราคา
+  quotationNumber?: string;
+  quotationDate?: string;
+  quotationUrl?: string;
+  vatRate: number;           // 0 หรือ 7%
   totalAmountBeforeTax: number;
   vatAmount: number;
   netTotalAmount: number;
-  status: "draft" | "submitted" | "pending_director" | "procurement_processing" | "delivered" | "inspected" | "cancelled";
+  committeeMembers?: Array<{
+    name: string;
+    position: string;
+    role: "president" | "member" | "secretary";
+  }>;
+  status: "draft" | "submitted" | "budget_verified" | "approved" | "purchasing" | "delivered" | "inspected" | "sent_to_finance" | "cancelled";
+  inspectionDate?: string;
+  inspectionResult?: "passed" | "failed";
+  inspectionRemarks?: string;
   items: Array<{
     itemNumber: number;
     description: string;

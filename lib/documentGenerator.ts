@@ -623,13 +623,24 @@ export function exportTableToExcel(data: Record<string, any>[], filename: string
   XLSX.writeFile(wb, `${filename}.xlsx`);
 }
 
-// 4. Export Purchase Requisition to Excel (.xlsx)
+// 4. Export Purchase Requisition to Excel (.xlsx) with Full Header & Committee Metadata
 export function exportPurchaseRequisitionExcel(pr: {
   prNumber: string;
+  procurementType?: string;
+  itemCategory?: string;
   projectName: string;
+  projectCode?: string;
   requesterName: string;
+  requesterPosition?: string;
   department: string;
   requestDate: string;
+  requiredDeliveryDate?: string;
+  budgetSource?: string;
+  reason?: string;
+  supplierName?: string;
+  quotationNumber?: string;
+  vatRate?: number;
+  committeeMembers?: Array<{ name: string; position: string; role: string }>;
   items: Array<{
     itemNumber: number;
     description: string;
@@ -639,6 +650,16 @@ export function exportPurchaseRequisitionExcel(pr: {
     totalPrice: number;
   }>;
 }) {
+  const metadataRows: Record<string, any>[] = [
+    { "ลำดับ": "แบบขอซื้อ / ขอจ้าง", "รายการพัสดุ / รายละเอียด": "คณะศิลปศาสตร์และวิทยาศาสตร์ มหาวิทยาลัยราชภัฏชัยภูมิ" },
+    { "ลำดับ": "เลขที่เอกสาร", "รายการพัสดุ / รายละเอียด": pr.prNumber, "จำนวน": "วันที่", "หน่วยนับ": pr.requestDate },
+    { "ลำดับ": "ผู้ขอซื้อ/จ้าง", "รายการพัสดุ / รายละเอียด": `${pr.requesterName} (${pr.requesterPosition || "อาจารย์ประจำสาขาวิชา"})`, "จำนวน": "สาขาวิชา", "หน่วยนับ": pr.department },
+    { "ลำดับ": "เพื่อใช้ในโครงการ", "รายการพัสดุ / รายละเอียด": `${pr.projectName} ${pr.projectCode ? `[${pr.projectCode}]` : ""}` },
+    { "ลำดับ": "แหล่งงบประมาณ", "รายการพัสดุ / รายละเอียด": pr.budgetSource === "national_budget" ? "งบประมาณแผ่นดิน" : pr.budgetSource === "faculty_revenue" ? "งบประมาณเงินรายได้คณะ" : "งบประมาณโครงการ" },
+    { "ลำดับ": "กำหนดส่งมอบ", "รายการพัสดุ / รายละเอียด": pr.requiredDeliveryDate || "ภายใน 15 วันทำการ", "จำนวน": "ผู้เสนอราคา", "หน่วยนับ": pr.supplierName || "-" },
+    { "ลำดับ": "---", "รายการพัสดุ / รายละเอียด": "----------------------------------------------------" }
+  ];
+
   const formattedItems: Record<string, any>[] = pr.items.map(item => ({
     "ลำดับ": item.itemNumber,
     "รายการพัสดุ / รายละเอียด": item.description,
@@ -649,36 +670,254 @@ export function exportPurchaseRequisitionExcel(pr: {
   }));
 
   const totalBeforeVat = pr.items.reduce((sum, item) => sum + item.totalPrice, 0);
-  const vat = totalBeforeVat * 0.07;
+  const vatRatePercent = pr.vatRate !== undefined ? pr.vatRate : 7;
+  const vat = Math.round(totalBeforeVat * (vatRatePercent / 100));
   const netTotal = totalBeforeVat + vat;
 
-  formattedItems.push({
-    "ลำดับ": "",
-    "รายการพัสดุ / รายละเอียด": "รวมเป็นเงินทั้งสิ้น (ก่อนภาษีมูลค่าเพิ่ม)",
-    "จำนวน": 0,
-    "หน่วยนับ": "",
-    "ราคาต่อหน่วย (บาท)": 0,
-    "จำนวนเงิน (บาท)": totalBeforeVat
-  });
-  formattedItems.push({
-    "ลำดับ": "",
-    "รายการพัสดุ / รายละเอียด": "ภาษีมูลค่าเพิ่ม 7%",
-    "จำนวน": 0,
-    "หน่วยนับ": "",
-    "ราคาต่อหน่วย (บาท)": 0,
-    "จำนวนเงิน (บาท)": vat
-  });
-  formattedItems.push({
-    "ลำดับ": "",
-    "รายการพัสดุ / รายละเอียด": "ยอดเงินรวมสุทธิ",
-    "จำนวน": 0,
-    "หน่วยนับ": "",
-    "ราคาต่อหน่วย (บาท)": 0,
-    "จำนวนเงิน (บาท)": netTotal
+  const summaryRows: Record<string, any>[] = [
+    {
+      "ลำดับ": "",
+      "รายการพัสดุ / รายละเอียด": "รวมเป็นเงินทั้งสิ้น (ก่อนภาษีมูลค่าเพิ่ม)",
+      "จำนวน": "",
+      "หน่วยนับ": "",
+      "ราคาต่อหน่วย (บาท)": "",
+      "จำนวนเงิน (บาท)": totalBeforeVat
+    },
+    {
+      "ลำดับ": "",
+      "รายการพัสดุ / รายละเอียด": `ภาษีมูลค่าเพิ่ม (${vatRatePercent}%)`,
+      "จำนวน": "",
+      "หน่วยนับ": "",
+      "ราคาต่อหน่วย (บาท)": "",
+      "จำนวนเงิน (บาท)": vat
+    },
+    {
+      "ลำดับ": "",
+      "รายการพัสดุ / รายละเอียด": "ยอดเงินรวมสุทธิทั้งสิ้น",
+      "จำนวน": "",
+      "หน่วยนับ": "",
+      "ราคาต่อหน่วย (บาท)": "",
+      "จำนวนเงิน (บาท)": netTotal
+    }
+  ];
+
+  const committeeRows: Record<string, any>[] = (pr.committeeMembers && pr.committeeMembers.length > 0) ? [
+    { "ลำดับ": "---", "รายการพัสดุ / รายละเอียด": "คณะกรรมการตรวจรับพัสดุ" },
+    ...pr.committeeMembers.map((c, i) => ({
+      "ลำดับ": i + 1,
+      "รายการพัสดุ / รายละเอียด": `${c.name} (${c.position})`,
+      "จำนวน": c.role === "president" ? "ประธานกรรมการ" : c.role === "secretary" ? "กรรมการและเลขานุการ" : "กรรมการ"
+    }))
+  ] : [];
+
+  const allRows = [...metadataRows, ...formattedItems, ...summaryRows, ...committeeRows];
+  exportTableToExcel(allRows, `ใบขอซื้อขอจ้าง_${pr.prNumber.replace('/', '-')}`, "รายการขอซื้อขอจ้าง");
+}
+
+// 4.1 Export Purchase Requisition to Word (.docx)
+export async function exportPurchaseRequisitionToWord(pr: {
+  prNumber: string;
+  procurementType?: string;
+  itemCategory?: string;
+  projectName: string;
+  projectCode?: string;
+  requesterName: string;
+  requesterPosition?: string;
+  department: string;
+  requestDate: string;
+  requiredDeliveryDate?: string;
+  budgetSource?: string;
+  reason?: string;
+  supplierName?: string;
+  quotationNumber?: string;
+  vatRate?: number;
+  committeeMembers?: Array<{ name: string; position: string; role: string }>;
+  items: Array<{
+    itemNumber: number;
+    description: string;
+    quantity: number;
+    unit: string;
+    unitPrice: number;
+    totalPrice: number;
+  }>;
+}) {
+  const totalBeforeVat = pr.items.reduce((sum, item) => sum + item.totalPrice, 0);
+  const vatRatePercent = pr.vatRate !== undefined ? pr.vatRate : 7;
+  const vat = Math.round(totalBeforeVat * (vatRatePercent / 100));
+  const netTotal = totalBeforeVat + vat;
+
+  const itemsTable = new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    rows: [
+      new TableRow({
+        children: ["ลำดับ", "รายการพัสดุ / รายละเอียดคุณลักษณะ", "จำนวน", "หน่วย", "ราคา/หน่วย (บาท)", "จำนวนเงิน (บาท)"].map(h => (
+          new TableCell({
+            children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: h, bold: true, size: 24, font: "TH Sarabun PSK" })] })]
+          })
+        ))
+      }),
+      ...pr.items.map(item => (
+        new TableRow({
+          children: [
+            new TableCell({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: item.itemNumber.toString(), size: 24, font: "TH Sarabun PSK" })] })] }),
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: item.description, size: 24, font: "TH Sarabun PSK" })] })] }),
+            new TableCell({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: item.quantity.toString(), size: 24, font: "TH Sarabun PSK" })] })] }),
+            new TableCell({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: item.unit, size: 24, font: "TH Sarabun PSK" })] })] }),
+            new TableCell({ children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: item.unitPrice.toLocaleString(), size: 24, font: "TH Sarabun PSK" })] })] }),
+            new TableCell({ children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: item.totalPrice.toLocaleString(), size: 24, font: "TH Sarabun PSK" })] })] })
+          ]
+        })
+      )),
+      new TableRow({
+        children: [
+          new TableCell({ children: [new Paragraph({ text: "" })] }),
+          new TableCell({ children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: "รวมเป็นเงินทั้งสิ้น (ก่อนภาษีมูลค่าเพิ่ม)", bold: true, size: 24, font: "TH Sarabun PSK" })] })] }),
+          new TableCell({ children: [new Paragraph({ text: "" })] }),
+          new TableCell({ children: [new Paragraph({ text: "" })] }),
+          new TableCell({ children: [new Paragraph({ text: "" })] }),
+          new TableCell({ children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: totalBeforeVat.toLocaleString(), bold: true, size: 24, font: "TH Sarabun PSK" })] })] })
+        ]
+      }),
+      new TableRow({
+        children: [
+          new TableCell({ children: [new Paragraph({ text: "" })] }),
+          new TableCell({ children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: `ภาษีมูลค่าเพิ่ม (${vatRatePercent}%)`, bold: true, size: 24, font: "TH Sarabun PSK" })] })] }),
+          new TableCell({ children: [new Paragraph({ text: "" })] }),
+          new TableCell({ children: [new Paragraph({ text: "" })] }),
+          new TableCell({ children: [new Paragraph({ text: "" })] }),
+          new TableCell({ children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: vat.toLocaleString(), size: 24, font: "TH Sarabun PSK" })] })] })
+        ]
+      }),
+      new TableRow({
+        children: [
+          new TableCell({ children: [new Paragraph({ text: "" })] }),
+          new TableCell({ children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: "ยอดเงินรวมสุทธิทั้งสิ้น", bold: true, size: 24, font: "TH Sarabun PSK" })] })] }),
+          new TableCell({ children: [new Paragraph({ text: "" })] }),
+          new TableCell({ children: [new Paragraph({ text: "" })] }),
+          new TableCell({ children: [new Paragraph({ text: "" })] }),
+          new TableCell({ children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: `${netTotal.toLocaleString()} บาท`, bold: true, size: 24, font: "TH Sarabun PSK" })] })] })
+        ]
+      })
+    ]
   });
 
-  exportTableToExcel(formattedItems, `ใบขอซื้อขอจ้าง_${pr.prNumber.replace('/', '-')}`, "รายการขอซื้อขอจ้าง");
+  const doc = new Document({
+    sections: [
+      {
+        children: [
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [
+              new TextRun({
+                text: pr.procurementType === "hire" ? "แบบขอจ้าง (จัดซื้อจัดจ้างภาครัฐ)" : "แบบขอซื้อ (จัดซื้อจัดจ้างภาครัฐ)",
+                bold: true,
+                size: 36,
+                font: "TH Sarabun PSK",
+              }),
+            ],
+          }),
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [
+              new TextRun({
+                text: "คณะศิลปศาสตร์และวิทยาศาสตร์ มหาวิทยาลัยราชภัฏชัยภูมิ",
+                bold: true,
+                size: 32,
+                font: "TH Sarabun PSK",
+              }),
+            ],
+          }),
+          new Paragraph({ text: "" }),
+
+          new Paragraph({
+            alignment: AlignmentType.RIGHT,
+            children: [
+              new TextRun({ text: `เลขที่: `, bold: true, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `${pr.prNumber}  `, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `วันที่: `, bold: true, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `${pr.requestDate}`, size: 30, font: "TH Sarabun PSK" }),
+            ],
+          }),
+
+          new Paragraph({
+            indent: { firstLine: 720 },
+            children: [
+              new TextRun({ text: `เรียน คณบดีคณะศิลปศาสตร์และวิทยาศาสตร์\n`, bold: true, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `ข้าพเจ้า `, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `${pr.requesterName} `, bold: true, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `ตำแหน่ง `, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `${pr.requesterPosition || "อาจารย์ประจำสาขาวิชา"} `, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `สังกัด `, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `${pr.department} `, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `มีความประสงค์ขออนุมัติ${pr.procurementType === "hire" ? "จ้าง" : "ซื้อ"}พัสดุเพื่อใช้ในการดำเนินงาน: `, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `${pr.projectName} `, bold: true, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `โดยเบิกจ่ายจาก: `, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `${pr.budgetSource === "national_budget" ? "งบประมาณแผ่นดิน" : "งบประมาณเงินรายได้คณะ"} `, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `เหตุผลและความจำเป็น: ${pr.reason || "เพื่อใช้ในการจัดการเรียนการสอนและโครงการของคณะ"} โดยมีความประสงค์จะใช้พัสดุภายในวันที่ ${pr.requiredDeliveryDate || "ตามที่กำหนด"}`, size: 30, font: "TH Sarabun PSK" }),
+            ],
+          }),
+
+          new Paragraph({ text: "" }),
+          itemsTable,
+          new Paragraph({ text: "" }),
+
+          ...(pr.committeeMembers && pr.committeeMembers.length > 0 ? [
+            new Paragraph({
+              children: [
+                new TextRun({ text: "ขอเสนอแต่งตั้งคณะกรรมการตรวจรับพัสดุ ดังรายนามต่อไปนี้:", bold: true, size: 30, font: "TH Sarabun PSK" }),
+              ]
+            }),
+            ...pr.committeeMembers.map((c, i) => new Paragraph({
+              indent: { firstLine: 720 },
+              children: [
+                new TextRun({ text: `${i + 1}. ${c.name}  ตำแหน่ง ${c.position}  (${c.role === "president" ? "ประธานกรรมการ" : c.role === "secretary" ? "กรรมการและเลขานุการ" : "กรรมการ"})`, size: 30, font: "TH Sarabun PSK" })
+              ]
+            })),
+            new Paragraph({ text: "" })
+          ] : []),
+
+          new Paragraph({
+            indent: { firstLine: 720 },
+            children: [
+              new TextRun({ text: "จึงเรียนมาเพื่อโปรดพิจารณาอนุมัติ", size: 30, font: "TH Sarabun PSK" }),
+            ],
+          }),
+
+          new Paragraph({ text: "" }),
+          new Paragraph({ text: "" }),
+
+          new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            rows: [
+              new TableRow({
+                children: [
+                  new TableCell({
+                    children: [
+                      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "(ลงชื่อ)........................................................\n", size: 28, font: "TH Sarabun PSK" })] }),
+                      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: `(${pr.requesterName})\n`, size: 28, font: "TH Sarabun PSK" })] }),
+                      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "ผู้ขอซื้อ/ขอจ้าง", size: 28, font: "TH Sarabun PSK" })] })
+                    ]
+                  }),
+                  new TableCell({
+                    children: [
+                      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "(ลงชื่อ)........................................................\n", size: 28, font: "TH Sarabun PSK" })] }),
+                      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "(ผู้ช่วยศาสตราจารย์ ดร.สานนท์ ด่านภักดี)\n", size: 28, font: "TH Sarabun PSK" })] }),
+                      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "คณบดีคณะศิลปศาสตร์และวิทยาศาสตร์", size: 28, font: "TH Sarabun PSK" })] })
+                    ]
+                  })
+                ]
+              })
+            ]
+          })
+        ],
+      },
+    ],
+  });
+
+  const blob = await Packer.toBlob(doc);
+  downloadBlob(blob, `ใบขอซื้อขอจ้าง_${pr.prNumber.replace('/', '-')}.docx`);
 }
+
 
 // 5. Export Loan Contract (Form 8500 สัญญาการยืมเงิน ฉบับ มรภ.ชัยภูมิ 2569) to Word (.docx)
 export async function exportLoanContractToWord(loan: {
