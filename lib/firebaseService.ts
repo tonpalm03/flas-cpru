@@ -36,6 +36,10 @@ import {
   UserLeaveQuota,
   FacultyPortfolio,
   EmploymentContract,
+  StrategicPlan,
+  StrategicKPI,
+  AppNotification,
+  UserRole,
   MasterSystemConfig,
   UserProfile
 } from "./types";
@@ -52,7 +56,9 @@ import {
   MOCK_LEAVE_REQUESTS,
   MOCK_USER_QUOTAS,
   MOCK_FACULTY_PORTFOLIOS,
-  MOCK_EMPLOYMENT_CONTRACTS
+  MOCK_EMPLOYMENT_CONTRACTS,
+  MOCK_STRATEGIC_PLAN,
+  MOCK_NOTIFICATIONS
 } from "./mockData";
 import { getNextAtomicNumber } from "./numberingService";
 import { logAuditEvent } from "./auditService";
@@ -1574,4 +1580,123 @@ export async function uploadDocumentFile(
     }
   }
   return URL.createObjectURL(file);
+}
+
+// ==========================================
+// 10. STRATEGIC PLANS & KPIS (แผนยุทธศาสตร์คณะ)
+// ==========================================
+export async function getStrategicPlan(fiscalYear: number = 2569): Promise<StrategicPlan> {
+  if (isConfigured) {
+    try {
+      const snap = await getDoc(doc(db, "strategic_plans", `plan-${fiscalYear}`));
+      if (snap.exists()) {
+        return snap.data() as StrategicPlan;
+      }
+    } catch (e) {
+      console.warn("Firestore getStrategicPlan fallback:", e);
+    }
+  }
+
+  const local = getLocalData<StrategicPlan>("strategic_plans", [MOCK_STRATEGIC_PLAN]);
+  const found = local.find(p => p.fiscalYear === fiscalYear);
+  return found || MOCK_STRATEGIC_PLAN;
+}
+
+export async function saveStrategicPlan(
+  plan: StrategicPlan,
+  actor?: UserProfile | null
+): Promise<void> {
+  const payload = {
+    ...plan,
+    updatedAt: new Date().toISOString(),
+    updatedBy: actor?.name || "ผู้บริหารคณะ"
+  };
+
+  if (isConfigured) {
+    try {
+      await setDoc(doc(db, "strategic_plans", plan.id || `plan-${plan.fiscalYear}`), {
+        ...payload,
+        timestamp: serverTimestamp()
+      }, { merge: true });
+      await logAuditEvent(actor || null, "SAVE_STRATEGIC_PLAN", "strategic_plans", plan.id, { fiscalYear: plan.fiscalYear, planTitle: plan.planTitle });
+      return;
+    } catch (e) {
+      console.error("Firestore saveStrategicPlan failed:", e);
+      throw e;
+    }
+  }
+
+  const list = getLocalData<StrategicPlan>("strategic_plans", [MOCK_STRATEGIC_PLAN]);
+  const exists = list.some(p => p.id === plan.id);
+  const updated = exists ? list.map(p => p.id === plan.id ? payload : p) : [payload, ...list];
+  setLocalData("strategic_plans", updated);
+}
+
+// ==========================================
+// 11. SYSTEM NOTIFICATIONS (ระบบแจ้งเตือนส่วนกลาง)
+// ==========================================
+export async function getAppNotifications(userId?: string, userRole?: UserRole): Promise<AppNotification[]> {
+  if (isConfigured) {
+    try {
+      const snap = await getDocs(query(collection(db, "notifications"), orderBy("createdAt", "desc")));
+      if (!snap.empty) {
+        return snap.docs.map(d => ({ id: d.id, ...d.data() } as AppNotification));
+      }
+    } catch (e) {
+      console.warn("Firestore getAppNotifications fallback:", e);
+    }
+  }
+
+  return getLocalData<AppNotification>("notifications", MOCK_NOTIFICATIONS);
+}
+
+export async function createAppNotification(
+  data: Omit<AppNotification, "id" | "createdAt" | "read">
+): Promise<AppNotification> {
+  const newNotif: Omit<AppNotification, "id"> = {
+    ...data,
+    read: false,
+    createdAt: new Date().toISOString()
+  };
+
+  if (isConfigured) {
+    try {
+      const ref = await addDoc(collection(db, "notifications"), {
+        ...newNotif,
+        timestamp: serverTimestamp()
+      });
+      return { id: ref.id, ...newNotif };
+    } catch (e) {
+      console.error("Firestore createAppNotification error:", e);
+    }
+  }
+
+  const list = getLocalData<AppNotification>("notifications", MOCK_NOTIFICATIONS);
+  const created: AppNotification = { id: `notif-${Date.now()}`, ...newNotif };
+  setLocalData("notifications", [created, ...list]);
+  return created;
+}
+
+export async function markNotificationAsRead(id: string): Promise<void> {
+  if (isConfigured) {
+    try {
+      await updateDoc(doc(db, "notifications", id), {
+        read: true,
+        updatedAt: serverTimestamp()
+      });
+      return;
+    } catch (e) {
+      console.warn("Firestore markNotificationAsRead fallback:", e);
+    }
+  }
+
+  const list = getLocalData<AppNotification>("notifications", MOCK_NOTIFICATIONS);
+  const updated = list.map(n => n.id === id ? { ...n, read: true } : n);
+  setLocalData("notifications", updated);
+}
+
+export async function markAllNotificationsAsRead(userId?: string): Promise<void> {
+  const list = getLocalData<AppNotification>("notifications", MOCK_NOTIFICATIONS);
+  const updated = list.map(n => ({ ...n, read: true }));
+  setLocalData("notifications", updated);
 }

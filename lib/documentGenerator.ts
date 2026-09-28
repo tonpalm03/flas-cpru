@@ -4,7 +4,7 @@ import { Document, Paragraph, TextRun, HeadingLevel, AlignmentType, Table, Table
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { LeaveRequest, FacultyPortfolio, EmploymentContract } from "./types";
+import { LeaveRequest, FacultyPortfolio, EmploymentContract, StrategicPlan } from "./types";
 
 // Helper to trigger browser download of a Blob
 export function downloadBlob(blob: Blob, filename: string) {
@@ -1598,7 +1598,125 @@ export async function exportEmploymentContractToWord(contract: EmploymentContrac
   downloadBlob(blob, `สัญญาจ้าง_${contract.contractNumber.replace(/[\/\s]/g, "_")}.docx`);
 }
 
-// 10. Generate Print-Ready PDF
+// 10. Export Strategic Plan & KPIs to Word (.docx)
+export async function exportStrategicPlanToWord(plan: StrategicPlan) {
+  const pillarSections: (Paragraph | Table)[] = [];
+
+  plan.pillars.forEach((pillar) => {
+    pillarSections.push(
+      new Paragraph({
+        children: [
+          new TextRun({ 
+            text: `ประเด็นยุทธศาสตร์ที่ ${pillar.pillarNumber} : ${pillar.name} (ค่าน้ำหนัก ${pillar.weight}%)`, 
+            bold: true, 
+            size: 30, 
+            font: "TH Sarabun PSK" 
+          }),
+        ],
+      }),
+      new Paragraph({
+        indent: { firstLine: 720 },
+        children: [
+          new TextRun({ text: `คำอธิบาย: ${pillar.description}`, size: 28, font: "TH Sarabun PSK" }),
+        ],
+      }),
+      new Paragraph({ text: "" })
+    );
+
+    // Build KPI Table for this pillar
+    const kpiTable = new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      rows: [
+        new TableRow({
+          children: ["รหัส", "ชื่อตัวชี้วัด (KPI / OKR)", "หน่วยนับ", "เป้าหมาย", "ผลจริง", "ร้อยละ", "ผู้รับผิดชอบ"].map(h => (
+            new TableCell({
+              children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: h, bold: true, size: 24, font: "TH Sarabun PSK" })] })]
+            })
+          ))
+        }),
+        ...pillar.kpis.map(kpi => (
+          new TableRow({
+            children: [
+              new TableCell({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: kpi.code, size: 24, font: "TH Sarabun PSK" })] })] }),
+              new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: kpi.name, size: 24, font: "TH Sarabun PSK" })] })] }),
+              new TableCell({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: kpi.unit, size: 24, font: "TH Sarabun PSK" })] })] }),
+              new TableCell({ children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: kpi.targetValue.toLocaleString(), size: 24, font: "TH Sarabun PSK" })] })] }),
+              new TableCell({ children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: kpi.hasData ? kpi.actualValue.toLocaleString() : "ยังไม่มีข้อมูล", size: 24, font: "TH Sarabun PSK" })] })] }),
+              new TableCell({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: kpi.hasData ? `${kpi.progressPercent}%` : "-", bold: true, size: 24, font: "TH Sarabun PSK" })] })] }),
+              new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: `${kpi.responsiblePerson} (${kpi.responsibleDepartment})`, size: 24, font: "TH Sarabun PSK" })] })] })
+            ]
+          })
+        ))
+      ]
+    });
+
+    pillarSections.push(kpiTable, new Paragraph({ text: "" }));
+  });
+
+  const doc = new Document({
+    sections: [
+      {
+        children: [
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [
+              new TextRun({ text: plan.planTitle, bold: true, size: 36, font: "TH Sarabun PSK" }),
+            ],
+          }),
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [
+              new TextRun({ text: `${plan.facultyName} ${plan.universityName}`, bold: true, size: 30, font: "TH Sarabun PSK" }),
+            ],
+          }),
+          new Paragraph({ text: "" }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: "วิสัยทัศน์ (Vision): ", bold: true, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: plan.vision, size: 30, font: "TH Sarabun PSK" }),
+            ],
+          }),
+          new Paragraph({ text: "" }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: "พันธกิจ (Missions):", bold: true, size: 30, font: "TH Sarabun PSK" }),
+            ],
+          }),
+          ...plan.missions.map((m, i) => (
+            new Paragraph({
+              indent: { firstLine: 720 },
+              children: [
+                new TextRun({ text: `${i + 1}. ${m}`, size: 30, font: "TH Sarabun PSK" }),
+              ]
+            })
+          )),
+          new Paragraph({ text: "" }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: "ประเด็นยุทธศาสตร์ เป้าประสงค์ และตัวชี้วัดความสำเร็จ:", bold: true, size: 30, font: "TH Sarabun PSK" }),
+            ],
+          }),
+          new Paragraph({ text: "" }),
+          ...pillarSections,
+          new Paragraph({ text: "" }),
+          new Paragraph({
+            alignment: AlignmentType.RIGHT,
+            children: [
+              new TextRun({ text: `(ลงชื่อ)........................................................\n`, size: 28, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `(ผู้ช่วยศาสตราจารย์ ดร.สานนท์ ด่านภักดี)\n`, size: 28, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `คณบดีคณะศิลปศาสตร์และวิทยาศาสตร์`, size: 28, font: "TH Sarabun PSK" }),
+            ],
+          })
+        ],
+      },
+    ],
+  });
+
+  const blob = await Packer.toBlob(doc);
+  downloadBlob(blob, `แผนยุทธศาสตร์_${plan.fiscalYear}.docx`);
+}
+
+// 11. Generate Print-Ready PDF
 export function printDocumentView() {
   if (typeof window !== "undefined") {
     window.print();

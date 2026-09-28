@@ -671,3 +671,79 @@ export interface EmploymentContract {
   createdAt?: string;
   updatedAt?: string;
 }
+
+// 6. แผนยุทธศาสตร์และตัวชี้วัด (Strategic Plan, OKRs & KPIs)
+export interface StrategicKPI {
+  id: string;
+  code: string;                // รหัสตัวชี้วัด เช่น KPI-1.1.1, KPI-3.1.2
+  name: string;                // ชื่อตัวชี้วัด
+  pillarId: string;            // อ้างอิงประเด็นยุทธศาสตร์ที่ 1-4 หรือ ศาสตร์พระราชา
+  pillarNumber: number;
+  goalId?: string;             // อ้างอิงเป้าประสงค์
+  unit: string;                // หน่วยนับ เช่น ร้อยละ, โครงการ, คน, ชุมชน, ระบบ
+  targetValue: number;         // ค่าเป้าหมาย
+  actualValue: number;         // ผลการดำเนินงานจริง
+  hasData: boolean;            // มีข้อมูลผลการดำเนินงานแล้วหรือไม่ (แยกกรณีไม่มีข้อมูลออกจาก 0)
+  progressPercent: number;     // ร้อยละความสำเร็จ (คำนวณ: min(100, (actual / target) * 100))
+  weight: number;              // ค่าน้ำหนัก (%)
+  calculationFormula?: string; // สูตรการคำนวณ
+  reportingPeriod: "quarterly" | "biannual" | "annual"; // รอบการรายงาน
+  quarterProgress?: {
+    q1?: number;
+    q2?: number;
+    q3?: number;
+    q4?: number;
+  };
+  responsibleDepartment: string; // หน่วยงานผู้รับผิดชอบ
+  responsiblePerson: string;     // ผู้รับผิดชอบหลัก
+  linkedProjectIds?: string[];   // รหัสโครงการที่เกี่ยวข้อง
+  evidenceUrl?: string;          // ลิงก์เอกสารหลักฐาน / SAR
+  status: "not_started" | "in_progress" | "achieved" | "exceeded";
+}
+
+export interface StrategicGoal {
+  id: string;
+  goalNumber: string;          // เช่น 1.1, 2.1, 3.1
+  name: string;                // ชื่อเป้าประสงค์
+  description?: string;
+}
+
+export interface StrategicPillar {
+  id: string;
+  pillarNumber: number;        // 1, 2, 3, 4, 5
+  code: string;                // SO1, SO2, SO3, SO4, SO-KP
+  name: string;                // ประเด็นยุทธศาสตร์
+  description: string;
+  weight: number;              // ค่าน้ำหนักรวมของยุทธศาสตร์ (%) เช่น 25%
+  goals: StrategicGoal[];
+  kpis: StrategicKPI[];
+  calculatedProgress?: number; // ความก้าวหน้าถ่วงน้ำหนัก (%)
+}
+
+export interface StrategicPlan {
+  id: string;
+  fiscalYear: number;          // 2569
+  planTitle: string;           // แผนปฏิบัติราชการประจำปีงบประมาณ พ.ศ. 2569
+  facultyName: string;
+  universityName: string;
+  vision: string;              // วิสัยทัศน์
+  missions: string[];          // พันธกิจ
+  pillars: StrategicPillar[];
+  totalOverallProgress?: number; // ร้อยละความก้าวหน้ารวมทั้งคณะ
+  status: "draft" | "active" | "archived";
+  updatedAt: string;
+  updatedBy?: string;
+}
+
+// 7. ระบบแจ้งเตือนส่วนกลาง (System Notifications)
+export interface AppNotification {
+  id: string;
+  userId?: string;             // ผู้รับเฉพาะบุคคล หรือ null สำหรับทุกคน
+  targetRole?: UserRole | "all";
+  title: string;
+  message: string;
+  category: "admin" | "project" | "finance" | "procurement" | "hr" | "plan";
+  linkHref?: string;
+  read: boolean;
+  createdAt: string;
+}

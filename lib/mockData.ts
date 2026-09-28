@@ -12,7 +12,11 @@ import {
   TeachingDisbursement,
   UserLeaveQuota,
   FacultyPortfolio,
-  EmploymentContract
+  EmploymentContract,
+  StrategicPlan,
+  StrategicPillar,
+  StrategicKPI,
+  AppNotification
 } from "./types";
 
 export const MOCK_USERS: UserProfile[] = [
@@ -843,5 +847,297 @@ export const MOCK_ROOMS: RoomBooking[] = [
     purpose: "อบรมเชิงปฏิบัติการเตรียมความพร้อมสหกิจศึกษา",
     status: "approved",
     createdAt: "2026-09-28T00:00:00Z"
+  }
+];
+
+export const MOCK_STRATEGIC_PLAN: StrategicPlan = {
+  id: "plan-2569",
+  fiscalYear: 2569,
+  planTitle: "แผนปฏิบัติราชการประจำปีงบประมาณ พ.ศ. 2569",
+  facultyName: "คณะศิลปศาสตร์และวิทยาศาสตร์",
+  universityName: "มหาวิทยาลัยราชภัฏชัยภูมิ",
+  vision: "คณะชั้นนำในการจัดการศึกษาและบูรณาการศาสตร์ เพื่อการพัฒนาท้องถิ่นอย่างยั่งยืนด้วยนวัตกรรมและเทคโนโลยีดิจิทัล",
+  missions: [
+    "ผลิตบัณฑิตที่มีสมรรถนะวิชาชีพและทักษะแห่งศตวรรษที่ 21 ตอบสนองความต้องการของท้องถิ่นและประเทศ",
+    "สร้างสรรค์งานวิจัยและนวัตกรรมเพื่อการพัฒนาเศรษฐกิจฐานรากตามแนวทางศาสตร์พระราชา",
+    "ให้บริการวิชาการและถ่ายทอดเทคโนโลยีเพื่อเสริมสร้างความเข้มแข็งของชุมชนและสังคม",
+    "พัฒนาระบบบริหารจัดการองค์กรด้วยหลักธรรมาภิบาลและเทคโนโลยีดิจิทัลสู่ความเป็นเลิศ"
+  ],
+  pillars: [
+    {
+      id: "pillar-1",
+      pillarNumber: 1,
+      code: "SO1",
+      name: "การพัฒนาท้องถิ่นและสร้างความเข้มแข็งของชุมชน (ศาสตร์พระราชา)",
+      description: "ยกระดับคุณภาพชีวิต ชุมชนเข้มแข็ง และสร้างมูลค่าเพิ่มแก่ผลผลิตทางการเกษตรและภูมิปัญญาท้องถิ่นในจังหวัดชัยภูมิ",
+      weight: 25,
+      goals: [
+        {
+          id: "goal-1.1",
+          goalNumber: "1.1",
+          name: "ยกระดับเศรษฐกิจฐานรากและส่งเสริมการพึ่งพาตนเองของชุมชนเป้าหมาย"
+        }
+      ],
+      kpis: [
+        {
+          id: "kpi-1.1.1",
+          code: "KPI-1.1.1",
+          pillarId: "pillar-1",
+          pillarNumber: 1,
+          goalId: "goal-1.1",
+          name: "จำนวนกลุ่มวิสาหกิจชุมชน/ท้องถิ่นที่ได้รับการถ่ายทอดองค์ความรู้และนวัตกรรม",
+          unit: "กลุ่ม",
+          targetValue: 5,
+          actualValue: 4,
+          hasData: true,
+          progressPercent: 80,
+          weight: 15,
+          calculationFormula: "(ผลจริง / เป้าหมาย) * 100",
+          reportingPeriod: "quarterly",
+          quarterProgress: { q1: 1, q2: 2, q3: 1, q4: 0 },
+          responsibleDepartment: "สาขาวิชาวิศวกรรมการผลิตและระบบอัตโนมัติ",
+          responsiblePerson: "ดร.สุรชัย นวัตกร",
+          linkedProjectIds: ["69-FLAS-003"],
+          evidenceUrl: "https://example.com/sar_kpi_1_1_1.pdf",
+          status: "in_progress"
+        },
+        {
+          id: "kpi-1.1.2",
+          code: "KPI-1.1.2",
+          pillarId: "pillar-1",
+          pillarNumber: 1,
+          goalId: "goal-1.1",
+          name: "ร้อยละของกลุ่มเป้าหมายในชุมชนที่มีรายได้หรือผลผลิตเพิ่มขึ้นหลังเข้าร่วมโครงการ",
+          unit: "ร้อยละ",
+          targetValue: 80,
+          actualValue: 85,
+          hasData: true,
+          progressPercent: 100,
+          weight: 10,
+          calculationFormula: "(กลุ่มที่มีรายได้เพิ่ม / กลุ่มเป้าหมายทั้งหมด) * 100",
+          reportingPeriod: "annual",
+          quarterProgress: { q3: 85 },
+          responsibleDepartment: "สาขาวิชาวิศวกรรมการผลิตและระบบอัตโนมัติ",
+          responsiblePerson: "ดร.สุรชัย นวัตกร",
+          linkedProjectIds: ["69-FLAS-003"],
+          status: "achieved"
+        }
+      ]
+    },
+    {
+      id: "pillar-2",
+      pillarNumber: 2,
+      code: "SO2",
+      name: "การผลิตและพัฒนาครูและบุคลากรทางการศึกษา/วิชาการ",
+      description: "ส่งเสริมและพัฒนาศักยภาพอาจารย์ บุคลากรสายสนับสนุน และอาจารย์ผู้สอนสู่มาตรฐานวิชาชีพชั้นสูง",
+      weight: 25,
+      goals: [
+        {
+          id: "goal-2.1",
+          goalNumber: "2.1",
+          name: "พัฒนาสมรรถนะอาจารย์และบุคลากรให้มีผลงานวิจัยและการตีพิมพ์ในระดับชาติและนานาชาติ"
+        }
+      ],
+      kpis: [
+        {
+          id: "kpi-2.1.1",
+          code: "KPI-2.1.1",
+          pillarId: "pillar-2",
+          pillarNumber: 2,
+          goalId: "goal-2.1",
+          name: "ร้อยละของคณาจารย์ที่มีผลงานวิจัยตีพิมพ์ในวารสารวิชาการระดับ TCI หรือ Scopus",
+          unit: "ร้อยละ",
+          targetValue: 60,
+          actualValue: 55,
+          hasData: true,
+          progressPercent: 91.6,
+          weight: 15,
+          calculationFormula: "(จำนวนอาจารย์ที่ตีพิมพ์ / อาจารย์ทั้งหมด) * 100",
+          reportingPeriod: "biannual",
+          quarterProgress: { q2: 40, q4: 55 },
+          responsibleDepartment: "งานวิจัยและบริการวิชาการ",
+          responsiblePerson: "ผศ.ดร. นฤมล อนันตโชค",
+          evidenceUrl: "https://example.com/research_summary_2569.pdf",
+          status: "in_progress"
+        },
+        {
+          id: "kpi-2.1.2",
+          code: "KPI-2.1.2",
+          pillarId: "pillar-2",
+          pillarNumber: 2,
+          goalId: "goal-2.1",
+          name: "จำนวนคณาจารย์ที่ได้รับการพัฒนาทักษะดิจิทัลและ AI เพื่อการจัดการเรียนรู้",
+          unit: "คน",
+          targetValue: 35,
+          actualValue: 38,
+          hasData: true,
+          progressPercent: 100,
+          weight: 10,
+          calculationFormula: "(ผลจริง / เป้าหมาย) * 100",
+          reportingPeriod: "annual",
+          quarterProgress: { q2: 20, q3: 18 },
+          responsibleDepartment: "งานบริหารงานบุคคล",
+          responsiblePerson: "นางสาวมณีรัตน์ การเงิน",
+          status: "exceeded"
+        }
+      ]
+    },
+    {
+      id: "pillar-3",
+      pillarNumber: 3,
+      code: "SO3",
+      name: "การยกระดับคุณภาพการศึกษาและการเรียนรู้ตลอดชีวิต",
+      description: "พัฒนาหลักสูตรที่ทันสมัย บัณฑิตมีทักษะศตวรรษที่ 21 และมีงานทำตรงตามความต้องการของตลาดแรงงาน",
+      weight: 25,
+      goals: [
+        {
+          id: "goal-3.1",
+          goalNumber: "3.1",
+          name: "ยกระดับคุณภาพหลักสูตรและการมีงานทำของบัณฑิต"
+        }
+      ],
+      kpis: [
+        {
+          id: "kpi-3.1.1",
+          code: "KPI-3.1.1",
+          pillarId: "pillar-3",
+          pillarNumber: 3,
+          goalId: "goal-3.1",
+          name: "ร้อยละของบัณฑิตที่มีงานทำหรือประกอบอาชีพอิสระภายใน 1 ปีหลังสำเร็จการศึกษา",
+          unit: "ร้อยละ",
+          targetValue: 85,
+          actualValue: 82,
+          hasData: true,
+          progressPercent: 96.4,
+          weight: 15,
+          calculationFormula: "(บัณฑิตมีงานทำ / บัณฑิตที่ตอบแบบสำรวจ) * 100",
+          reportingPeriod: "annual",
+          quarterProgress: { q3: 82 },
+          responsibleDepartment: "งานบริการการศึกษาและพัฒนานักศึกษา",
+          responsiblePerson: "อ.สมบัติ วิชาการ",
+          linkedProjectIds: ["69-FLAS-001", "69-FLAS-002"],
+          status: "in_progress"
+        },
+        {
+          id: "kpi-3.1.2",
+          code: "KPI-3.1.2",
+          pillarId: "pillar-3",
+          pillarNumber: 3,
+          goalId: "goal-3.1",
+          name: "จำนวนหลักสูตรที่ผ่านการประเมินคุณภาพการศึกษาระดับหลักสูตรตามเกณฑ์ AUN-QA",
+          unit: "หลักสูตร",
+          targetValue: 4,
+          actualValue: 4,
+          hasData: true,
+          progressPercent: 100,
+          weight: 10,
+          calculationFormula: "(ผลจริง / เป้าหมาย) * 100",
+          reportingPeriod: "annual",
+          quarterProgress: { q4: 4 },
+          responsibleDepartment: "งานประกันคุณภาพการศึกษา",
+          responsiblePerson: "ผศ.ดร. นฤมล อนันตโชค",
+          status: "achieved"
+        }
+      ]
+    },
+    {
+      id: "pillar-4",
+      pillarNumber: 4,
+      code: "SO4",
+      name: "การพัฒนาระบบบริหารจัดการองค์กรสู่ความเป็นเลิศ (FLAS Digital ERP)",
+      description: "พัฒนาระบบดิจิทัลเพื่อการบริหารจัดการคณะครบ 6 โมดูล และส่งเสริมธรรมาภิบาลในการปฏิบัติงาน",
+      weight: 25,
+      goals: [
+        {
+          id: "goal-4.1",
+          goalNumber: "4.1",
+          name: "พัฒนาระบบเทคโนโลยีดิจิทัลและสารสนเทศเพื่อการบริหารงานคณะให้มีประสิทธิภาพ"
+        }
+      ],
+      kpis: [
+        {
+          id: "kpi-4.1.1",
+          code: "KPI-4.1.1",
+          pillarId: "pillar-4",
+          pillarNumber: 4,
+          goalId: "goal-4.1",
+          name: "ร้อยละความสำเร็จของการนำระบบ FLAS ERP 6 โมดูลมาใช้ในการปฏิบัติงานจริงของคณะ",
+          unit: "ร้อยละ",
+          targetValue: 100,
+          actualValue: 90,
+          hasData: true,
+          progressPercent: 90,
+          weight: 15,
+          calculationFormula: "(โมดูลที่เปิดใช้จริง / 6 โมดูล) * 100",
+          reportingPeriod: "quarterly",
+          quarterProgress: { q1: 50, q2: 75, q3: 90 },
+          responsibleDepartment: "สำนักงานคณบดี",
+          responsiblePerson: "นายสมเกียรติ วงศ์สารบรรณ",
+          evidenceUrl: "https://flas-cpru.web.app",
+          status: "in_progress"
+        },
+        {
+          id: "kpi-4.1.2",
+          code: "KPI-4.1.2",
+          pillarId: "pillar-4",
+          pillarNumber: 4,
+          goalId: "goal-4.1",
+          name: "ระดับความพึงพอใจของบุคลากรและนักศึกษาต่อระบบการบริหารจัดการคณะ",
+          unit: "ระดับคะแนน",
+          targetValue: 4.5,
+          actualValue: 4.62,
+          hasData: true,
+          progressPercent: 100,
+          weight: 10,
+          calculationFormula: "(ผลคะแนนเฉลี่ย / 5.00) * 100",
+          reportingPeriod: "annual",
+          quarterProgress: { q4: 4.62 },
+          responsibleDepartment: "งานประกันคุณภาพและยุทธศาสตร์",
+          responsiblePerson: "ผศ.ดร. นฤมล อนันตโชค",
+          status: "exceeded"
+        }
+      ]
+    }
+  ],
+  status: "active",
+  updatedAt: "2026-09-28T00:00:00Z"
+};
+
+export const MOCK_NOTIFICATIONS: AppNotification[] = [
+  {
+    id: "notif-01",
+    title: "หนังสือรับใหม่: ชี้แจงโครงการยุทธศาสตร์ 2569",
+    message: "กองนโยบายและแผน ส่งหนังสือรับเลขที่ 015/2569 เรื่อง แนวทางการจัดสรรงบประมาณยุทธศาสตร์",
+    category: "admin",
+    linkHref: "/admin/inbound",
+    read: false,
+    createdAt: new Date(Date.now() - 15 * 60 * 1000).toISOString()
+  },
+  {
+    id: "notif-02",
+    title: "สัญญายืมเงิน ยม. 01/2569 ได้รับอนุมัติและพร้อมจ่ายเงิน",
+    message: "ฝ่ายการเงินอนุมัติสัญญายืมเงินเพื่อจัดโครงการเตรียมความพร้อมราชการ จำนวน 35,000 บาท",
+    category: "finance",
+    linkHref: "/finance/loans",
+    read: false,
+    createdAt: new Date(Date.now() - 2 * 3600 * 1000).toISOString()
+  },
+  {
+    id: "notif-03",
+    title: "คำขอซื้อ-ขอจ้าง พด. 01/2569 ผ่านการอนุมัติงบประมาณ",
+    message: "งานพัสดุและจัดซื้อดำเนินการสั่งซื้อวัสดุประกอบการจัดอบรมเรียบร้อยแล้ว รอนัดหมายตรวจรับ",
+    category: "procurement",
+    linkHref: "/procurement",
+    read: true,
+    createdAt: new Date(Date.now() - 24 * 3600 * 1000).toISOString()
+  },
+  {
+    id: "notif-04",
+    title: "ใบลาพักผ่อน ลพ. 001/2569 ได้รับการอนุมัติแล้ว",
+    message: "คณบดีอนุมัติคำขอลาพักผ่อนของ อ.ฤทธิชัย ภาระวิเศษ วันที่ 5-7 ต.ค. 2569",
+    category: "hr",
+    linkHref: "/hr",
+    read: true,
+    createdAt: new Date(Date.now() - 48 * 3600 * 1000).toISOString()
   }
 ];

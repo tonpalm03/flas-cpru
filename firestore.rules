@@ -173,10 +173,15 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    match /admin_checklists/{checkId} {
+    // 12. Strategic Plans & KPIs
+    match /strategic_plans/{planId} {
       allow read: if isAuthenticated();
-      allow create, update: if isAuthenticated();
-      allow delete: if isAdmin();
+      allow create, update, delete: if isAdmin() || isDean();
+    }
+
+    // 13. System Notifications
+    match /notifications/{notifId} {
+      allow read, write: if isAuthenticated();
     }
 
     // 10. Audit Logs (Immutable append-only)
