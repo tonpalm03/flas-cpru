@@ -680,9 +680,306 @@ export function exportPurchaseRequisitionExcel(pr: {
   exportTableToExcel(formattedItems, `ใบขอซื้อขอจ้าง_${pr.prNumber.replace('/', '-')}`, "รายการขอซื้อขอจ้าง");
 }
 
-// 5. Generate Print-Ready PDF
+// 5. Export Loan Contract (Form 8500 สัญญาการยืมเงิน ฉบับ มรภ.ชัยภูมิ 2569) to Word (.docx)
+export async function exportLoanContractToWord(loan: {
+  contractNumber: string;
+  borrowerName: string;
+  position: string;
+  department: string;
+  purpose: string;
+  amount: number;
+  bahtText?: string;
+  borrowDate: string;
+  settleDueDate: string;
+  approverName?: string;
+  approverPosition?: string;
+  estimatedExpenses?: Array<{ category: string; description: string; amount: number }>;
+  settlements?: Array<{ settleDate: string; cashAmount: number; voucherAmount: number; receiptNumber?: string; remainingBalance: number }>;
+}) {
+  const expenseTable = (loan.estimatedExpenses && loan.estimatedExpenses.length > 0) ? [
+    new Paragraph({ text: "" }),
+    new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      rows: [
+        new TableRow({
+          children: ["ลำดับ", "หมวดรายจ่าย / รายละเอียดประมาณการ", "จำนวนเงิน (บาท)"].map(h => (
+            new TableCell({
+              children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: h, bold: true, size: 26, font: "TH Sarabun PSK" })] })]
+            })
+          ))
+        }),
+        ...loan.estimatedExpenses.map((exp, idx) => (
+          new TableRow({
+            children: [
+              new TableCell({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: (idx + 1).toString(), size: 26, font: "TH Sarabun PSK" })] })] }),
+              new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: `[${exp.category}] ${exp.description}`, size: 26, font: "TH Sarabun PSK" })] })] }),
+              new TableCell({ children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: exp.amount.toLocaleString(), size: 26, font: "TH Sarabun PSK" })] })] })
+            ]
+          })
+        )),
+        new TableRow({
+          children: [
+            new TableCell({ children: [new Paragraph({ text: "" })] }),
+            new TableCell({ children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: "รวมเป็นเงินยืมทั้งสิ้น", bold: true, size: 26, font: "TH Sarabun PSK" })] })] }),
+            new TableCell({ children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: `${loan.amount.toLocaleString()} บาท`, bold: true, size: 26, font: "TH Sarabun PSK" })] })] })
+          ]
+        })
+      ]
+    }),
+    new Paragraph({ text: "" })
+  ] : [];
+
+  const doc = new Document({
+    sections: [
+      {
+        children: [
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [
+              new TextRun({
+                text: "สัญญาการยืมเงิน (แบบ 8500)",
+                bold: true,
+                size: 36,
+                font: "TH Sarabun PSK",
+              }),
+            ],
+          }),
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [
+              new TextRun({
+                text: "คณะศิลปศาสตร์และวิทยาศาสตร์ มหาวิทยาลัยราชภัฏชัยภูมิ",
+                bold: true,
+                size: 32,
+                font: "TH Sarabun PSK",
+              }),
+            ],
+          }),
+          new Paragraph({ text: "" }),
+
+          new Paragraph({
+            alignment: AlignmentType.RIGHT,
+            children: [
+              new TextRun({ text: `สัญญาเลขที่: `, bold: true, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `${loan.contractNumber}\n`, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `วันที่ทำสัญญา: `, bold: true, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `${loan.borrowDate}`, size: 30, font: "TH Sarabun PSK" }),
+            ],
+          }),
+          new Paragraph({ text: "" }),
+
+          new Paragraph({
+            indent: { firstLine: 720 },
+            children: [
+              new TextRun({ text: `ข้าพเจ้า `, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `${loan.borrowerName} `, bold: true, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `ตำแหน่ง `, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `${loan.position} `, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `สังกัด `, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `${loan.department} `, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `มีความประสงค์ขอยืมเงินจากมหาวิทยาลัยราชภัฏชัยภูมิ เพื่อนำไปใช้จ่ายในการดำเนินงาน: `, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `${loan.purpose} `, bold: true, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `รวมเป็นจำนวนเงินทั้งสิ้น `, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `${loan.amount.toLocaleString()} บาท `, bold: true, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `(${loan.bahtText || "บาทถ้วน"})`, size: 30, font: "TH Sarabun PSK" }),
+            ],
+          }),
+
+          new Paragraph({
+            indent: { firstLine: 720 },
+            children: [
+              new TextRun({ text: `โดยมีรายละเอียดประมาณการค่าใช้จ่ายดังรายการต่อไปนี้:`, size: 30, font: "TH Sarabun PSK" }),
+            ],
+          }),
+
+          ...expenseTable,
+
+          new Paragraph({
+            indent: { firstLine: 720 },
+            children: [
+              new TextRun({ text: `ข้าพเจ้าสัญญาว่าจะปฏิบัติตามระเบียบของทางราชการทุกประการ และจะนำใบสำคัญคู่จ่ายพร้อมเงินสดที่เหลือ (ถ้ามี) มาส่งใช้คืนตามสัญญานี้ให้เสร็จสิ้นภายในวันที่ `, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `${loan.settleDueDate} `, bold: true, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `(ภายใน 30 วันนับแต่วันที่ได้รับเงินยืม) หากข้าพเจ้าไม่ส่งใช้คืนตามกำหนด ยินยอมให้หักเงินเดือนหรือเงินอื่นใดที่ข้าพเจ้าพึงได้รับจากทางราชการชดใช้เงินยืมนี้จนครบถ้วน`, size: 30, font: "TH Sarabun PSK" }),
+            ],
+          }),
+
+          new Paragraph({ text: "" }),
+          new Paragraph({ text: "" }),
+
+          // Signatures Block
+          new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            rows: [
+              new TableRow({
+                children: [
+                  new TableCell({
+                    children: [
+                      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "(ลงชื่อ)........................................................\n", size: 28, font: "TH Sarabun PSK" })] }),
+                      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: `(${loan.borrowerName})\n`, size: 28, font: "TH Sarabun PSK" })] }),
+                      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "ผู้ยืมเงิน", size: 28, font: "TH Sarabun PSK" })] })
+                    ]
+                  }),
+                  new TableCell({
+                    children: [
+                      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "(ลงชื่อ)........................................................\n", size: 28, font: "TH Sarabun PSK" })] }),
+                      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: `(${loan.approverName || "ผู้ช่วยศาสตราจารย์ ดร.สานนท์ ด่านภักดี"})\n`, size: 28, font: "TH Sarabun PSK" })] }),
+                      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: `${loan.approverPosition || "คณบดีคณะศิลปศาสตร์และวิทยาศาสตร์"}`, size: 28, font: "TH Sarabun PSK" })] })
+                    ]
+                  })
+                ]
+              })
+            ]
+          })
+        ],
+      },
+    ],
+  });
+
+  const blob = await Packer.toBlob(doc);
+  downloadBlob(blob, `สัญญายืมเงิน_${loan.contractNumber.replace('/', '-')}.docx`);
+}
+
+// 6. Export Teaching / Supervision Fee Reimbursement Memo to Word (.docx)
+export async function exportTeachingDisbursementToWord(batch: {
+  batchNumber?: string;
+  periodMonth: string;
+  program: string;
+  academicYear: number;
+  term: string;
+  totalAmount: number;
+  netAmountTotal: number;
+  taxDeductionTotal: number;
+  teachersCount: number;
+  items: Array<{
+    teacherName: string;
+    courseCode: string;
+    courseName: string;
+    hours: number;
+    ratePerHour: number;
+    total: number;
+    taxDeduction: number;
+    netAmount: number;
+  }>;
+}) {
+  const table = new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    rows: [
+      new TableRow({
+        children: ["ลำดับ", "ชื่อ-สกุล อาจารย์ผู้สอน", "รหัสวิชา / รายวิชา", "ชั่วโมง", "อัตรา", "รวมเงิน", "ภาษี 1%", "ยอดสุทธิ"].map(h => (
+          new TableCell({
+            children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: h, bold: true, size: 24, font: "TH Sarabun PSK" })] })]
+          })
+        ))
+      }),
+      ...batch.items.map((item, idx) => (
+        new TableRow({
+          children: [
+            new TableCell({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: (idx + 1).toString(), size: 24, font: "TH Sarabun PSK" })] })] }),
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: item.teacherName, size: 24, font: "TH Sarabun PSK" })] })] }),
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: `${item.courseCode} ${item.courseName}`, size: 24, font: "TH Sarabun PSK" })] })] }),
+            new TableCell({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: item.hours.toString(), size: 24, font: "TH Sarabun PSK" })] })] }),
+            new TableCell({ children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: item.ratePerHour.toLocaleString(), size: 24, font: "TH Sarabun PSK" })] })] }),
+            new TableCell({ children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: item.total.toLocaleString(), size: 24, font: "TH Sarabun PSK" })] })] }),
+            new TableCell({ children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: item.taxDeduction.toLocaleString(), size: 24, font: "TH Sarabun PSK" })] })] }),
+            new TableCell({ children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: item.netAmount.toLocaleString(), size: 24, font: "TH Sarabun PSK" })] })] })
+          ]
+        })
+      )),
+      new TableRow({
+        children: [
+          new TableCell({ children: [new Paragraph({ text: "" })] }),
+          new TableCell({ children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: `รวมทั้งสิ้น (${batch.teachersCount} ท่าน)`, bold: true, size: 24, font: "TH Sarabun PSK" })] })] }),
+          new TableCell({ children: [new Paragraph({ text: "" })] }),
+          new TableCell({ children: [new Paragraph({ text: "" })] }),
+          new TableCell({ children: [new Paragraph({ text: "" })] }),
+          new TableCell({ children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: batch.totalAmount.toLocaleString(), bold: true, size: 24, font: "TH Sarabun PSK" })] })] }),
+          new TableCell({ children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: batch.taxDeductionTotal.toLocaleString(), bold: true, size: 24, font: "TH Sarabun PSK" })] })] }),
+          new TableCell({ children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: `${batch.netAmountTotal.toLocaleString()} บาท`, bold: true, size: 24, font: "TH Sarabun PSK" })] })] })
+        ]
+      })
+    ]
+  });
+
+  const doc = new Document({
+    sections: [
+      {
+        children: [
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [
+              new TextRun({
+                text: "บันทึกข้อความขออนุมัติเบิกจ่ายค่าตอบแทนการสอนพิเศษ",
+                bold: true,
+                size: 36,
+                font: "TH Sarabun PSK",
+              }),
+            ],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: `ส่วนราชการ: `, bold: true, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `คณะศิลปศาสตร์และวิทยาศาสตร์ มหาวิทยาลัยราชภัฏชัยภูมิ โทร. 044-816-200`, size: 30, font: "TH Sarabun PSK" }),
+            ],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: `ที่: `, bold: true, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `อว 0643.04/บจ ${batch.batchNumber || "01/2569"}    `, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `วันที่: `, bold: true, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: new Date().toLocaleDateString("th-TH", { year: "numeric", month: "long", day: "numeric" }), size: 30, font: "TH Sarabun PSK" }),
+            ],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: `เรื่อง: `, bold: true, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `ขออนุมัติเบิกจ่ายค่าตอบแทนการสอนพิเศษ ประจำเดือน ${batch.periodMonth} (${batch.program})`, size: 30, font: "TH Sarabun PSK" }),
+            ],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: `เรียน: `, bold: true, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `คณบดีคณะศิลปศาสตร์และวิทยาศาสตร์`, size: 30, font: "TH Sarabun PSK" }),
+            ],
+          }),
+          new Paragraph({ text: "" }),
+          new Paragraph({
+            indent: { firstLine: 720 },
+            children: [
+              new TextRun({ text: `ตามที่ คณะศิลปศาสตร์และวิทยาศาสตร์ ได้จัดการเรียนการสอน ${batch.program} ภาคเรียนที่ ${batch.term} ประจำปีการศึกษา ${batch.academicYear} บัดนี้ อาจารย์ผู้สอนได้ปฏิบัติการสอนเรียบร้อยแล้ว จึงขออนุมัติเบิกจ่ายเงินค่าตอบแทนการสอนพิเศษ ประจำเดือน ${batch.periodMonth} จำนวน ${batch.teachersCount} ท่าน เป็นจำนวนเงินสุทธิทั้งสิ้น ${batch.netAmountTotal.toLocaleString()} บาท ดังมีรายละเอียดประกอบดังนี้:`, size: 30, font: "TH Sarabun PSK" }),
+            ],
+          }),
+          new Paragraph({ text: "" }),
+          table,
+          new Paragraph({ text: "" }),
+          new Paragraph({
+            indent: { firstLine: 720 },
+            children: [
+              new TextRun({ text: "จึงเรียนมาเพื่อโปรดพิจารณาอนุมัติการเบิกจ่ายงบประมาณดังกล่าวต่อไป", size: 30, font: "TH Sarabun PSK" }),
+            ],
+          }),
+          new Paragraph({ text: "" }),
+          new Paragraph({ text: "" }),
+          new Paragraph({
+            alignment: AlignmentType.RIGHT,
+            children: [
+              new TextRun({ text: "(ลงชื่อ)........................................................\n", size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: "(หัวหน้างานบริการวิชาการและจัดการศึกษา)\n", size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: "ผู้เสนอขอเบิกจ่าย", size: 30, font: "TH Sarabun PSK" }),
+            ],
+          }),
+        ],
+      },
+    ],
+  });
+
+  const blob = await Packer.toBlob(doc);
+  downloadBlob(blob, `ใบเบิกค่าสอนพิเศษ_${batch.periodMonth}.docx`);
+}
+
+// 7. Generate Print-Ready PDF
 export function printDocumentView() {
   if (typeof window !== "undefined") {
     window.print();
   }
 }
+

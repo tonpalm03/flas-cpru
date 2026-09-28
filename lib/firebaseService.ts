@@ -29,11 +29,23 @@ import {
   ProjectReport,
   PurchaseRequisition,
   LoanContract,
+  BudgetLedgerItem,
+  LedgerTransaction,
+  TeachingDisbursement,
   LeaveRequest,
   MasterSystemConfig,
   UserProfile
 } from "./types";
-import { MOCK_INBOUND_DOCS, MOCK_OUTBOUND_DOCS, MOCK_PROJECTS, MOCK_ROOMS } from "./mockData";
+import { 
+  MOCK_INBOUND_DOCS, 
+  MOCK_OUTBOUND_DOCS, 
+  MOCK_PROJECTS, 
+  MOCK_ROOMS,
+  MOCK_BUDGET_ITEMS,
+  MOCK_LEDGER_TRANSACTIONS,
+  MOCK_LOANS,
+  MOCK_DISBURSEMENTS
+} from "./mockData";
 import { getNextAtomicNumber } from "./numberingService";
 import { logAuditEvent } from "./auditService";
 
@@ -770,8 +782,103 @@ export async function createProcurementPR(
 }
 
 // ==========================================
-// 6. FINANCE LOANS (สัญญายืมเงินทดรองจ่าย)
+// 6. FINANCE MODULE (งานการเงินและงบประมาณ)
 // ==========================================
+
+// 6.1 BUDGET LEDGER & ALLOCATIONS
+export async function getBudgetLedger(): Promise<BudgetLedgerItem[]> {
+  if (isConfigured) {
+    try {
+      const snap = await getDocs(collection(db, "finance_ledger"));
+      if (!snap.empty) {
+        return snap.docs.map(d => ({ id: d.id, ...d.data() } as BudgetLedgerItem));
+      }
+    } catch (e) {
+      console.warn("Firestore getBudgetLedger fallback:", e);
+    }
+  }
+  return getLocalData("finance_ledger", MOCK_BUDGET_ITEMS);
+}
+
+export async function updateBudgetLedgerItem(
+  id: string,
+  data: Partial<BudgetLedgerItem>,
+  actor?: UserProfile | null
+) {
+  if (isConfigured) {
+    try {
+      const docRef = doc(db, "finance_ledger", id);
+      await updateDoc(docRef, {
+        ...data,
+        updatedAt: serverTimestamp()
+      });
+      await logAuditEvent(actor || null, "UPDATE_BUDGET_ITEM", "finance_ledger", id, data);
+      return;
+    } catch (e) {
+      console.error("Firestore updateBudgetLedgerItem failed:", e);
+      throw e;
+    }
+  }
+
+  const list = getLocalData<BudgetLedgerItem>("finance_ledger", MOCK_BUDGET_ITEMS);
+  const updated = list.map(item => item.id === id ? { ...item, ...data, updatedAt: new Date().toISOString() } : item);
+  setLocalData("finance_ledger", updated);
+}
+
+// 6.2 LEDGER TRANSACTIONS (รายการเคลื่อนไหวงบประมาณ)
+export async function getLedgerTransactions(): Promise<LedgerTransaction[]> {
+  if (isConfigured) {
+    try {
+      const snap = await getDocs(collection(db, "finance_transactions"));
+      if (!snap.empty) {
+        return snap.docs.map(d => ({ id: d.id, ...d.data() } as LedgerTransaction));
+      }
+    } catch (e) {
+      console.warn("Firestore getLedgerTransactions fallback:", e);
+    }
+  }
+  return getLocalData("finance_transactions", MOCK_LEDGER_TRANSACTIONS);
+}
+
+export async function createLedgerTransaction(
+  data: Omit<LedgerTransaction, "id" | "createdAt" | "transactionNumber">,
+  actor?: UserProfile | null
+): Promise<LedgerTransaction> {
+  const transactionNumber = `TX-${data.fiscalYear || 2569}-${Date.now().toString().slice(-4)}`;
+  const newTx: Omit<LedgerTransaction, "id"> = {
+    ...data,
+    transactionNumber,
+    createdById: actor?.id,
+    createdAt: new Date().toISOString()
+  };
+
+  if (isConfigured) {
+    try {
+      const ref = await addDoc(collection(db, "finance_transactions"), {
+        ...newTx,
+        timestamp: serverTimestamp()
+      });
+      const created: LedgerTransaction = { id: ref.id, ...newTx };
+      await logAuditEvent(actor || null, "CREATE_LEDGER_TX", "finance_transactions", ref.id, {
+        transactionNumber,
+        type: data.transactionType,
+        amount: data.amount,
+        subCategory: data.subCategory
+      });
+      return created;
+    } catch (e) {
+      console.error("Firestore createLedgerTransaction failed:", e);
+      throw e;
+    }
+  }
+
+  const list = getLocalData<LedgerTransaction>("finance_transactions", MOCK_LEDGER_TRANSACTIONS);
+  const created: LedgerTransaction = { id: `tx-${Date.now()}`, ...newTx };
+  setLocalData("finance_transactions", [created, ...list]);
+  return created;
+}
+
+// 6.3 FINANCE LOANS (สัญญายืมเงินทดรองจ่าย และการส่งใช้คืน)
 export async function getFinanceLoans(): Promise<LoanContract[]> {
   if (isConfigured) {
     try {
@@ -783,7 +890,7 @@ export async function getFinanceLoans(): Promise<LoanContract[]> {
       console.warn("Firestore getFinanceLoans fallback:", e);
     }
   }
-  return getLocalData("finance_loans", []);
+  return getLocalData("finance_loans", MOCK_LOANS);
 }
 
 export async function createFinanceLoan(
@@ -794,6 +901,8 @@ export async function createFinanceLoan(
   const newLoan: Omit<LoanContract, "id"> = {
     ...data,
     contractNumber,
+    remainingBalance: data.amount,
+    totalSettledAmount: 0,
     borrowerId: actor?.id,
     createdById: actor?.id,
     createdAt: new Date().toISOString()
@@ -814,10 +923,191 @@ export async function createFinanceLoan(
     }
   }
 
-  const list = getLocalData<LoanContract>("finance_loans", []);
+  const list = getLocalData<LoanContract>("finance_loans", MOCK_LOANS);
   const created: LoanContract = { id: `loan-${Date.now()}`, ...newLoan };
   setLocalData("finance_loans", [created, ...list]);
   return created;
+}
+
+export async function updateFinanceLoanStatus(
+  id: string,
+  status: LoanContract["status"],
+  extraData?: Partial<LoanContract>,
+  actor?: UserProfile | null
+) {
+  if (isConfigured) {
+    try {
+      const docRef = doc(db, "finance_loans", id);
+      await updateDoc(docRef, {
+        status,
+        ...(extraData && extraData),
+        updatedAt: serverTimestamp()
+      });
+      await logAuditEvent(actor || null, "UPDATE_LOAN_STATUS", "finance_loans", id, { status, ...extraData });
+      return;
+    } catch (e) {
+      console.error("Firestore updateFinanceLoanStatus failed:", e);
+      throw e;
+    }
+  }
+
+  const list = getLocalData<LoanContract>("finance_loans", MOCK_LOANS);
+  const updated = list.map(item => item.id === id ? { ...item, status, ...(extraData && extraData), updatedAt: new Date().toISOString() } : item);
+  setLocalData("finance_loans", updated);
+}
+
+export async function settleFinanceLoan(
+  id: string,
+  settlement: {
+    cashAmount: number;
+    voucherAmount: number;
+    receiptNumber?: string;
+    voucherSummary?: string;
+    receivedBy?: string;
+    remark?: string;
+  },
+  actor?: UserProfile | null
+): Promise<LoanContract> {
+  const currentList = await getFinanceLoans();
+  const currentLoan = currentList.find(l => l.id === id);
+  if (!currentLoan) throw new Error("Loan contract not found");
+
+  const settleTotal = (Number(settlement.cashAmount) || 0) + (Number(settlement.voucherAmount) || 0);
+  const currentTotalSettled = (currentLoan.totalSettledAmount || 0) + settleTotal;
+  const newRemainingBalance = Math.max(0, currentLoan.amount - currentTotalSettled);
+  const newStatus: LoanContract["status"] = newRemainingBalance <= 0 ? "settled" : "partially_settled";
+
+  const settlementRecord = {
+    id: `stl-${Date.now()}`,
+    settleDate: new Date().toISOString().split("T")[0],
+    cashAmount: settlement.cashAmount,
+    voucherAmount: settlement.voucherAmount,
+    receiptNumber: settlement.receiptNumber,
+    voucherSummary: settlement.voucherSummary,
+    receivedBy: settlement.receivedBy || actor?.name || "เจ้าหน้าที่การเงิน",
+    remainingBalance: newRemainingBalance,
+    remark: settlement.remark
+  };
+
+  const updatedSettlements = [...(currentLoan.settlements || []), settlementRecord];
+
+  if (isConfigured) {
+    try {
+      const docRef = doc(db, "finance_loans", id);
+      await updateDoc(docRef, {
+        status: newStatus,
+        totalSettledAmount: currentTotalSettled,
+        remainingBalance: newRemainingBalance,
+        settlements: updatedSettlements,
+        updatedAt: serverTimestamp()
+      });
+      await logAuditEvent(actor || null, "SETTLE_LOAN", "finance_loans", id, {
+        settleTotal,
+        newRemainingBalance,
+        newStatus
+      });
+      return {
+        ...currentLoan,
+        status: newStatus,
+        totalSettledAmount: currentTotalSettled,
+        remainingBalance: newRemainingBalance,
+        settlements: updatedSettlements
+      };
+    } catch (e) {
+      console.error("Firestore settleFinanceLoan failed:", e);
+      throw e;
+    }
+  }
+
+  const updatedLoan: LoanContract = {
+    ...currentLoan,
+    status: newStatus,
+    totalSettledAmount: currentTotalSettled,
+    remainingBalance: newRemainingBalance,
+    settlements: updatedSettlements,
+    updatedAt: new Date().toISOString()
+  };
+  const list = getLocalData<LoanContract>("finance_loans", MOCK_LOANS);
+  setLocalData("finance_loans", list.map(l => l.id === id ? updatedLoan : l));
+  return updatedLoan;
+}
+
+// 6.4 TEACHING & SUPERVISION DISBURSEMENTS
+export async function getFinanceDisbursements(): Promise<TeachingDisbursement[]> {
+  if (isConfigured) {
+    try {
+      const snap = await getDocs(collection(db, "finance_disbursements"));
+      if (!snap.empty) {
+        return snap.docs.map(d => ({ id: d.id, ...d.data() } as TeachingDisbursement));
+      }
+    } catch (e) {
+      console.warn("Firestore getFinanceDisbursements fallback:", e);
+    }
+  }
+  return getLocalData("finance_disbursements", MOCK_DISBURSEMENTS);
+}
+
+export async function createFinanceDisbursement(
+  data: Omit<TeachingDisbursement, "id" | "createdAt" | "batchNumber">,
+  actor?: UserProfile | null
+): Promise<TeachingDisbursement> {
+  const batchNumber = `บจ. ${Date.now().toString().slice(-3)}/${data.academicYear || 2569}`;
+  const newBatch: Omit<TeachingDisbursement, "id"> = {
+    ...data,
+    batchNumber,
+    createdById: actor?.id,
+    createdAt: new Date().toISOString()
+  };
+
+  if (isConfigured) {
+    try {
+      const ref = await addDoc(collection(db, "finance_disbursements"), {
+        ...newBatch,
+        timestamp: serverTimestamp()
+      });
+      const created: TeachingDisbursement = { id: ref.id, ...newBatch };
+      await logAuditEvent(actor || null, "CREATE_DISBURSEMENT", "finance_disbursements", ref.id, {
+        batchNumber,
+        periodMonth: data.periodMonth,
+        totalAmount: data.totalAmount,
+        teachersCount: data.teachersCount
+      });
+      return created;
+    } catch (e) {
+      console.error("Firestore createFinanceDisbursement failed:", e);
+      throw e;
+    }
+  }
+
+  const list = getLocalData<TeachingDisbursement>("finance_disbursements", MOCK_DISBURSEMENTS);
+  const created: TeachingDisbursement = { id: `disb-${Date.now()}`, ...newBatch };
+  setLocalData("finance_disbursements", [created, ...list]);
+  return created;
+}
+
+export async function updateFinanceDisbursementStatus(
+  id: string,
+  status: TeachingDisbursement["status"],
+  actor?: UserProfile | null
+) {
+  if (isConfigured) {
+    try {
+      const docRef = doc(db, "finance_disbursements", id);
+      await updateDoc(docRef, {
+        status,
+        updatedAt: serverTimestamp()
+      });
+      await logAuditEvent(actor || null, "UPDATE_DISBURSEMENT_STATUS", "finance_disbursements", id, { status });
+      return;
+    } catch (e) {
+      console.error("Firestore updateFinanceDisbursementStatus failed:", e);
+      throw e;
+    }
+  }
+
+  const list = getLocalData<TeachingDisbursement>("finance_disbursements", MOCK_DISBURSEMENTS);
+  const updated = list.map(item => item.id === id ? { ...item, status, updatedAt: new Date().toISOString() } : item);
+  setLocalData("finance_disbursements", updated);
 }
 
 // ==========================================

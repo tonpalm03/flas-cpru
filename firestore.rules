@@ -101,17 +101,28 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // 7. Finance Loans & Disbursement
+    // 7. Finance Loans, Ledger, Transactions & Disbursement
     match /finance_loans/{loanId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update: if isAuthenticated();
+      allow create, update: if isAuthenticated();
       allow delete: if isAdmin();
     }
 
     match /finance_ledger/{ledgerId} {
       allow read: if isAuthenticated();
-      allow create, update: if isFinanceStaff();
+      allow create, update: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    match /finance_transactions/{txId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    match /finance_disbursements/{disburseId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
       allow delete: if isAdmin();
     }
 

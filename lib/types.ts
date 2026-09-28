@@ -315,15 +315,38 @@ export interface ProjectReport {
 // 3. งานการเงินและงบประมาณ
 export interface BudgetLedgerItem {
   id: string;
-  category: string;          // งบดำเนินงาน, ค่าตอบแทน, ใช้สอย, วัสดุ
+  category: "compensation" | "operating" | "material" | "investment" | "general"; // งบดำเนินงาน, ค่าตอบแทน, ใช้สอย, วัสดุ, ลงทุน
   subCategory: string;
   fiscalYear: number;
+  budgetSource: "faculty_revenue" | "national_budget" | "external";
   allocatedAmount: number;   // จัดสรร
   committedAmount: number;   // ผูกพัน
   disbursedAmount: number;   // เบิกจ่ายจริง
-  remainingAmount: number;   // คงเหลือ
+  remainingAmount: number;   // คงเหลือ = allocated - (committed + disbursed)
   department: string;
+  projectId?: string;
+  projectCode?: string;
   updatedAt?: string;
+}
+
+export interface LedgerTransaction {
+  id: string;
+  transactionNumber: string; // เช่น TX-2569-001
+  fiscalYear: number;
+  budgetSource: "faculty_revenue" | "national_budget" | "external";
+  category: "compensation" | "operating" | "material" | "investment" | "general";
+  subCategory: string;
+  projectId?: string;
+  projectCode?: string;
+  activityId?: string;
+  transactionType: "allocation" | "commitment" | "disbursement" | "settlement" | "refund" | "adjustment";
+  amount: number;
+  referenceDocNumber: string;
+  description: string;
+  performedBy: string;
+  date: string;
+  createdById?: string;
+  createdAt: string;
 }
 
 export interface LoanContract {
@@ -334,16 +357,41 @@ export interface LoanContract {
   position: string;
   department: string;
   purpose: string;           // ยืมเพื่อโครงการ
-  amount: number;            // จำนวนเงิน
+  projectId?: string;
+  projectCode?: string;
+  amount: number;            // จำนวนเงิน (ตัวเลข)
+  bahtText?: string;         // จำนวนเงิน (ตัวอักษร)
+  estimatedExpenses?: Array<{
+    category: string;
+    description: string;
+    amount: number;
+  }>;
   borrowDate: string;
+  disbursedDate?: string;
+  disbursedAmount?: number;
   settleDueDate: string;     // กำหนดชำระคืน (ภายใน 30 วัน)
-  status: "draft" | "pending_approval" | "approved" | "active" | "settled" | "overdue" | "cancelled";
+  status: "draft" | "submitted" | "approved" | "disbursed" | "partially_settled" | "settled" | "overdue" | "cancelled";
   checklist: {
     hasContract: boolean;
     hasMemo: boolean;
     hasApprovedProject: boolean;
     hasEstimate: boolean;
   };
+  settlements?: Array<{
+    id: string;
+    settleDate: string;
+    cashAmount: number;
+    voucherAmount: number;
+    receiptNumber?: string;
+    voucherSummary?: string;
+    receivedBy?: string;
+    remainingBalance: number;
+    remark?: string;
+  }>;
+  totalSettledAmount?: number;
+  remainingBalance?: number;
+  approverName?: string;
+  approverPosition?: string;
   createdById?: string;
   createdAt: string;
   updatedAt?: string;
@@ -351,17 +399,40 @@ export interface LoanContract {
 
 export interface TeachingDisbursement {
   id: string;
+  batchNumber?: string;      // เช่น บจ. 001/2569
   periodMonth: string;       // กุมภาพันธ์ 2569
+  academicYear: number;      // 2568
+  term: string;              // 1/2568, 2/2568, 1/2569
   program: "bachelor_regular" | "bachelor_gspch" | "supervision"; // ภาคปกติ, กศ.ปช., ค่านิเทศ
   totalAmount: number;
+  taxDeductionTotal: number;
+  netAmountTotal: number;
   teachersCount: number;
+  taxRate: number;           // 0, 1, 3, 5%
   status: "draft" | "verified" | "approved" | "paid";
   items: Array<{
+    id: string;
     teacherName: string;
     courseCode: string;
     courseName: string;
     hours: number;
     ratePerHour: number;
+    total: number;
+    taxDeduction: number;
+    netAmount: number;
+    dates?: string;
+    room?: string;
+  }>;
+  supervisionItems?: Array<{
+    id: string;
+    supervisorName: string;
+    department: string;
+    studentName: string;
+    organization: string;
+    visitDate: string;
+    visitMethod: "onsite" | "online";
+    supervisionFee: number;
+    travelAllowance: number;
     total: number;
     taxDeduction: number;
     netAmount: number;

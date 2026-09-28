@@ -7,7 +7,9 @@ import {
   LeaveRequest, 
   UserProfile, 
   RoomBooking,
-  BudgetLedgerItem
+  BudgetLedgerItem,
+  LedgerTransaction,
+  TeachingDisbursement
 } from "./types";
 
 export const MOCK_USERS: UserProfile[] = [
@@ -218,16 +220,42 @@ export const MOCK_LOANS: LoanContract[] = [
     position: "อาจารย์ประจำสาขาวิชารัฐศาสตร์",
     department: "สาขาวิชารัฐศาสตร์และรัฐประศาสนศาสตร์",
     purpose: "โครงการติดอาวุธเพื่อเตรียมความพร้อมสำหรับการเข้าสู่ระบบราชการกลุ่มวิชาทางรัฐศาสตร์",
+    projectCode: "69-FLAS-002",
     amount: 35000,
+    bahtText: "สามหมื่นห้าพันบาทถ้วน",
+    estimatedExpenses: [
+      { category: "ค่าตอบแทน", description: "ค่าตอบแทนวิทยากรเตรียมสอบราชการ (12 ชม.)", amount: 12000 },
+      { category: "ค่าใช้สอย", description: "ค่าอาหารกลางวันและอาหารว่างผู้เข้าร่วม 50 คน", amount: 18000 },
+      { category: "ค่าวัสดุ", description: "ค่าเอกสารแนวข้อสอบและอุปกรณ์จัดอบรม", amount: 5000 }
+    ],
     borrowDate: "2026-09-15",
-    settleDueDate: "2026-10-15",
-    status: "active",
+    disbursedDate: "2026-09-16",
+    disbursedAmount: 35000,
+    settleDueDate: "2026-10-16",
+    status: "disbursed",
     checklist: {
       hasContract: true,
       hasMemo: true,
       hasApprovedProject: true,
       hasEstimate: true
     },
+    settlements: [
+      {
+        id: "stl-01",
+        settleDate: "2026-09-25",
+        cashAmount: 5000,
+        voucherAmount: 20000,
+        receiptNumber: "บส. 69/042",
+        voucherSummary: "ใบสำคัญจ่ายค่าอาหารและค่าวิทยากร",
+        receivedBy: "นางสาวมณีรัตน์ การเงิน",
+        remainingBalance: 10000,
+        remark: "ส่งใช้คืนงวดที่ 1 คงเหลือ 10,000 บาท"
+      }
+    ],
+    totalSettledAmount: 25000,
+    remainingBalance: 10000,
+    approverName: "ผู้ช่วยศาสตราจารย์ ดร.สานนท์ ด่านภักดี",
+    approverPosition: "คณบดีคณะศิลปศาสตร์และวิทยาศาสตร์",
     createdAt: "2026-09-15T00:00:00Z"
   },
   {
@@ -237,16 +265,29 @@ export const MOCK_LOANS: LoanContract[] = [
     position: "อาจารย์ประจำสาขาบริหารธุรกิจ",
     department: "สาขาวิชาบริหารธุรกิจ",
     purpose: "โครงการอบรมเชิงปฏิบัติการ Startup Creator สร้างนวัตกรท่องเที่ยวรุ่นใหม่",
+    projectCode: "69-FLAS-001",
     amount: 50000,
+    bahtText: "ห้าหมื่นบาทถ้วน",
+    estimatedExpenses: [
+      { category: "ค่าตอบแทน", description: "ค่าวิทยากร Startup และ AI", amount: 18000 },
+      { category: "ค่าใช้สอย", description: "ค่าอาหารและสถานที่", amount: 25000 },
+      { category: "ค่าวัสดุ", description: "ค่าวัสดุและเกียรติบัตร", amount: 7000 }
+    ],
     borrowDate: "2026-09-20",
-    settleDueDate: "2026-10-20",
-    status: "active",
+    disbursedDate: "2026-09-21",
+    disbursedAmount: 50000,
+    settleDueDate: "2026-10-21",
+    status: "disbursed",
     checklist: {
       hasContract: true,
       hasMemo: true,
       hasApprovedProject: true,
       hasEstimate: true
     },
+    totalSettledAmount: 0,
+    remainingBalance: 50000,
+    approverName: "ผู้ช่วยศาสตราจารย์ ดร.สานนท์ ด่านภักดี",
+    approverPosition: "คณบดีคณะศิลปศาสตร์และวิทยาศาสตร์",
     createdAt: "2026-09-20T00:00:00Z"
   }
 ];
@@ -254,9 +295,10 @@ export const MOCK_LOANS: LoanContract[] = [
 export const MOCK_BUDGET_ITEMS: BudgetLedgerItem[] = [
   {
     id: "bg-01",
-    category: "งบดำเนินงาน",
+    category: "operating",
     subCategory: "ค่าตอบแทนใช้สอยและวัสดุ (โครงการคณะ)",
     fiscalYear: 2569,
+    budgetSource: "faculty_revenue",
     allocatedAmount: 1500000,
     committedAmount: 450000,
     disbursedAmount: 620000,
@@ -265,9 +307,10 @@ export const MOCK_BUDGET_ITEMS: BudgetLedgerItem[] = [
   },
   {
     id: "bg-02",
-    category: "งบยุทธศาสตร์ มรภ.",
+    category: "general",
     subCategory: "โครงการศาสตร์พระราชาเพื่อพัฒนาท้องถิ่น",
     fiscalYear: 2569,
+    budgetSource: "national_budget",
     allocatedAmount: 2000000,
     committedAmount: 850000,
     disbursedAmount: 780000,
@@ -276,14 +319,136 @@ export const MOCK_BUDGET_ITEMS: BudgetLedgerItem[] = [
   },
   {
     id: "bg-03",
-    category: "งบรายได้จัดการศึกษา",
+    category: "compensation",
     subCategory: "ค่าตอบแทนการสอนภาคพิเศษ (กศ.ปช.)",
     fiscalYear: 2569,
+    budgetSource: "faculty_revenue",
     allocatedAmount: 800000,
     committedAmount: 240000,
     disbursedAmount: 310000,
     remainingAmount: 250000,
     department: "งานบริการวิชาการ"
+  },
+  {
+    id: "bg-04",
+    category: "operating",
+    subCategory: "ค่าใช้จ่ายในการเดินทางไปราชการและนิเทศนักศึกษา",
+    fiscalYear: 2569,
+    budgetSource: "faculty_revenue",
+    allocatedAmount: 400000,
+    committedAmount: 120000,
+    disbursedAmount: 180000,
+    remainingAmount: 100000,
+    department: "ทุกสาขาวิชา"
+  }
+];
+
+export const MOCK_LEDGER_TRANSACTIONS: LedgerTransaction[] = [
+  {
+    id: "tx-01",
+    transactionNumber: "TX-69-001",
+    fiscalYear: 2569,
+    budgetSource: "national_budget",
+    category: "general",
+    subCategory: "โครงการศาสตร์พระราชาเพื่อพัฒนาท้องถิ่น",
+    projectCode: "69-KING-001",
+    transactionType: "allocation",
+    amount: 250000,
+    referenceDocNumber: "อนุมัติแผน 2569",
+    description: "จัดสรรงบประมาณโครงการพัฒนาเศรษฐกิจฐานรากสับปะรดอบแห้ง",
+    performedBy: "เจ้าหน้าที่งานแผน",
+    date: "2026-10-01",
+    createdAt: "2026-10-01T00:00:00Z"
+  },
+  {
+    id: "tx-02",
+    transactionNumber: "TX-69-002",
+    fiscalYear: 2569,
+    budgetSource: "faculty_revenue",
+    category: "operating",
+    subCategory: "ค่าตอบแทนใช้สอยและวัสดุ (โครงการคณะ)",
+    projectCode: "69-FLAS-001",
+    transactionType: "commitment",
+    amount: 50000,
+    referenceDocNumber: "ยม 02/2569",
+    description: "ผูกพันงบประมาณการยืมเงินทดรองราชการ โครงการ Startup Creator",
+    performedBy: "ผศ.ดร. นฤมล อนันตโชค",
+    date: "2026-09-20",
+    createdAt: "2026-09-20T00:00:00Z"
+  },
+  {
+    id: "tx-03",
+    transactionNumber: "TX-69-003",
+    fiscalYear: 2569,
+    budgetSource: "faculty_revenue",
+    category: "compensation",
+    subCategory: "ค่าตอบแทนการสอนภาคพิเศษ (กศ.ปช.)",
+    transactionType: "disbursement",
+    amount: 45000,
+    referenceDocNumber: "บจ. 09/2569",
+    description: "เบิกจ่ายค่าสอนพิเศษอาจารย์ กศ.ปช. ประจำเดือนสิงหาคม 2569",
+    performedBy: "นางสาวมณีรัตน์ การเงิน",
+    date: "2026-09-10",
+    createdAt: "2026-09-10T00:00:00Z"
+  }
+];
+
+export const MOCK_DISBURSEMENTS: TeachingDisbursement[] = [
+  {
+    id: "disb-01",
+    batchNumber: "บจ. 01/2569",
+    periodMonth: "กันยายน 2569",
+    academicYear: 2568,
+    term: "1/2568",
+    program: "bachelor_gspch",
+    totalAmount: 23600,
+    taxDeductionTotal: 236,
+    netAmountTotal: 23364,
+    teachersCount: 3,
+    taxRate: 1,
+    status: "approved",
+    items: [
+      {
+        id: "item-1",
+        teacherName: "ผศ.ดร. นฤมล อนันตโชค",
+        courseCode: "BUS3201",
+        courseName: "การบริหารธุรกิจสร้างสรรค์และสตาร์ทอัพ",
+        hours: 16,
+        ratePerHour: 600,
+        total: 9600,
+        taxDeduction: 96,
+        netAmount: 9504,
+        dates: "ส. 6, อา. 7, ส. 13, อา. 14 ก.ย. 69",
+        room: "421"
+      },
+      {
+        id: "item-2",
+        teacherName: "อ.ฤทธิชัย ภาระวิเศษ",
+        courseCode: "POL2104",
+        courseName: "การเมืองการปกครองและนโยบายสาธารณะ",
+        hours: 16,
+        ratePerHour: 500,
+        total: 8000,
+        taxDeduction: 80,
+        netAmount: 7920,
+        dates: "ส. 6, อา. 7, ส. 13, อา. 14 ก.ย. 69",
+        room: "422"
+      },
+      {
+        id: "item-3",
+        teacherName: "ดร.สุรชัย นวัตกร",
+        courseCode: "ENG1102",
+        courseName: "ระบบอัตโนมัติและนวัตกรรมชุมชน",
+        hours: 12,
+        ratePerHour: 500,
+        total: 6000,
+        taxDeduction: 60,
+        netAmount: 5940,
+        dates: "ส. 20, อา. 21, ส. 27 ก.ย. 69",
+        room: "Lab 3"
+      }
+    ],
+    createdAt: "2026-09-22T00:00:00Z"
   }
 ];
 
