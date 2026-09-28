@@ -123,7 +123,7 @@ export async function createInboundDoc(
   actor?: UserProfile | null
 ): Promise<InboundDocument> {
   const receiveNumber = await getNextAtomicNumber("inbound", 2569);
-  const newDoc: InboundDocument = {
+  const newDoc: Omit<InboundDocument, "id"> = {
     ...data,
     receiveNumber,
     createdById: actor?.id,
@@ -136,7 +136,7 @@ export async function createInboundDoc(
         ...newDoc,
         timestamp: serverTimestamp()
       });
-      const created = { id: ref.id, ...newDoc };
+      const created: InboundDocument = { id: ref.id, ...newDoc };
       await logAuditEvent(actor || null, "CREATE_INBOUND_DOC", "admin_documents_in", ref.id, { receiveNumber, title: data.title });
       return created;
     } catch (e) {
@@ -204,7 +204,7 @@ export async function createOutboundDoc(
   const master = await getMasterSettings();
   const docNumber = await getNextAtomicNumber("outbound", master.fiscalYear, master.docPrefix);
   
-  const newDoc: OutboundDocument = {
+  const newDoc: Omit<OutboundDocument, "id"> = {
     ...data,
     docNumber,
     createdById: actor?.id,
@@ -217,7 +217,7 @@ export async function createOutboundDoc(
         ...newDoc,
         timestamp: serverTimestamp()
       });
-      const created = { id: ref.id, ...newDoc };
+      const created: OutboundDocument = { id: ref.id, ...newDoc };
       await logAuditEvent(actor || null, "CREATE_OUTBOUND_DOC", "admin_documents_out", ref.id, { docNumber, title: data.title });
       return created;
     } catch (e) {
@@ -254,7 +254,7 @@ export async function createProject(
   actor?: UserProfile | null
 ): Promise<ProjectProposal> {
   const code = await getNextAtomicNumber("project", data.fiscalYear || 2569);
-  const newProject: ProjectProposal = {
+  const newProject: Omit<ProjectProposal, "id"> = {
     ...data,
     code,
     createdById: actor?.id,
@@ -267,7 +267,7 @@ export async function createProject(
         ...newProject,
         timestamp: serverTimestamp()
       });
-      const created = { id: ref.id, ...newProject };
+      const created: ProjectProposal = { id: ref.id, ...newProject };
       await logAuditEvent(actor || null, "CREATE_PROJECT", "projects", ref.id, { code, title: data.title, budget: data.budgetApproved });
       return created;
     } catch (e) {
@@ -304,7 +304,7 @@ export async function createProcurementPR(
   actor?: UserProfile | null
 ): Promise<PurchaseRequisition> {
   const prNumber = await getNextAtomicNumber("pr", 2569);
-  const newPR: PurchaseRequisition = {
+  const newPR: Omit<PurchaseRequisition, "id"> = {
     ...data,
     prNumber,
     requesterId: actor?.id,
@@ -318,7 +318,7 @@ export async function createProcurementPR(
         ...newPR,
         timestamp: serverTimestamp()
       });
-      const created = { id: ref.id, ...newPR };
+      const created: PurchaseRequisition = { id: ref.id, ...newPR };
       await logAuditEvent(actor || null, "CREATE_PR", "procurement", ref.id, { prNumber, projectName: data.projectName, grandTotal: data.netTotalAmount });
       return created;
     } catch (e) {
@@ -355,7 +355,7 @@ export async function createFinanceLoan(
   actor?: UserProfile | null
 ): Promise<LoanContract> {
   const contractNumber = await getNextAtomicNumber("loan", 2569);
-  const newLoan: LoanContract = {
+  const newLoan: Omit<LoanContract, "id"> = {
     ...data,
     contractNumber,
     borrowerId: actor?.id,
@@ -369,7 +369,7 @@ export async function createFinanceLoan(
         ...newLoan,
         timestamp: serverTimestamp()
       });
-      const created = { id: ref.id, ...newLoan };
+      const created: LoanContract = { id: ref.id, ...newLoan };
       await logAuditEvent(actor || null, "CREATE_LOAN", "finance_loans", ref.id, { contractNumber, amount: data.amount, borrowerName: data.borrowerName });
       return created;
     } catch (e) {
@@ -405,7 +405,7 @@ export async function createLeaveRequest(
   data: Omit<LeaveRequest, "id" | "createdAt">,
   actor?: UserProfile | null
 ): Promise<LeaveRequest> {
-  const newLeave: LeaveRequest = {
+  const newLeave: Omit<LeaveRequest, "id"> = {
     ...data,
     staffId: actor?.id,
     createdById: actor?.id,
@@ -418,7 +418,7 @@ export async function createLeaveRequest(
         ...newLeave,
         timestamp: serverTimestamp()
       });
-      const created = { id: ref.id, ...newLeave };
+      const created: LeaveRequest = { id: ref.id, ...newLeave };
       await logAuditEvent(actor || null, "CREATE_LEAVE_REQUEST", "hr_leaves", ref.id, { staffName: data.staffName, leaveType: data.leaveType, totalDays: data.totalDays });
       return created;
     } catch (e) {
@@ -454,7 +454,7 @@ export async function createRoomBooking(
   data: Omit<RoomBooking, "id" | "createdAt">,
   actor?: UserProfile | null
 ): Promise<RoomBooking> {
-  const newBooking: RoomBooking = {
+  const newBooking: Omit<RoomBooking, "id"> = {
     ...data,
     bookedById: actor?.id,
     createdAt: new Date().toISOString()
