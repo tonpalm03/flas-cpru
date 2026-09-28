@@ -113,11 +113,6 @@ export default function Sidebar() {
     },
   ];
 
-  // Filter sections based on presentation mode
-  const displayedSections = viewMode === "admin_only" 
-    ? allSections.filter(s => s.key === "admin")
-    : allSections;
-
   return (
     <aside className="w-64 bg-white border-r border-slate-200 flex flex-col h-screen sticky top-0 select-none z-30">
       {/* Brand Header */}
@@ -130,7 +125,7 @@ export default function Sidebar() {
             คณะศิลปศาสตร์ฯ
           </h1>
           <p className="text-[11px] text-slate-500 font-medium truncate">
-            {viewMode === "admin_only" ? "ระบบสารบรรณและธุรการ" : "ระบบบริหารงานคณะ (ERP)"}
+            ระบบบริหารงานคณะ (ERP)
           </p>
         </div>
       </div>
@@ -147,17 +142,17 @@ export default function Sidebar() {
           }`}
         >
           <Home className={`w-4 h-4 ${pathname === "/" ? "text-blue-700" : "text-slate-400"}`} />
-          <span>{viewMode === "admin_only" ? "ภาพรวมงานธุรการ" : "หน้าหลักทั้งคณะ"}</span>
+          <span>หน้าหลักทั้งคณะ</span>
         </Link>
 
         <div className="pt-2 pb-1 px-3 flex items-center justify-between">
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-            {viewMode === "admin_only" ? "เมนูงานธุรการ (โหมดนำเสนอ)" : "โมดูลงานในคณะ"}
+            โมดูลงานในคณะ
           </p>
         </div>
 
         {/* Core Modules List */}
-        {displayedSections.map((section) => {
+        {allSections.map((section) => {
           const Icon = section.icon;
           const isOpen = openSections[section.key];
           const hasActiveChild = section.subItems.some((sub) => pathname === sub.href);
@@ -227,28 +222,14 @@ export default function Sidebar() {
         })}
       </div>
 
-      {/* Footer with Mode Toggle Button */}
-      <div className="p-3 border-t border-slate-100 bg-slate-50/50 space-y-2">
-        <button
-          type="button"
-          onClick={toggleViewMode}
-          className="w-full py-1.5 px-2.5 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg text-xs font-medium text-slate-700 flex items-center justify-between transition-colors shadow-subtle"
-        >
-          <span className="flex items-center gap-1.5">
-            <Layers className="w-3.5 h-3.5 text-blue-700" />
-            <span>โหมดนำเสนอ:</span>
-          </span>
-          <span className="font-bold text-blue-900 text-[11px]">
-            {viewMode === "admin_only" ? "เฉพาะธุรการ" : "ทั้ง 6 ฝ่าย"}
-          </span>
-        </button>
-
-        <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
+      {/* Footer */}
+      <div className="p-3 border-t border-slate-100 bg-slate-50/50">
+        <div className="flex items-center justify-between text-xs text-slate-500">
           <span className="flex items-center gap-1.5 text-[11px]">
             <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-            Firebase Firestore
+            เชื่อมต่อ Cloud Firestore
           </span>
-          <span className="text-[10px] text-slate-400 font-mono">2569</span>
+          <span className="text-[10px] text-slate-400 font-mono">v1.0</span>
         </div>
       </div>
     </aside>
