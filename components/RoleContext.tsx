@@ -50,10 +50,21 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(false);
   }, []);
 
-  // Auth Guard: If not logged in and not on /login page, redirect to /login
+  // Auth Guard: If not logged in and on a protected internal route, redirect to /login
   useEffect(() => {
     if (!isLoading) {
-      if (!currentUser && pathname !== "/login") {
+      const isPublic = 
+        pathname === "/" || 
+        pathname === "" || 
+        pathname === "/index.html" || 
+        pathname === "/login" || 
+        pathname === "/login/" || 
+        pathname?.startsWith("/login") || 
+        pathname === "/flow" || 
+        pathname === "/flow/" || 
+        pathname?.startsWith("/flow");
+
+      if (!currentUser && !isPublic) {
         router.replace("/login");
       }
     }
