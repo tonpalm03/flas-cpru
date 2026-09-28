@@ -21,8 +21,9 @@ export default function LoginPage() {
   const [regName, setRegName] = useState("");
   const [regEmail, setRegEmail] = useState("");
   const [regPassword, setRegPassword] = useState("");
+  const [regConfirmPassword, setRegConfirmPassword] = useState("");
   const [regRole, setRegRole] = useState<UserRole>("admin");
-  const [regDepartment, setRegDepartment] = useState("สำนักงานคณบดี คณะศิลปศาสตร์และวิทยาศาสตร์");
+  const [regDepartment, setRegDepartment] = useState("");
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
@@ -55,6 +56,12 @@ export default function LoginPage() {
     e.preventDefault();
     setErrorMsg("");
     setSuccessMsg("");
+
+    if (regPassword !== regConfirmPassword) {
+      setErrorMsg("รหัสผ่านและการยืนยันรหัสผ่านไม่ตรงกัน กรุณาตรวจสอบอีกครั้ง");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -141,7 +148,6 @@ export default function LoginPage() {
                 <input
                   type="email"
                   required
-                  placeholder="เช่น admin@cpru.ac.th"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-slate-900 focus:outline-none focus:border-blue-900"
@@ -156,7 +162,6 @@ export default function LoginPage() {
                 <input
                   type="password"
                   required
-                  placeholder="กรอกรหัสผ่านของคุณ"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-slate-900 focus:outline-none focus:border-blue-900"
@@ -185,7 +190,6 @@ export default function LoginPage() {
                 <input
                   type="text"
                   required
-                  placeholder="เช่น นายสมเกียรติ วงศ์สารบรรณ / ผศ.ดร. นฤมล..."
                   value={regName}
                   onChange={(e) => setRegName(e.target.value)}
                   className="w-full border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-slate-900 focus:outline-none focus:border-blue-900"
@@ -214,7 +218,6 @@ export default function LoginPage() {
                 <input
                   type="text"
                   required
-                  placeholder="เช่น สำนักงานคณบดี / สาขาวิชารัฐศาสตร์..."
                   value={regDepartment}
                   onChange={(e) => setRegDepartment(e.target.value)}
                   className="w-full border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-slate-900 focus:outline-none focus:border-blue-900"
@@ -229,7 +232,6 @@ export default function LoginPage() {
                 <input
                   type="email"
                   required
-                  placeholder="your.email@cpru.ac.th"
                   value={regEmail}
                   onChange={(e) => setRegEmail(e.target.value)}
                   className="w-full border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-slate-900 focus:outline-none focus:border-blue-900"
@@ -244,9 +246,22 @@ export default function LoginPage() {
                 <input
                   type="password"
                   required
-                  placeholder="กำหนดรหัสผ่าน"
                   value={regPassword}
                   onChange={(e) => setRegPassword(e.target.value)}
+                  className="w-full border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-slate-900 focus:outline-none focus:border-blue-900"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block font-medium text-slate-700 mb-1">ยืนยันรหัสผ่าน</label>
+              <div className="relative">
+                <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="password"
+                  required
+                  value={regConfirmPassword}
+                  onChange={(e) => setRegConfirmPassword(e.target.value)}
                   className="w-full border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-slate-900 focus:outline-none focus:border-blue-900"
                 />
               </div>
