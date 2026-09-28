@@ -28,13 +28,15 @@ export default function LoanContractsPage() {
       {
         id: `loan-${Date.now()}`,
         ...formData,
+        department: "คณะศิลปศาสตร์และวิทยาศาสตร์",
         status: "active",
         checklist: {
           hasContract: true,
           hasMemo: true,
           hasApprovedProject: true,
           hasEstimate: true
-        }
+        },
+        createdAt: new Date().toISOString()
       },
       ...loans
     ]);

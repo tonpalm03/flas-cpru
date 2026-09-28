@@ -27,7 +27,8 @@ export default function RoomBookingPage() {
       {
         id: `rm-${Date.now()}`,
         ...formData,
-        status: "approved"
+        status: "approved",
+        createdAt: new Date().toISOString()
       },
       ...bookings
     ]);

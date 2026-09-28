@@ -46,6 +46,7 @@ export default function OutboundDocsPage() {
       recipient: formData.recipient,
       category: formData.category,
       signatory: formData.signatory,
+      urgency: "normal",
       status: "signed",
       createdAt: new Date().toISOString(),
     };

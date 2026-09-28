@@ -34,7 +34,7 @@ interface NavSubItem {
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const { currentUser, viewMode, toggleViewMode } = useRole();
+  const { currentUser } = useRole();
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     admin: true,
     projects: true,
