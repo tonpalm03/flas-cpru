@@ -1,4 +1,5 @@
-// Admin Template Customizer Storage & Types
+import { getMasterSettings, saveMasterSettings } from "./firebaseService";
+import { UserProfile } from "./types";
 
 export interface SystemTemplatesConfig {
   facultyName: string;
@@ -42,6 +43,29 @@ export const DEFAULT_TEMPLATES_CONFIG: SystemTemplatesConfig = {
   }
 };
 
+export async function fetchSystemTemplatesConfig(): Promise<SystemTemplatesConfig> {
+  try {
+    const master = await getMasterSettings();
+    if (master) {
+      return {
+        facultyName: master.facultyName || DEFAULT_TEMPLATES_CONFIG.facultyName,
+        universityName: master.universityName || DEFAULT_TEMPLATES_CONFIG.universityName,
+        officeName: DEFAULT_TEMPLATES_CONFIG.officeName,
+        telephone: DEFAULT_TEMPLATES_CONFIG.telephone,
+        deanName: master.deanName || DEFAULT_TEMPLATES_CONFIG.deanName,
+        deanPosition: master.deanPosition || DEFAULT_TEMPLATES_CONFIG.deanPosition,
+        defaultDocPrefix: master.docPrefix || DEFAULT_TEMPLATES_CONFIG.defaultDocPrefix,
+        defaultFiscalYear: master.fiscalYear || DEFAULT_TEMPLATES_CONFIG.defaultFiscalYear,
+        vatRate: master.defaultVatRate || DEFAULT_TEMPLATES_CONFIG.vatRate,
+        memoStandardParagraphs: (master as any).memoStandardParagraphs || DEFAULT_TEMPLATES_CONFIG.memoStandardParagraphs
+      };
+    }
+  } catch (e) {
+    console.warn("fetchSystemTemplatesConfig error:", e);
+  }
+  return getSystemTemplates();
+}
+
 export function getSystemTemplates(): SystemTemplatesConfig {
   if (typeof window === "undefined") return DEFAULT_TEMPLATES_CONFIG;
   const saved = localStorage.getItem("faculty_erp_templates_config");
@@ -53,8 +77,22 @@ export function getSystemTemplates(): SystemTemplatesConfig {
   }
 }
 
-export function saveSystemTemplates(config: SystemTemplatesConfig) {
+export async function saveSystemTemplates(config: SystemTemplatesConfig, actor?: UserProfile | null) {
   if (typeof window !== "undefined") {
     localStorage.setItem("faculty_erp_templates_config", JSON.stringify(config));
+  }
+  try {
+    await saveMasterSettings({
+      facultyName: config.facultyName,
+      universityName: config.universityName,
+      deanName: config.deanName,
+      deanPosition: config.deanPosition,
+      docPrefix: config.defaultDocPrefix,
+      fiscalYear: config.defaultFiscalYear,
+      defaultVatRate: config.vatRate,
+      ...({ memoStandardParagraphs: config.memoStandardParagraphs } as any)
+    }, actor);
+  } catch (e) {
+    console.warn("saveSystemTemplates to Firestore error:", e);
   }
 }

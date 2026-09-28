@@ -130,7 +130,78 @@ export interface RoomBooking {
   endTime: string;
   purpose: string;
   driverName?: string;
+  destination?: string;
+  passengerCount?: number;
+  travelMemoNumber?: string;
   status: "pending" | "approved" | "rejected" | "cancelled";
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface OfficialOrder {
+  id: string;
+  orderNumber: string;         // เลขที่คำสั่ง/ประกาศ เช่น คำสั่งคณะที่ 015/2569
+  orderType: "committee_appointment" | "procurement_committee" | "announcement" | "work_assignment";
+  date: string;
+  title: string;
+  signedBy: string;
+  signatoryPosition?: string;
+  category: string;
+  status: "active" | "revoked";
+  revokedReason?: string;
+  revokedByOrderNumber?: string;
+  fileUrl?: string;
+  committeeMembers?: Array<{
+    name: string;
+    position: string;
+    role: string;              // ประธานกรรมการ, กรรมการ, กรรมการและเลขานุการ
+  }>;
+  createdById?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface OfficialResponse {
+  id: string;
+  responseNumber: string;      // เช่น ตบ 01/2569
+  responseType: "speaker" | "activity" | "facility";
+  decision: "accept" | "decline";
+  declineReason?: string;
+  responderName: string;
+  responderPosition: string;
+  organization: string;
+  telephone: string;
+  projectName: string;
+  eventDate: string;
+  location: string;
+  feeOption: string;
+  participantsCount?: number;
+  participantsList?: Array<{
+    name: string;
+    position: string;
+    telephone?: string;
+  }>;
+  status: "draft" | "submitted" | "confirmed";
+  createdById?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface ChecklistSubmission {
+  id: string;
+  checklistType: "loan" | "reimbursement" | "travel" | "teaching_fee" | "supervision";
+  title: string;
+  applicantName: string;
+  department: string;
+  projectName: string;
+  amount?: number;
+  checkedItems: Record<string, { status: "yes" | "no" | "na"; remark?: string }>;
+  isComplete: boolean;
+  reviewerName?: string;
+  reviewDate?: string;
+  status: "draft" | "verified" | "returned" | "approved";
+  returnReason?: string;
+  createdById?: string;
   createdAt: string;
   updatedAt?: string;
 }

@@ -123,6 +123,26 @@ service cloud.firestore {
       allow update, delete: if isAuthenticated();
     }
 
+    // 10. Orders & Announcements
+    match /orders/{orderId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    // 11. Admin Responses & Checklists
+    match /admin_responses/{respId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    match /admin_checklists/{checkId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
     // 10. Audit Logs (Immutable append-only)
     match /audit_logs/{logId} {
       allow read: if isAdmin() || isDean();

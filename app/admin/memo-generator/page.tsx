@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { 
   FileEdit, 
@@ -8,87 +8,199 @@ import {
   Printer, 
   Sparkles, 
   FileText, 
-  Copy, 
-  Check,
-  RefreshCw,
-  Eye,
-  Settings,
-  HelpCircle
+  Check, 
+  Save, 
+  RotateCcw, 
+  Plus, 
+  Trash2, 
+  FolderOpen, 
+  X,
+  AlertCircle,
+  Clock,
+  Building
 } from "lucide-react";
+import { useRole } from "@/components/RoleContext";
 import { exportMemoToWord, printDocumentView } from "@/lib/documentGenerator";
+import { fetchSystemTemplatesConfig } from "@/lib/templateConfig";
+import { getMemos, createMemo, updateMemo } from "@/lib/firebaseService";
+import { OfficialMemo } from "@/lib/types";
 
-const TEMPLATES = {
-  speaker_invite: {
-    name: "หนังสือเชิญวิทยากร (ภายใน)",
-    department: "สาขาวิชารัฐศาสตร์ คณะศิลปศาสตร์และวิทยาศาสตร์ โทร. 044-811-xxx",
-    subject: "ขอเรียนเชิญเป็นวิทยากรโครงการพัฒนาศักยภาพนักศึกษา",
-    to: "คณบดีคณะศิลปศาสตร์และวิทยาศาสตร์ / อาจารย์ประจำสาขาวิชา",
-    paragraphs: [
-      "ด้วย สาขาวิชารัฐศาสตร์ คณะศิลปศาสตร์และวิทยาศาสตร์ มีกำหนดจัดโครงการพัฒนาศักยภาพและเสริมสร้างประสบการณ์เรียนรู้เชิงนวัตกรรม ในวันที่ 15 ตุลาคม 2569 เวลา 09.00 - 16.30 น. ณ ห้องประชุมสิริวิชาญ",
-      "ในการนี้ สาขาวิชารัฐศาสตร์ พิจารณาเห็นว่าท่านเป็นผู้มีความรู้ ความสามารถ และประสบการณ์ในหัวข้อดังกล่าว จึงใคร่ขอเรียนเชิญท่านเป็นวิทยากรบรรยายตามวัน เวลา และสถานที่ดังกล่าวข้างต้น",
-      "จึงเรียนมาเพื่อโปรดพิจารณาและให้ความอนุเคราะห์"
-    ],
-    signatoryName: "อาจารย์ฤทธิชัย ภาระวิเศษ",
-    signatoryPosition: "หัวหน้าโครงการ / อาจารย์ประจำสาขาวิชา"
-  },
-  class_exemption: {
-    name: "ขอความอนุเคราะห์เวลาเรียน (นักศึกษาเข้าร่วมโครงการ)",
-    department: "งานบริการการศึกษา คณะศิลปศาสตร์และวิทยาศาสตร์ โทร. 044-811-xxx",
-    subject: "ขอความอนุเคราะห์เวลาเรียนของนักศึกษาเข้าร่วมโครงการ",
-    to: "อาจารย์ผู้สอนทุกท่าน",
-    paragraphs: [
-      "ด้วย คณะศิลปศาสตร์และวิทยาศาสตร์ ได้จัดโครงการอบรมเชิงปฏิบัติการ Startup Creator สร้างนวัตกรท่องเที่ยวรุ่นใหม่ ในวันพุธที่ 8 ตุลาคม 2569 เวลา 08.30 - 16.30 น. ณ อาคาร 4 ห้อง 421",
-      "เพื่อให้การดำเนินโครงการบรรลุตามวัตถุประสงค์ จึงใคร่ขอความอนุเคราะห์เวลาเรียนของนักศึกษาชั้นปีที่ 3 และ 4 สาขาวิชาบริหารธุรกิจ จำนวน 45 คน ตามรายชื่อแนบท้าย เพื่อเข้าร่วมกิจกรรมดังกล่าว",
-      "จึงเรียนมาเพื่อโปรดพิจารณาให้ความอนุเคราะห์"
-    ],
-    signatoryName: "ผู้ช่วยศาสตราจารย์ ดร.นฤมล อนันตโชค",
-    signatoryPosition: "คณบดีคณะศิลปศาสตร์และวิทยาศาสตร์"
-  },
-  travel_duty: {
-    name: "บันทึกขออนุมัติเดินทางไปปฏิบัติราชการ",
-    department: "สาขาวิชาวิศวกรรมการผลิต คณะศิลปศาสตร์และวิทยาศาสตร์",
-    subject: "ขออนุมัติเดินทางไปปฏิบัติราชการและขอใช้ยานพาหนะ",
-    to: "คณบดีคณะศิลปศาสตร์และวิทยาศาสตร์",
-    paragraphs: [
-      "ด้วย ข้าพเจ้าและคณะรวม 3 คน มีความจำเป็นต้องเดินทางไปดำเนินงานโครงการยกระดับเศรษฐกิจฐานราก ณ ชุมชนบ้านเสี้ยวน้อย ตำบลท่าหินโงม อำเภอเมือง จังหวัดชัยภูมิ ในวันที่ 20 ตุลาคม 2569",
-      "ในการนี้ จึงขออนุมัติเดินทางไปปฏิบัติราชการ พร้อมขออนุมัติใช้รถยนต์ส่วนกลางของคณะ หมายเลขทะเบียน นข 1234 ชัยภูมิ และขออนุมัติเบิกจ่ายค่าใช้จ่ายในการเดินทางตามระเบียบของทางราชการ",
-      "จึงเรียนมาเพื่อโปรดพิจารณาอนุมัติ"
-    ],
-    signatoryName: "ดร.สุรชัย นวัตกร",
-    signatoryPosition: "อาจารย์ประจำสาขาวิชา / หัวหน้าโครงการ"
-  }
-};
+interface SpeakerItem {
+  name: string;
+  position: string;
+  topic: string;
+}
 
 export default function MemoGeneratorPage() {
-  const [selectedTemplateKey, setSelectedTemplateKey] = useState<keyof typeof TEMPLATES>("speaker_invite");
-  
-  const [department, setDepartment] = useState(TEMPLATES.speaker_invite.department);
-  const [docNumber, setDocNumber] = useState("อว 0604.05/ว 048");
-  const [date, setDate] = useState("28 กันยายน 2569");
-  const [subject, setSubject] = useState(TEMPLATES.speaker_invite.subject);
-  const [to, setTo] = useState(TEMPLATES.speaker_invite.to);
-  const [p1, setP1] = useState(TEMPLATES.speaker_invite.paragraphs[0]);
-  const [p2, setP2] = useState(TEMPLATES.speaker_invite.paragraphs[1]);
-  const [p3, setP3] = useState(TEMPLATES.speaker_invite.paragraphs[2]);
-  const [signatoryName, setSignatoryName] = useState(TEMPLATES.speaker_invite.signatoryName);
-  const [signatoryPosition, setSignatoryPosition] = useState(TEMPLATES.speaker_invite.signatoryPosition);
-  
-  const [copied, setCopied] = useState(false);
+  const { currentUser } = useRole();
+  const [selectedTemplateKey, setSelectedTemplateKey] = useState<
+    "speaker_single" | "speaker_multiple" | "class_exemption" | "travel_duty" | "propose_dean"
+  >("speaker_single");
 
-  const applyTemplate = (key: keyof typeof TEMPLATES) => {
+  const [loading, setLoading] = useState(true);
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [savedMemos, setSavedMemos] = useState<OfficialMemo[]>([]);
+  const [showDraftsModal, setShowDraftsModal] = useState(false);
+  const [activeMemoId, setActiveMemoId] = useState<string | null>(null);
+
+  // Memo Form State
+  const [facultyName, setFacultyName] = useState("คณะศิลปศาสตร์และวิทยาศาสตร์");
+  const [department, setDepartment] = useState("สาขาวิชารัฐศาสตร์ คณะศิลปศาสตร์และวิทยาศาสตร์");
+  const [docNumber, setDocNumber] = useState("อว 0643.04/ว ");
+  const [date, setDate] = useState(new Date().toLocaleDateString("th-TH", { year: "numeric", month: "long", day: "numeric" }));
+  const [to, setTo] = useState("คณบดีคณะศิลปศาสตร์และวิทยาศาสตร์");
+  const [subject, setSubject] = useState("ขอเรียนเชิญเป็นวิทยากรโครงการพัฒนาศักยภาพนักศึกษา");
+  const [p1, setP1] = useState("");
+  const [p2, setP2] = useState("");
+  const [p3, setP3] = useState("จึงเรียนมาเพื่อโปรดพิจารณาและให้ความอนุเคราะห์");
+  const [signatoryName, setSignatoryName] = useState("อาจารย์ ดร.ฤทธิชัย ภาระวิเศษ");
+  const [signatoryPosition, setSignatoryPosition] = useState("หัวหน้าโครงการ / อาจารย์ประจำสาขาวิชา");
+
+  // Multi-speakers table state
+  const [speakers, setSpeakers] = useState<SpeakerItem[]>([
+    { name: "ผู้ช่วยศาสตราจารย์ ดร.สานนท์ ด่านภักดี", position: "คณบดีคณะศิลปศาสตร์และวิทยาศาสตร์", topic: "การประยุกต์ใช้ AI ในการบริหารภาครัฐ" },
+    { name: "นายธีรเดช เจริญสุข", position: "ผู้เชี่ยวชาญด้านระบบสารสนเทศ", topic: "การพัฒนาเว็บแอปพลิเคชัน ERP ยุคใหม่" }
+  ]);
+
+  // Load system master settings & memos
+  useEffect(() => {
+    async function init() {
+      try {
+        setLoading(true);
+        const config = await fetchSystemTemplatesConfig();
+        if (config) {
+          setFacultyName(config.facultyName);
+          setDocNumber(`${config.defaultDocPrefix}ว `);
+        }
+        const memos = await getMemos();
+        setSavedMemos(memos);
+        loadDefaultTemplateContent("speaker_single", config);
+      } catch (err) {
+        console.warn("Init memo config error:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    init();
+  }, []);
+
+  const loadDefaultTemplateContent = (key: string, config?: any) => {
+    switch (key) {
+      case "speaker_single":
+        setSubject("ขอเรียนเชิญเป็นวิทยากรโครงการพัฒนาศักยภาพนักศึกษา");
+        setTo("คณบดีคณะศิลปศาสตร์และวิทยาศาสตร์ / อาจารย์ประจำสาขาวิชา");
+        setP1("ด้วย สาขาวิชารัฐศาสตร์ คณะศิลปศาสตร์และวิทยาศาสตร์ มีกำหนดจัดโครงการพัฒนาศักยภาพและเสริมสร้างประสบการณ์เรียนรู้เชิงนวัตกรรม ประจำปีงบประมาณ พ.ศ. 2569 ในวันที่ 15 ตุลาคม 2569 เวลา 09.00 - 16.30 น. ณ ห้อง Smart Classroom 421");
+        setP2("ในการนี้ สาขาวิชาพิจารณาเห็นว่าท่านเป็นผู้มีความรู้ ความเชี่ยวชาญ และประสบการณ์สูงในหัวข้อดังกล่าว จึงใคร่ขอเรียนเชิญท่านเป็นวิทยากรบรรยายตามวัน เวลา และสถานที่ดังกล่าวข้างต้น");
+        setP3("จึงเรียนมาเพื่อโปรดพิจารณาและให้ความอนุเคราะห์");
+        break;
+
+      case "speaker_multiple":
+        setSubject("ขอเรียนเชิญเป็นวิทยากรโครงการบริการวิชาการแก่ชุมชน (คณะวิทยากร)");
+        setTo("ผู้อำนวยการหน่วยงาน / อาจารย์ประจำสาขาวิชา");
+        setP1("ด้วย คณะศิลปศาสตร์และวิทยาศาสตร์ มีกำหนดดำเนินโครงการยกระดับเศรษฐกิจฐานรากและพัฒนาทักษะวิชาชีพชุมชน ในวันที่ 22-24 ตุลาคม 2569 ณ ศาลาประชาคมบ้านเสี้ยวน้อย ตำบลท่าหินโงม อำเภอเมือง จังหวัดชัยภูมิ");
+        setP2("เพื่อให้การดำเนินโครงการบรรลุตามวัตถุประสงค์และเกิดประโยชน์สูงสุด จึงใคร่ขอเรียนเชิญบุคลากรในสังกัดของท่าน จำนวน 2 ท่าน ตามรายชื่อและหัวข้อบรรยายแนบท้าย เพื่อเป็นวิทยากรในการจัดอบรมเชิงปฏิบัติการ");
+        setP3("จึงเรียนมาเพื่อโปรดพิจารณาให้ความอนุเคราะห์");
+        break;
+
+      case "class_exemption":
+        setSubject("ขอความอนุเคราะห์เวลาเรียนของนักศึกษาเข้าร่วมโครงการ");
+        setTo("อาจารย์ผู้สอนประจำรายวิชาทุกท่าน");
+        setP1("ด้วย คณะศิลปศาสตร์และวิทยาศาสตร์ ได้จัดโครงการอบรมเชิงปฏิบัติการ Startup Creator สร้างนวัตกรท่องเที่ยวรุ่นใหม่ ในวันพุธที่ 8 ตุลาคม 2569 เวลา 08.30 - 16.30 น. ณ อาคาร 4 ห้อง 421");
+        setP2("เพื่อให้การดำเนินโครงการบรรลุตามวัตถุประสงค์ จึงใคร่ขอความอนุเคราะห์เวลาเรียนของนักศึกษาชั้นปีที่ 3 และ 4 สาขาวิชาบริหารธุรกิจ จำนวน 45 คน ตามรายชื่อแนบท้าย เพื่อเข้าร่วมกิจกรรมดังกล่าว");
+        setP3("จึงเรียนมาเพื่อโปรดพิจารณาให้ความอนุเคราะห์");
+        break;
+
+      case "travel_duty":
+        setSubject("ขออนุมัติเดินทางไปปฏิบัติราชการและขอใช้ยานพาหนะคณะ");
+        setTo("คณบดีคณะศิลปศาสตร์และวิทยาศาสตร์");
+        setP1("ด้วย ข้าพเจ้าและคณะรวม 3 คน มีความจำเป็นต้องเดินทางไปดำเนินงานโครงการยกระดับเศรษฐกิจฐานราก ณ ชุมชนบ้านเสี้ยวน้อย ตำบลท่าหินโงม อำเภอเมือง จังหวัดชัยภูมิ ในวันที่ 20 ตุลาคม 2569");
+        setP2("ในการนี้ จึงขออนุมัติเดินทางไปปฏิบัติราชการ พร้อมขออนุมัติใช้รถยนต์ส่วนกลางของคณะ หมายเลขทะเบียน นข 1234 ชัยภูมิ และขออนุมัติเบิกจ่ายค่าใช้จ่ายในการเดินทางตามระเบียบของทางราชการ");
+        setP3("จึงเรียนมาเพื่อโปรดพิจารณาอนุมัติ");
+        break;
+
+      case "propose_dean":
+        setSubject("ขอความอนุเคราะห์เสนออธิการบดีลงนามในหนังสือราชการ");
+        setTo("คณบดีคณะศิลปศาสตร์และวิทยาศาสตร์");
+        setP1("ด้วย สาขาวิชารัฐศาสตร์ ได้จัดทำหนังสือราชการภายนอก เพื่อประสานความร่วมมือทางวิชาการและจัดหาสถานที่ฝึกประสบการณ์วิชาชีพแก่นักศึกษา ณ องค์การบริหารส่วนจังหวัดชัยภูมิ เรียบร้อยแล้ว");
+        setP2("ในการนี้ จึงใคร่ขอความอนุเคราะห์จากท่าน เพื่อโปรดพิจารณาและนำกราบเรียนเสนอท่านอธิการบดีลงนามในหนังสือราชการดังกล่าว ตามเอกสารที่แนบมาพร้อมนี้");
+        setP3("จึงเรียนมาเพื่อโปรดพิจารณาให้ความอนุเคราะห์");
+        break;
+    }
+  };
+
+  const handleSelectTemplate = (key: typeof selectedTemplateKey) => {
     setSelectedTemplateKey(key);
-    const tmpl = TEMPLATES[key];
-    setDepartment(tmpl.department);
-    setSubject(tmpl.subject);
-    setTo(tmpl.to);
-    setP1(tmpl.paragraphs[0] || "");
-    setP2(tmpl.paragraphs[1] || "");
-    setP3(tmpl.paragraphs[2] || "");
-    setSignatoryName(tmpl.signatoryName);
-    setSignatoryPosition(tmpl.signatoryPosition);
+    loadDefaultTemplateContent(key);
+  };
+
+  const handleAddSpeaker = () => {
+    setSpeakers([...speakers, { name: "", position: "", topic: "" }]);
+  };
+
+  const handleRemoveSpeaker = (index: number) => {
+    setSpeakers(speakers.filter((_, idx) => idx !== index));
+  };
+
+  const handleSaveDraft = async () => {
+    try {
+      setSavingDraft(true);
+      const memoPayload: Omit<OfficialMemo, "id" | "createdAt"> = {
+        title: subject,
+        docNumber,
+        department,
+        date,
+        to,
+        subject,
+        bodyParagraphs: [p1, p2, p3].filter(Boolean),
+        signatoryName,
+        signatoryPosition,
+        templateType: 
+          selectedTemplateKey === "speaker_single" ? "invite_speaker_internal" :
+          selectedTemplateKey === "speaker_multiple" ? "invite_speaker_multiple" :
+          selectedTemplateKey === "class_exemption" ? "class_exemption" :
+          selectedTemplateKey === "travel_duty" ? "official_travel" : "general_memo",
+        status: "draft"
+      };
+
+      if (activeMemoId) {
+        await updateMemo(activeMemoId, memoPayload, currentUser);
+      } else {
+        const created = await createMemo(memoPayload, currentUser);
+        setActiveMemoId(created.id);
+        setSavedMemos([created, ...savedMemos]);
+      }
+
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (err: any) {
+      alert("บันทึกร่างไม่สำเร็จ: " + err.message);
+    } finally {
+      setSavingDraft(false);
+    }
+  };
+
+  const handleLoadMemo = (m: OfficialMemo) => {
+    setActiveMemoId(m.id);
+    setSubject(m.subject || m.title);
+    setDocNumber(m.docNumber);
+    setDepartment(m.department);
+    setDate(m.date);
+    setTo(m.to);
+    setP1(m.bodyParagraphs[0] || "");
+    setP2(m.bodyParagraphs[1] || "");
+    setP3(m.bodyParagraphs[2] || "");
+    setSignatoryName(m.signatoryName);
+    setSignatoryPosition(m.signatoryPosition);
+    setShowDraftsModal(false);
   };
 
   const handleExportWord = async () => {
+    const tableData = selectedTemplateKey === "speaker_multiple" ? {
+      tableHeaders: ["ลำดับ", "ชื่อ-สกุล วิทยากร", "ตำแหน่ง / สังกัด", "หัวข้อการบรรยาย"],
+      tableRows: speakers.map((s, idx) => [(idx + 1).toString(), s.name, s.position, s.topic])
+    } : {};
+
     await exportMemoToWord({
       department,
       docNumber,
@@ -98,6 +210,7 @@ export default function MemoGeneratorPage() {
       paragraphs: [p1, p2, p3].filter(Boolean),
       signatoryName,
       signatoryPosition,
+      ...tableData
     });
   };
 
@@ -107,7 +220,7 @@ export default function MemoGeneratorPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <Link href="/admin" className="text-xs text-blue-800 hover:underline">
+            <Link href="/admin" className="text-xs text-blue-900 hover:underline">
               ← กลับไปศูนย์ธุรการ
             </Link>
           </div>
@@ -115,18 +228,35 @@ export default function MemoGeneratorPage() {
             สร้างบันทึกข้อความราชการ (Official Memo Generator)
           </h1>
           <p className="text-xs text-slate-500">
-            กรอกข้อมูลในระบบ แสดงตัวอย่างแบบฟอร์มราชการตราครุฑ และส่งออกเป็น Word (.docx) หรือ PDF
+            สร้างบันทึกข้อความราชการตราครุฑมาตรฐาน บันทึกร่างในระบบ และส่งออก Word (.docx) และ PDF
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowDraftsModal(true)}
+            className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl shadow-subtle transition-all"
+          >
+            <FolderOpen className="w-4 h-4 text-blue-900" />
+            <span>คลังร่าง ({savedMemos.length})</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleSaveDraft}
+            disabled={savingDraft}
+            className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold rounded-xl transition-all"
+          >
+            <Save className="w-4 h-4 text-slate-700" />
+            <span>{savingDraft ? "กำลังบันทึก..." : activeMemoId ? "บันทึกการแก้ไข" : "บันทึกร่าง"}</span>
+          </button>
           <button
             type="button"
             onClick={printDocumentView}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl shadow-subtle transition-all"
+            className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl shadow-subtle transition-all"
           >
             <Printer className="w-4 h-4 text-slate-600" />
-            <span>พิมพ์ / บันทึก PDF</span>
+            <span>พิมพ์ / PDF</span>
           </button>
           <button
             type="button"
@@ -139,38 +269,82 @@ export default function MemoGeneratorPage() {
         </div>
       </div>
 
-      {/* Template Selector Pills */}
-      <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-subtle flex flex-wrap items-center gap-2">
+      {saveSuccess && (
+        <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
+          <Check className="w-4 h-4 text-emerald-600" />
+          <span>บันทึกร่างบันทึกข้อความลงในฐานข้อมูลเรียบร้อยแล้ว</span>
+        </div>
+      )}
+
+      {/* Template Selection Pills */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-subtle flex flex-wrap items-center gap-2">
         <span className="text-xs font-bold text-slate-700 flex items-center gap-1 mr-2">
-          <Sparkles className="w-3.5 h-3.5 text-blue-800" /> แม่แบบบันทึกข้อความ:
+          <Sparkles className="w-3.5 h-3.5 text-blue-900" /> เลือกแม่แบบมาตรฐาน:
         </span>
-        {(Object.keys(TEMPLATES) as Array<keyof typeof TEMPLATES>).map((key) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => applyTemplate(key)}
-            className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-all ${
-              selectedTemplateKey === key
-                ? "bg-blue-900 text-white shadow-sm"
-                : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-            }`}
-          >
-            {TEMPLATES[key].name}
-          </button>
-        ))}
+        <button
+          type="button"
+          onClick={() => handleSelectTemplate("speaker_single")}
+          className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-all ${
+            selectedTemplateKey === "speaker_single" ? "bg-blue-900 text-white shadow-sm" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+          }`}
+        >
+          1. เชิญวิทยากรเดี่ยว
+        </button>
+        <button
+          type="button"
+          onClick={() => handleSelectTemplate("speaker_multiple")}
+          className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-all ${
+            selectedTemplateKey === "speaker_multiple" ? "bg-blue-900 text-white shadow-sm" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+          }`}
+        >
+          2. เชิญวิทยากรหลายท่าน
+        </button>
+        <button
+          type="button"
+          onClick={() => handleSelectTemplate("class_exemption")}
+          className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-all ${
+            selectedTemplateKey === "class_exemption" ? "bg-blue-900 text-white shadow-sm" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+          }`}
+        >
+          3. ขอเวลาเรียนนักศึกษา
+        </button>
+        <button
+          type="button"
+          onClick={() => handleSelectTemplate("travel_duty")}
+          className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-all ${
+            selectedTemplateKey === "travel_duty" ? "bg-blue-900 text-white shadow-sm" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+          }`}
+        >
+          4. ขอไปปฏิบัติราชการ
+        </button>
+        <button
+          type="button"
+          onClick={() => handleSelectTemplate("propose_dean")}
+          className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-all ${
+            selectedTemplateKey === "propose_dean" ? "bg-blue-900 text-white shadow-sm" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+          }`}
+        >
+          5. เสนอคณบดี/อธิการบดี
+        </button>
       </div>
 
-      {/* Main Grid: Form Left, Realtime Document Preview Right */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Form: 5 cols */}
-        <div className="lg:col-span-5 bg-white border border-slate-200 rounded-2xl p-5 shadow-card space-y-4 text-xs">
-          <h2 className="font-bold text-sm text-slate-900 pb-2 border-b border-slate-100 flex items-center justify-between">
-            <span>แบบฟอร์มกรอกข้อมูล</span>
-            <span className="text-[10px] text-blue-800 font-normal">แก้ไขเพื่อเปลี่ยนพรีวิวสด</span>
-          </h2>
+      {/* Main Grid: Editor on Left, Live Preview on Right */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Editor Form */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-card space-y-4 text-xs">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100 font-bold text-slate-900">
+            <span className="flex items-center gap-1.5">
+              <FileEdit className="w-4 h-4 text-blue-900" /> กรอกข้อมูลบันทึกข้อความ
+            </span>
+            {activeMemoId && (
+              <span className="text-[11px] font-normal text-blue-900 bg-blue-50 px-2 py-0.5 rounded">
+                กำลังแก้ไขบันทึกข้อความร่าง
+              </span>
+            )}
+          </div>
 
           <div>
-            <label className="block font-medium text-slate-700 mb-1">ส่วนราชการ (หน่วยงาน/โทรศัพท์)</label>
+            <label className="block font-semibold text-slate-700 mb-1">ส่วนราชการ (หน่วยงานเจ้าของเรื่อง)</label>
             <input
               type="text"
               value={department}
@@ -179,18 +353,18 @@ export default function MemoGeneratorPage() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block font-medium text-slate-700 mb-1">ที่ (เลขที่หนังสือ)</label>
+              <label className="block font-semibold text-slate-700 mb-1">ที่ (เลขที่หนังสือ)</label>
               <input
                 type="text"
                 value={docNumber}
                 onChange={(e) => setDocNumber(e.target.value)}
-                className="w-full border border-slate-200 rounded-lg p-2 font-mono focus:border-blue-900 focus:outline-none"
+                className="w-full border border-slate-200 rounded-lg p-2 focus:border-blue-900 focus:outline-none font-mono"
               />
             </div>
             <div>
-              <label className="block font-medium text-slate-700 mb-1">วันที่</label>
+              <label className="block font-semibold text-slate-700 mb-1">วันที่</label>
               <input
                 type="text"
                 value={date}
@@ -201,17 +375,17 @@ export default function MemoGeneratorPage() {
           </div>
 
           <div>
-            <label className="block font-medium text-slate-700 mb-1">เรื่อง</label>
+            <label className="block font-semibold text-slate-700 mb-1">เรื่อง</label>
             <input
               type="text"
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
-              className="w-full border border-slate-200 rounded-lg p-2 font-semibold text-slate-900 focus:border-blue-900 focus:outline-none"
+              className="w-full border border-slate-200 rounded-lg p-2 focus:border-blue-900 focus:outline-none"
             />
           </div>
 
           <div>
-            <label className="block font-medium text-slate-700 mb-1">เรียน</label>
+            <label className="block font-semibold text-slate-700 mb-1">เรียน</label>
             <input
               type="text"
               value={to}
@@ -221,27 +395,94 @@ export default function MemoGeneratorPage() {
           </div>
 
           <div>
-            <label className="block font-medium text-slate-700 mb-1">ข้อความ (ย่อหน้าเกริ่นนำ)</label>
+            <label className="block font-semibold text-slate-700 mb-1">ย่อหน้าที่ 1 (ข้อความเปิด/ความเดิม)</label>
             <textarea
               rows={3}
               value={p1}
               onChange={(e) => setP1(e.target.value)}
-              className="w-full border border-slate-200 rounded-lg p-2 focus:border-blue-900 focus:outline-none resize-none"
+              className="w-full border border-slate-200 rounded-lg p-2 focus:border-blue-900 focus:outline-none"
             />
           </div>
 
           <div>
-            <label className="block font-medium text-slate-700 mb-1">ข้อความ (ย่อหน้าเนื้อหา/จุดประสงค์)</label>
+            <label className="block font-semibold text-slate-700 mb-1">ย่อหน้าที่ 2 (เนื้อหา/ความประสงค์)</label>
             <textarea
               rows={3}
               value={p2}
               onChange={(e) => setP2(e.target.value)}
-              className="w-full border border-slate-200 rounded-lg p-2 focus:border-blue-900 focus:outline-none resize-none"
+              className="w-full border border-slate-200 rounded-lg p-2 focus:border-blue-900 focus:outline-none"
             />
           </div>
 
+          {selectedTemplateKey === "speaker_multiple" && (
+            <div className="space-y-3 p-3 bg-blue-50/50 rounded-xl border border-blue-100">
+              <div className="flex items-center justify-between">
+                <label className="font-bold text-blue-900">ตารางรายชื่อวิทยากรและหัวข้อ</label>
+                <button
+                  type="button"
+                  onClick={handleAddSpeaker}
+                  className="px-2 py-1 bg-blue-900 text-white text-[10px] font-semibold rounded-lg flex items-center gap-1"
+                >
+                  <Plus className="w-3 h-3" /> เพิ่มวิทยากร
+                </button>
+              </div>
+
+              {speakers.map((s, idx) => (
+                <div key={idx} className="bg-white p-2.5 rounded-lg border border-slate-200 space-y-2">
+                  <div className="flex items-center justify-between text-[11px] font-bold text-slate-700">
+                    <span>วิทยากรท่านที่ {idx + 1}</span>
+                    {speakers.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveSpeaker(idx)}
+                        className="text-rose-600 hover:text-rose-800 p-0.5"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      placeholder="ชื่อ-นามสกุล..."
+                      value={s.name}
+                      onChange={(e) => {
+                        const next = [...speakers];
+                        next[idx].name = e.target.value;
+                        setSpeakers(next);
+                      }}
+                      className="border border-slate-200 rounded p-1.5"
+                    />
+                    <input
+                      type="text"
+                      placeholder="ตำแหน่ง / สังกัด..."
+                      value={s.position}
+                      onChange={(e) => {
+                        const next = [...speakers];
+                        next[idx].position = e.target.value;
+                        setSpeakers(next);
+                      }}
+                      className="border border-slate-200 rounded p-1.5"
+                    />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="หัวข้อการบรรยาย..."
+                    value={s.topic}
+                    onChange={(e) => {
+                      const next = [...speakers];
+                      next[idx].topic = e.target.value;
+                      setSpeakers(next);
+                    }}
+                    className="w-full border border-slate-200 rounded p-1.5"
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+
           <div>
-            <label className="block font-medium text-slate-700 mb-1">ข้อความ (ย่อหน้าสรุป)</label>
+            <label className="block font-semibold text-slate-700 mb-1">ย่อหน้าที่ 3 (ข้อความลงท้าย)</label>
             <input
               type="text"
               value={p3}
@@ -250,9 +491,9 @@ export default function MemoGeneratorPage() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-100">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
             <div>
-              <label className="block font-medium text-slate-700 mb-1">ชื่อผู้ลงนาม</label>
+              <label className="block font-semibold text-slate-700 mb-1">ชื่อผู้ลงนาม</label>
               <input
                 type="text"
                 value={signatoryName}
@@ -261,7 +502,7 @@ export default function MemoGeneratorPage() {
               />
             </div>
             <div>
-              <label className="block font-medium text-slate-700 mb-1">ตำแหน่ง</label>
+              <label className="block font-semibold text-slate-700 mb-1">ตำแหน่งผู้ลงนาม</label>
               <input
                 type="text"
                 value={signatoryPosition}
@@ -272,65 +513,150 @@ export default function MemoGeneratorPage() {
           </div>
         </div>
 
-        {/* Right Preview (Official Thai Memo Sheet A4 Style): 7 cols */}
-        <div className="lg:col-span-7 bg-white border border-slate-300 rounded-2xl p-8 md:p-12 shadow-float text-slate-900 doc-sarabun text-sm relative">
-          <div className="absolute top-4 right-4 no-print flex items-center gap-1 text-slate-400 text-xs">
-            <Eye className="w-3.5 h-3.5" /> พรีวิวหนังสือราชการ A4
+        {/* Live Printable Garuda Preview */}
+        <div className="bg-slate-100 p-4 rounded-2xl border border-slate-200 flex flex-col items-center">
+          <div className="w-full flex items-center justify-between pb-2 mb-2 border-b border-slate-200 text-xs font-bold text-slate-600">
+            <span>ตัวอย่างเอกสารฉบับทางการ (Garuda Memo Preview)</span>
+            <span className="text-[11px] text-slate-400">ขนาด A4 มาตรฐาน</span>
           </div>
 
-          {/* Official Emblem & Header */}
-          <div className="text-center relative pt-4 pb-2">
-            {/* Garuda Symbol placeholder */}
-            <div className="w-16 h-16 mx-auto mb-2 flex items-center justify-center border-2 border-slate-300 rounded-full text-slate-700 font-serif font-bold text-xs bg-slate-50">
-              [ตราครุฑ]
-            </div>
-            <h2 className="text-2xl font-bold tracking-tight text-slate-900">บันทึกข้อความ</h2>
-          </div>
-
-          {/* Memo Meta Fields */}
-          <div className="mt-6 space-y-2 border-b border-slate-900 pb-3">
-            <div className="flex items-baseline">
-              <span className="font-bold w-24 flex-shrink-0">ส่วนราชการ:</span>
-              <span className="flex-1 text-slate-800">{department || "..........................................................."}</span>
-            </div>
-            <div className="flex items-baseline justify-between gap-4">
-              <div className="flex items-baseline flex-1">
-                <span className="font-bold w-12 flex-shrink-0">ที่:</span>
-                <span className="flex-1 font-mono text-slate-800">{docNumber || "......................................."}</span>
+          {/* Paper Container for print */}
+          <div 
+            id="printable-document-area"
+            className="bg-white shadow-xl rounded-lg p-8 sm:p-12 w-full max-w-[210mm] min-h-[297mm] text-slate-900 font-sans leading-relaxed text-sm flex flex-col justify-between"
+            style={{ fontFamily: "'TH Sarabun PSK', 'Sarabun', sans-serif" }}
+          >
+            <div>
+              {/* Header with Center Garuda Text */}
+              <div className="text-center pb-4">
+                <div className="w-16 h-16 mx-auto mb-2 bg-slate-100 rounded-full border border-slate-300 flex items-center justify-center text-[10px] font-bold text-slate-500">
+                  ตราครุฑ
+                </div>
+                <h2 className="text-2xl font-bold tracking-tight text-slate-900">
+                  บันทึกข้อความ
+                </h2>
               </div>
-              <div className="flex items-baseline flex-1">
-                <span className="font-bold w-16 flex-shrink-0">วันที่:</span>
-                <span className="flex-1 text-slate-800">{date || "......................................."}</span>
+
+              {/* Memo Info Table */}
+              <div className="border-b-2 border-slate-900 pb-3 space-y-1.5 text-sm">
+                <div className="flex">
+                  <span className="font-bold w-24 flex-shrink-0">ส่วนราชการ:</span>
+                  <span className="flex-1">{department}</span>
+                </div>
+                <div className="flex justify-between">
+                  <div className="flex">
+                    <span className="font-bold w-10 flex-shrink-0">ที่:</span>
+                    <span className="font-mono">{docNumber}</span>
+                  </div>
+                  <div className="flex">
+                    <span className="font-bold w-12 flex-shrink-0">วันที่:</span>
+                    <span>{date}</span>
+                  </div>
+                </div>
+                <div className="flex">
+                  <span className="font-bold w-24 flex-shrink-0">เรื่อง:</span>
+                  <span className="font-semibold flex-1">{subject}</span>
+                </div>
+                <div className="flex">
+                  <span className="font-bold w-24 flex-shrink-0">เรียน:</span>
+                  <span className="flex-1">{to}</span>
+                </div>
+              </div>
+
+              {/* Body Content */}
+              <div className="pt-6 space-y-4 text-sm text-justify">
+                {p1 && <p className="indent-12 leading-relaxed">{p1}</p>}
+                {p2 && <p className="indent-12 leading-relaxed">{p2}</p>}
+
+                {selectedTemplateKey === "speaker_multiple" && speakers.length > 0 && (
+                  <div className="py-2">
+                    <table className="w-full border-collapse border border-slate-400 text-xs">
+                      <thead>
+                        <tr className="bg-slate-100 border-b border-slate-400 font-bold text-center">
+                          <th className="p-1.5 border-r border-slate-400 w-10">ลำดับ</th>
+                          <th className="p-1.5 border-r border-slate-400">ชื่อ-สกุล วิทยากร</th>
+                          <th className="p-1.5 border-r border-slate-400">ตำแหน่ง / สังกัด</th>
+                          <th className="p-1.5">หัวข้อการบรรยาย</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {speakers.map((s, idx) => (
+                          <tr key={idx} className="border-b border-slate-400">
+                            <td className="p-1.5 text-center border-r border-slate-400">{idx + 1}</td>
+                            <td className="p-1.5 border-r border-slate-400 font-medium">{s.name}</td>
+                            <td className="p-1.5 border-r border-slate-400">{s.position}</td>
+                            <td className="p-1.5">{s.topic}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {p3 && <p className="indent-12 leading-relaxed">{p3}</p>}
               </div>
             </div>
-            <div className="flex items-baseline">
-              <span className="font-bold w-16 flex-shrink-0">เรื่อง:</span>
-              <span className="font-bold text-slate-900 flex-1">{subject || "..........................................................."}</span>
+
+            {/* Signature Block */}
+            <div className="pt-16 pb-6 text-right">
+              <div className="inline-block text-center pr-4">
+                <p className="mb-8">(ลงชื่อ)........................................................</p>
+                <p className="font-bold">({signatoryName})</p>
+                <p className="text-xs text-slate-600 mt-0.5">{signatoryPosition}</p>
+              </div>
             </div>
           </div>
-
-          {/* Addressee */}
-          <div className="mt-4 flex items-baseline">
-            <span className="font-bold w-16 flex-shrink-0">เรียน:</span>
-            <span className="text-slate-800">{to || "..........................................................."}</span>
-          </div>
-
-          {/* Body Paragraphs */}
-          <div className="mt-4 space-y-3 leading-relaxed text-justify text-slate-800">
-            {p1 && <p className="indent-12">{p1}</p>}
-            {p2 && <p className="indent-12">{p2}</p>}
-            {p3 && <p className="indent-12">{p3}</p>}
-          </div>
-
-          {/* Signature Block */}
-          <div className="mt-14 float-right text-center min-w-[240px]">
-            <p className="text-slate-400 text-xs mb-8">(ลงชื่อ)........................................................</p>
-            <p className="font-medium text-slate-900">({signatoryName || "......................................................."})</p>
-            <p className="text-xs text-slate-600 mt-1">{signatoryPosition || "......................................................."}</p>
-          </div>
-          <div className="clear-both"></div>
         </div>
       </div>
+
+      {/* Modal: Drafts Vault */}
+      {showDraftsModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-900 flex items-center justify-center">
+                  <FolderOpen className="w-4 h-4" />
+                </div>
+                <h3 className="font-bold text-base text-slate-900">คลังบันทึกข้อความร่าง (Saved Memos)</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowDraftsModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="max-h-80 overflow-y-auto divide-y divide-slate-100 mt-3 text-xs">
+              {savedMemos.length === 0 ? (
+                <div className="py-8 text-center text-slate-400">
+                  ยังไม่มีร่างบันทึกข้อความที่บันทึกไว้
+                </div>
+              ) : (
+                savedMemos.map((m) => (
+                  <div key={m.id} className="py-3 flex items-center justify-between hover:bg-slate-50 px-2 rounded-lg transition-colors">
+                    <div className="max-w-md">
+                      <p className="font-bold text-slate-900 text-xs">{m.subject || m.title}</p>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        เลขที่: {m.docNumber || "-"} • วันที่: {m.date} • ผู้เสนอ: {m.proposerName || "อาจารย์"}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleLoadMemo(m)}
+                      className="px-3 py-1.5 bg-blue-900 hover:bg-blue-800 text-white rounded-lg text-xs font-semibold"
+                    >
+                      เปิดแก้ไข
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

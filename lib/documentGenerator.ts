@@ -27,7 +27,38 @@ export async function exportMemoToWord(memo: {
   paragraphs: string[];
   signatoryName: string;
   signatoryPosition: string;
+  tableHeaders?: string[];
+  tableRows?: string[][];
 }) {
+  const tableElements = (memo.tableHeaders && memo.tableRows && memo.tableRows.length > 0) ? [
+    new Paragraph({ text: "" }),
+    new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      rows: [
+        new TableRow({
+          children: memo.tableHeaders.map((header) => new TableCell({
+            children: [
+              new Paragraph({
+                alignment: AlignmentType.CENTER,
+                children: [new TextRun({ text: header, bold: true, size: 28, font: "TH Sarabun PSK" })]
+              })
+            ]
+          }))
+        }),
+        ...memo.tableRows.map((row) => new TableRow({
+          children: row.map((cell) => new TableCell({
+            children: [
+              new Paragraph({
+                children: [new TextRun({ text: cell, size: 28, font: "TH Sarabun PSK" })]
+              })
+            ]
+          }))
+        }))
+      ]
+    }),
+    new Paragraph({ text: "" })
+  ] : [];
+
   const doc = new Document({
     sections: [
       {
@@ -129,6 +160,7 @@ export async function exportMemoToWord(memo: {
                 ],
               })
           ),
+          ...tableElements,
           new Paragraph({ text: "" }),
           new Paragraph({ text: "" }),
           new Paragraph({

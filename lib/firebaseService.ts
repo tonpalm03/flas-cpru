@@ -21,6 +21,9 @@ import {
   InboundDocument, 
   OutboundDocument, 
   OfficialMemo, 
+  OfficialOrder,
+  OfficialResponse,
+  ChecklistSubmission,
   RoomBooking, 
   ProjectProposal,
   PurchaseRequisition,
@@ -229,6 +232,328 @@ export async function createOutboundDoc(
   const list = getLocalData<OutboundDocument>("outbound_docs", MOCK_OUTBOUND_DOCS);
   const created: OutboundDocument = { id: `out-${Date.now()}`, ...newDoc };
   setLocalData("outbound_docs", [created, ...list]);
+  return created;
+}
+
+export async function updateOutboundDocStatus(
+  id: string,
+  status: OutboundDocument["status"],
+  signedFileUrl?: string,
+  actor?: UserProfile | null
+) {
+  if (isConfigured) {
+    try {
+      const docRef = doc(db, "admin_documents_out", id);
+      await updateDoc(docRef, {
+        status,
+        ...(signedFileUrl && { signedFileUrl }),
+        updatedAt: serverTimestamp()
+      });
+      await logAuditEvent(actor || null, "UPDATE_OUTBOUND_STATUS", "admin_documents_out", id, { status, signedFileUrl });
+      return;
+    } catch (e) {
+      console.error("Firestore updateOutboundDocStatus failed:", e);
+      throw e;
+    }
+  }
+
+  const list = getLocalData<OutboundDocument>("outbound_docs", MOCK_OUTBOUND_DOCS);
+  const updated = list.map(item => item.id === id ? { ...item, status, ...(signedFileUrl && { signedFileUrl }) } : item);
+  setLocalData("outbound_docs", updated);
+}
+
+// ==========================================
+// 3.1 OFFICIAL MEMOS (บันทึกข้อความราชการ)
+// ==========================================
+export async function getMemos(): Promise<OfficialMemo[]> {
+  if (isConfigured) {
+    try {
+      const snap = await getDocs(collection(db, "memos"));
+      if (!snap.empty) {
+        return snap.docs.map(d => ({ id: d.id, ...d.data() } as OfficialMemo));
+      }
+    } catch (e) {
+      console.warn("Firestore getMemos fallback:", e);
+    }
+  }
+  return getLocalData("memos", []);
+}
+
+export async function createMemo(
+  data: Omit<OfficialMemo, "id" | "createdAt">,
+  actor?: UserProfile | null
+): Promise<OfficialMemo> {
+  const newMemo: Omit<OfficialMemo, "id"> = {
+    ...data,
+    createdById: actor?.id,
+    proposerId: actor?.id,
+    proposerName: actor?.name,
+    createdAt: new Date().toISOString()
+  };
+
+  if (isConfigured) {
+    try {
+      const ref = await addDoc(collection(db, "memos"), {
+        ...newMemo,
+        timestamp: serverTimestamp()
+      });
+      const created: OfficialMemo = { id: ref.id, ...newMemo };
+      await logAuditEvent(actor || null, "CREATE_MEMO", "memos", ref.id, { subject: data.subject, docNumber: data.docNumber });
+      return created;
+    } catch (e) {
+      console.error("Firestore createMemo failed:", e);
+      throw e;
+    }
+  }
+
+  const list = getLocalData<OfficialMemo>("memos", []);
+  const created: OfficialMemo = { id: `memo-${Date.now()}`, ...newMemo };
+  setLocalData("memos", [created, ...list]);
+  return created;
+}
+
+export async function updateMemo(
+  id: string,
+  data: Partial<OfficialMemo>,
+  actor?: UserProfile | null
+) {
+  if (isConfigured) {
+    try {
+      const docRef = doc(db, "memos", id);
+      await updateDoc(docRef, {
+        ...data,
+        updatedAt: serverTimestamp()
+      });
+      await logAuditEvent(actor || null, "UPDATE_MEMO", "memos", id, data);
+      return;
+    } catch (e) {
+      console.error("Firestore updateMemo failed:", e);
+      throw e;
+    }
+  }
+
+  const list = getLocalData<OfficialMemo>("memos", []);
+  const updated = list.map(item => item.id === id ? { ...item, ...data, updatedAt: new Date().toISOString() } : item);
+  setLocalData("memos", updated);
+}
+
+// ==========================================
+// 3.2 OFFICIAL ORDERS & ANNOUNCEMENTS (คำสั่ง/ประกาศคณะ)
+// ==========================================
+export async function getOrders(): Promise<OfficialOrder[]> {
+  if (isConfigured) {
+    try {
+      const snap = await getDocs(collection(db, "orders"));
+      if (!snap.empty) {
+        return snap.docs.map(d => ({ id: d.id, ...d.data() } as OfficialOrder));
+      }
+    } catch (e) {
+      console.warn("Firestore getOrders fallback:", e);
+    }
+  }
+  return getLocalData("orders", [
+    {
+      id: "ord-01",
+      orderNumber: "คำสั่งคณะที่ 015/2569",
+      orderType: "committee_appointment",
+      date: "2026-09-10",
+      title: "แต่งตั้งคณะกรรมการดำเนินงานโครงการบูรณาการธุรกิจการค้าสมัยใหม่ ดิจิทัล และสตาร์ทอัพ",
+      signedBy: "ผู้ช่วยศาสตราจารย์ ดร.สานนท์ ด่านภักดี",
+      signatoryPosition: "คณบดีคณะศิลปศาสตร์และวิทยาศาสตร์",
+      category: "แต่งตั้งคณะกรรมการ",
+      status: "active",
+      committeeMembers: [
+        { name: "อาจารย์ ดร.เดชา พัฒนากุล", position: "ประธานสาขาวิชา", role: "ประธานกรรมการ" },
+        { name: "อาจารย์กิตติยา นาวาการ", position: "อาจารย์ประจำสาขา", role: "กรรมการ" },
+        { name: "นางสาวศิริพร บุญมั่น", position: "เจ้าหน้าที่ธุรการ", role: "กรรมการและเลขานุการ" }
+      ],
+      createdAt: "2026-09-10T09:00:00.000Z"
+    },
+    {
+      id: "ord-02",
+      orderNumber: "คำสั่งคณะที่ 016/2569",
+      orderType: "procurement_committee",
+      date: "2026-09-18",
+      title: "แต่งตั้งคณะกรรมการตรวจรับพัสดุ โครงการพัฒนาทักษะทางวิชาชีพ",
+      signedBy: "ผู้ช่วยศาสตราจารย์ ดร.สานนท์ ด่านภักดี",
+      signatoryPosition: "คณบดีคณะศิลปศาสตร์และวิทยาศาสตร์",
+      category: "ตรวจรับพัสดุ",
+      status: "active",
+      committeeMembers: [
+        { name: "ผู้ช่วยศาสตราจารย์ ดร.สมชาย ทรงคุณ", position: "อาจารย์", role: "ประธานกรรมการ" },
+        { name: "อาจารย์พงษ์ศักดิ์ เจริญดี", position: "อาจารย์", role: "กรรมการ" },
+        { name: "นายวีระยุทธ การดี", position: "เจ้าหน้าที่พัสดุ", role: "กรรมการและเลขานุการ" }
+      ],
+      createdAt: "2026-09-18T10:00:00.000Z"
+    },
+    {
+      id: "ord-03",
+      orderNumber: "ประกาศคณะที่ 004/2569",
+      orderType: "announcement",
+      date: "2026-09-22",
+      title: "ประกาศแนวปฏิบัติการจัดการเรียนการสอนและการส่งหลักฐานเบิกค่าสอน กศ.ปช.",
+      signedBy: "ผู้ช่วยศาสตราจารย์ ดร.สานนท์ ด่านภักดี",
+      signatoryPosition: "คณบดีคณะศิลปศาสตร์และวิทยาศาสตร์",
+      category: "ประกาศแนวปฏิบัติ",
+      status: "active",
+      createdAt: "2026-09-22T14:00:00.000Z"
+    }
+  ]);
+}
+
+export async function createOrder(
+  data: Omit<OfficialOrder, "id" | "createdAt">,
+  actor?: UserProfile | null
+): Promise<OfficialOrder> {
+  const newOrder: Omit<OfficialOrder, "id"> = {
+    ...data,
+    createdById: actor?.id,
+    createdAt: new Date().toISOString()
+  };
+
+  if (isConfigured) {
+    try {
+      const ref = await addDoc(collection(db, "orders"), {
+        ...newOrder,
+        timestamp: serverTimestamp()
+      });
+      const created: OfficialOrder = { id: ref.id, ...newOrder };
+      await logAuditEvent(actor || null, "CREATE_ORDER", "orders", ref.id, { orderNumber: data.orderNumber, title: data.title });
+      return created;
+    } catch (e) {
+      console.error("Firestore createOrder failed:", e);
+      throw e;
+    }
+  }
+
+  const list = getLocalData<OfficialOrder>("orders", []);
+  const created: OfficialOrder = { id: `ord-${Date.now()}`, ...newOrder };
+  setLocalData("orders", [created, ...list]);
+  return created;
+}
+
+export async function updateOrderStatus(
+  id: string,
+  status: OfficialOrder["status"],
+  revokedReason?: string,
+  revokedByOrderNumber?: string,
+  actor?: UserProfile | null
+) {
+  if (isConfigured) {
+    try {
+      const docRef = doc(db, "orders", id);
+      await updateDoc(docRef, {
+        status,
+        ...(revokedReason && { revokedReason }),
+        ...(revokedByOrderNumber && { revokedByOrderNumber }),
+        updatedAt: serverTimestamp()
+      });
+      await logAuditEvent(actor || null, "UPDATE_ORDER_STATUS", "orders", id, { status, revokedReason, revokedByOrderNumber });
+      return;
+    } catch (e) {
+      console.error("Firestore updateOrderStatus failed:", e);
+      throw e;
+    }
+  }
+
+  const list = getLocalData<OfficialOrder>("orders", []);
+  const updated = list.map(item => item.id === id ? { ...item, status, ...(revokedReason && { revokedReason }), ...(revokedByOrderNumber && { revokedByOrderNumber }) } : item);
+  setLocalData("orders", updated);
+}
+
+// ==========================================
+// 3.3 OFFICIAL RESPONSES (แบบตอบรับเข้าร่วม/สถานที่/วิทยากร)
+// ==========================================
+export async function getResponses(): Promise<OfficialResponse[]> {
+  if (isConfigured) {
+    try {
+      const snap = await getDocs(collection(db, "admin_responses"));
+      if (!snap.empty) {
+        return snap.docs.map(d => ({ id: d.id, ...d.data() } as OfficialResponse));
+      }
+    } catch (e) {
+      console.warn("Firestore getResponses fallback:", e);
+    }
+  }
+  return getLocalData("admin_responses", []);
+}
+
+export async function createResponse(
+  data: Omit<OfficialResponse, "id" | "createdAt">,
+  actor?: UserProfile | null
+): Promise<OfficialResponse> {
+  const newResp: Omit<OfficialResponse, "id"> = {
+    ...data,
+    createdById: actor?.id,
+    createdAt: new Date().toISOString()
+  };
+
+  if (isConfigured) {
+    try {
+      const ref = await addDoc(collection(db, "admin_responses"), {
+        ...newResp,
+        timestamp: serverTimestamp()
+      });
+      const created: OfficialResponse = { id: ref.id, ...newResp };
+      await logAuditEvent(actor || null, "CREATE_RESPONSE", "admin_responses", ref.id, { responseNumber: data.responseNumber, responderName: data.responderName, decision: data.decision });
+      return created;
+    } catch (e) {
+      console.error("Firestore createResponse failed:", e);
+      throw e;
+    }
+  }
+
+  const list = getLocalData<OfficialResponse>("admin_responses", []);
+  const created: OfficialResponse = { id: `resp-${Date.now()}`, ...newResp };
+  setLocalData("admin_responses", [created, ...list]);
+  return created;
+}
+
+// ==========================================
+// 3.4 DOCUMENT CHECKLISTS (เช็คลิสต์ตรวจเอกสาร)
+// ==========================================
+export async function getChecklists(): Promise<ChecklistSubmission[]> {
+  if (isConfigured) {
+    try {
+      const snap = await getDocs(collection(db, "admin_checklists"));
+      if (!snap.empty) {
+        return snap.docs.map(d => ({ id: d.id, ...d.data() } as ChecklistSubmission));
+      }
+    } catch (e) {
+      console.warn("Firestore getChecklists fallback:", e);
+    }
+  }
+  return getLocalData("admin_checklists", []);
+}
+
+export async function createChecklist(
+  data: Omit<ChecklistSubmission, "id" | "createdAt">,
+  actor?: UserProfile | null
+): Promise<ChecklistSubmission> {
+  const newChecklist: Omit<ChecklistSubmission, "id"> = {
+    ...data,
+    createdById: actor?.id,
+    createdAt: new Date().toISOString()
+  };
+
+  if (isConfigured) {
+    try {
+      const ref = await addDoc(collection(db, "admin_checklists"), {
+        ...newChecklist,
+        timestamp: serverTimestamp()
+      });
+      const created: ChecklistSubmission = { id: ref.id, ...newChecklist };
+      await logAuditEvent(actor || null, "CREATE_CHECKLIST", "admin_checklists", ref.id, { checklistType: data.checklistType, title: data.title });
+      return created;
+    } catch (e) {
+      console.error("Firestore createChecklist failed:", e);
+      throw e;
+    }
+  }
+
+  const list = getLocalData<ChecklistSubmission>("admin_checklists", []);
+  const created: ChecklistSubmission = { id: `chk-${Date.now()}`, ...newChecklist };
+  setLocalData("admin_checklists", [created, ...list]);
   return created;
 }
 
@@ -479,6 +804,31 @@ export async function createRoomBooking(
   const created: RoomBooking = { id: `room-${Date.now()}`, ...newBooking };
   setLocalData("rooms", [created, ...list]);
   return created;
+}
+
+export async function updateRoomBookingStatus(
+  id: string,
+  status: RoomBooking["status"],
+  actor?: UserProfile | null
+) {
+  if (isConfigured) {
+    try {
+      const docRef = doc(db, "rooms", id);
+      await updateDoc(docRef, {
+        status,
+        updatedAt: serverTimestamp()
+      });
+      await logAuditEvent(actor || null, "UPDATE_ROOM_BOOKING_STATUS", "rooms", id, { status });
+      return;
+    } catch (e) {
+      console.error("Firestore updateRoomBookingStatus failed:", e);
+      throw e;
+    }
+  }
+
+  const list = getLocalData<RoomBooking>("rooms", MOCK_ROOMS);
+  const updated = list.map(item => item.id === id ? { ...item, status } : item);
+  setLocalData("rooms", updated);
 }
 
 // ==========================================
