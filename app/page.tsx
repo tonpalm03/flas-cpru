@@ -114,13 +114,7 @@ export default function FacultyPortalDashboard() {
                 <div className={`w-10 h-10 rounded-lg flex items-center justify-center border ${item.color}`}>
                   <Icon className="w-5 h-5" />
                 </div>
-                {item.badge ? (
-                  <span className="text-[10px] font-bold bg-blue-100 text-blue-900 px-2 py-0.5 rounded-full">
-                    {item.badge}
-                  </span>
-                ) : (
-                  <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-blue-700 transition-colors" />
-                )}
+                <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-blue-700 transition-colors" />
               </div>
               <div className="mt-4">
                 <p className="text-xs font-medium text-slate-500">{item.title}</p>
