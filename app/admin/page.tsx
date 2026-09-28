@@ -19,9 +19,14 @@ import {
   CheckCircle2,
   Clock
 } from "lucide-react";
-import { MOCK_INBOUND_DOCS, MOCK_OUTBOUND_DOCS, MOCK_ROOMS } from "@/lib/mockData";
+import { useRole } from "@/components/RoleContext";
 
 export default function AdminModuleHub() {
+  const { currentUser } = useRole();
+
+  if (!currentUser) {
+    return null;
+  }
   return (
     <div className="space-y-8 pb-12">
       {/* Header Banner */}

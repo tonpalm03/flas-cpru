@@ -27,6 +27,10 @@ import { MOCK_INBOUND_DOCS, MOCK_PROJECTS, MOCK_LOANS, MOCK_PURCHASE_REQ } from 
 export default function FacultyPortalDashboard() {
   const { currentUser } = useRole();
 
+  if (!currentUser) {
+    return null;
+  }
+
   const quickStats = [
     {
       title: "หนังสือรับ-ส่ง (ธุรการ)",

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { GraduationCap, Lock, Mail, User, Building2, ArrowRight, AlertCircle, CheckCircle2 } from "lucide-react";
 import { loginWithEmail, registerWithEmail } from "@/lib/firebaseAuthService";
@@ -9,7 +9,13 @@ import { UserRole } from "@/lib/types";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { setCurrentUser } = useRole();
+  const { currentUser, setCurrentUser, isLoading } = useRole();
+
+  useEffect(() => {
+    if (!isLoading && currentUser) {
+      router.replace(currentUser.role === "admin" ? "/admin" : "/");
+    }
+  }, [currentUser, isLoading, router]);
 
   const [isRegisterMode, setIsRegisterMode] = useState(false);
   
