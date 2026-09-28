@@ -20,7 +20,9 @@ import {
   ChevronRight,
   GraduationCap,
   Layers,
-  Lock
+  Settings,
+  CheckSquare,
+  FileCheck
 } from "lucide-react";
 import { useRole } from "./RoleContext";
 
@@ -34,9 +36,9 @@ export default function Sidebar() {
   const pathname = usePathname();
   const { currentUser, viewMode, toggleViewMode } = useRole();
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
-    admin: true, // Default open for user's module
-    projects: false,
-    finance: false,
+    admin: true,
+    projects: true,
+    finance: true,
     procurement: false,
     hr: false,
     plan: false,
@@ -57,17 +59,21 @@ export default function Sidebar() {
         { title: "ทะเบียนหนังสือรับ", href: "/admin/inbound", badge: "4 ใหม่" },
         { title: "ทะเบียนหนังสือส่ง", href: "/admin/outbound" },
         { title: "สร้างบันทึกข้อความ (Word/PDF)", href: "/admin/memo-generator" },
+        { title: "แบบตอบรับวิทยากร/สถานที่", href: "/admin/responses" },
+        { title: "เช็คลิสต์ตรวจเอกสาร", href: "/admin/checklists" },
+        { title: "จัดการแม่แบบเอกสาร (แอดมิน)", href: "/admin/templates" },
         { title: "ทะเบียนคำสั่ง/ประกาศคณะ", href: "/admin/orders" },
         { title: "จองห้องประชุม/ยานพาหนะ", href: "/admin/rooms" },
       ]
     },
     {
       key: "projects",
-      label: "งานโครงการ",
+      label: "งานโครงการและกิจกรรม",
       icon: FolderKanban,
       subItems: [
         { title: "โครงการยุทธศาสตร์ 2569", href: "/projects" },
         { title: "เขียนเสนอโครงการ (Word)", href: "/projects/new" },
+        { title: "รายงานผลโครงการ & SDG", href: "/projects/reports" },
       ]
     },
     {
@@ -77,6 +83,7 @@ export default function Sidebar() {
       subItems: [
         { title: "คุมงบประมาณรายได้ 2568", href: "/finance" },
         { title: "สัญญายืมเงินทดรอง", href: "/finance/loans" },
+        { title: "เบิกค่าสอน / ค่านิเทศ", href: "/finance/disbursement" },
       ]
     },
     {
@@ -93,6 +100,7 @@ export default function Sidebar() {
       icon: Users,
       subItems: [
         { title: "ยื่นใบลา (พักผ่อน/ป่วย/กิจ)", href: "/hr" },
+        { title: "แฟ้มประวัติและผลงาน (SAR)", href: "/hr/portfolio" },
       ]
     },
     {
@@ -146,11 +154,6 @@ export default function Sidebar() {
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
             {viewMode === "admin_only" ? "เมนูงานธุรการ (โหมดนำเสนอ)" : "โมดูลงานในคณะ"}
           </p>
-          {viewMode === "admin_only" && (
-            <span className="text-[9px] bg-blue-100 text-blue-900 font-bold px-1.5 py-0.2 rounded">
-              เฉพาะธุรการ
-            </span>
-          )}
         </div>
 
         {/* Core Modules List */}
@@ -168,13 +171,13 @@ export default function Sidebar() {
                   hasActiveChild
                     ? "bg-blue-50/70 text-blue-900 font-semibold"
                     : "text-slate-700 hover:bg-slate-50 hover:text-slate-900"
-                } ${section.isMyPart ? "ring-1 ring-blue-100/80 bg-slate-50/50" : ""}`}
+                }`}
               >
                 <div className="flex items-center gap-2.5 min-w-0">
                   <Icon
                     className={`w-4 h-4 flex-shrink-0 ${
                       hasActiveChild ? "text-blue-700" : "text-slate-400"
-                    } ${section.isMyPart ? "text-blue-600" : ""}`}
+                    }`}
                   />
                   <span className="truncate">{section.label}</span>
                 </div>
