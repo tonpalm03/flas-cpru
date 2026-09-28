@@ -151,6 +151,9 @@ export const MOCK_PROJECTS: ProjectProposal[] = [
   {
     id: "proj-01",
     code: "69-FLAS-001",
+    projectType: "kings_philosophy",
+    planType: "in_plan",
+    budgetSource: "national_budget",
     fiscalYear: 2569,
     title: "โครงการบูรณาการธุรกิจการค้าสมัยใหม่ ดิจิทัล และสตาร์ทอัพท่องเที่ยวเพื่อพัฒนาเศรษฐกิจสร้างสรรค์",
     strategicGoal: "โครงการตามยุทธศาสตร์เพื่อการพัฒนาท้องถิ่น (ศาสตร์พระราชา)",
@@ -168,6 +171,9 @@ export const MOCK_PROJECTS: ProjectProposal[] = [
   {
     id: "proj-02",
     code: "69-FLAS-002",
+    projectType: "faculty_strategy",
+    planType: "in_plan",
+    budgetSource: "faculty_revenue",
     fiscalYear: 2569,
     title: "โครงการยกระดับคุณภาพการศึกษาเพื่อพัฒนาคุณภาพบัณฑิตให้มีความรู้และทักษะในศตวรรษที่ 21",
     strategicGoal: "ประเด็นยุทธศาสตร์ที่ 3 : ยกระดับคุณภาพการศึกษา",
@@ -185,6 +191,9 @@ export const MOCK_PROJECTS: ProjectProposal[] = [
   {
     id: "proj-03",
     code: "69-FLAS-003",
+    projectType: "kings_philosophy",
+    planType: "in_plan",
+    budgetSource: "national_budget",
     fiscalYear: 2569,
     title: "โครงการเพิ่มมูลค่าสับปะรดด้วยนวัตกรรมการอบแห้งเพื่อพัฒนาเศรษฐกิจฐานราก ต.ท่าหินโงม",
     strategicGoal: "โครงการตามยุทธศาสตร์เพื่อการพัฒนาท้องถิ่น (ศาสตร์พระราชา)",

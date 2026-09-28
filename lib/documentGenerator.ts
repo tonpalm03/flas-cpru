@@ -192,7 +192,7 @@ export async function exportMemoToWord(memo: {
   downloadBlob(blob, `บันทึกข้อความ_${memo.subject.substring(0, 30)}.docx`);
 }
 
-// 2. Export Project Proposal to Word (.docx)
+// 2. Export Project Proposal to Word (.docx) - CPRU Full Form Standard 2569
 export async function exportProjectToWord(project: {
   title: string;
   strategicGoal: string;
@@ -200,10 +200,82 @@ export async function exportProjectToWord(project: {
   leader: string;
   fiscalYear: number;
   budgetApproved: number;
+  budgetSource?: string;
+  planType?: string;
   kpis: string[];
   rationale?: string;
   objectives?: string[];
+  targetGroup?: string;
+  location?: string;
+  startDate?: string;
+  endDate?: string;
+  outcomes?: string;
+  activities?: Array<{ name: string; quarter: number; targetGroup: string; location: string; budget: number }>;
+  budgetItems?: Array<{ category: string; description: string; amount: number }>;
 }) {
+  // Build Activities Table
+  const activitiesTable = (project.activities && project.activities.length > 0) ? [
+    new Paragraph({ text: "" }),
+    new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      rows: [
+        new TableRow({
+          children: ["ลำดับ", "กิจกรรม / ขั้นตอนดำเนินงาน", "ไตรมาส", "กลุ่มเป้าหมาย/สถานที่", "งบประมาณ (บาท)"].map(h => (
+            new TableCell({
+              children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: h, bold: true, size: 26, font: "TH Sarabun PSK" })] })]
+            })
+          ))
+        }),
+        ...project.activities.map((act, idx) => (
+          new TableRow({
+            children: [
+              new TableCell({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: (idx + 1).toString(), size: 26, font: "TH Sarabun PSK" })] })] }),
+              new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: act.name, size: 26, font: "TH Sarabun PSK" })] })] }),
+              new TableCell({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: `ไตรมาส ${act.quarter}`, size: 26, font: "TH Sarabun PSK" })] })] }),
+              new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: `${act.targetGroup || "-"} / ${act.location || "-"}`, size: 26, font: "TH Sarabun PSK" })] })] }),
+              new TableCell({ children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: act.budget.toLocaleString(), size: 26, font: "TH Sarabun PSK" })] })] })
+            ]
+          })
+        ))
+      ]
+    }),
+    new Paragraph({ text: "" })
+  ] : [];
+
+  // Build Budget Items Table
+  const budgetTable = (project.budgetItems && project.budgetItems.length > 0) ? [
+    new Paragraph({ text: "" }),
+    new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      rows: [
+        new TableRow({
+          children: ["ลำดับ", "หมวดรายจ่าย / รายการรายละเอียด", "จำนวนเงิน (บาท)"].map(h => (
+            new TableCell({
+              children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: h, bold: true, size: 26, font: "TH Sarabun PSK" })] })]
+            })
+          ))
+        }),
+        ...project.budgetItems.map((b, idx) => (
+          new TableRow({
+            children: [
+              new TableCell({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: (idx + 1).toString(), size: 26, font: "TH Sarabun PSK" })] })] }),
+              new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: `[${b.category === "compensation" ? "ค่าตอบแทน" : b.category === "operating" ? "ค่าใช้สอย" : "ค่าวัสดุ"}] ${b.description}`, size: 26, font: "TH Sarabun PSK" })] })] }),
+              new TableCell({ children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: b.amount.toLocaleString(), size: 26, font: "TH Sarabun PSK" })] })] })
+            ]
+          })
+        )),
+        new TableRow({
+          children: [
+            new TableCell({ children: [new Paragraph({ text: "" })] }),
+            new TableCell({ children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: "รวมงบประมาณทั้งสิ้น", bold: true, size: 26, font: "TH Sarabun PSK" })] })] }),
+            new TableCell({ children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: `${project.budgetApproved.toLocaleString()} บาท`, bold: true, size: 26, font: "TH Sarabun PSK" })] })] })
+          ]
+        })
+      ]
+    }),
+    new Paragraph({ text: "" })
+  ] : [];
+
   const doc = new Document({
     sections: [
       {
@@ -231,52 +303,316 @@ export async function exportProjectToWord(project: {
             ],
           }),
           new Paragraph({ text: "" }),
+
+          // Section 1
           new Paragraph({
             children: [
-              new TextRun({ text: "1. ชื่อโครงการ: ", bold: true, size: 32, font: "TH Sarabun PSK" }),
-              new TextRun({ text: project.title, size: 32, font: "TH Sarabun PSK" }),
+              new TextRun({ text: "1. ชื่อโครงการ: ", bold: true, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: project.title, size: 30, font: "TH Sarabun PSK" }),
+            ],
+          }),
+
+          // Section 2
+          new Paragraph({
+            children: [
+              new TextRun({ text: "2. ความสอดคล้องกับยุทธศาสตร์: ", bold: true, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: project.strategicGoal, size: 30, font: "TH Sarabun PSK" }),
+            ],
+          }),
+
+          // Section 3
+          new Paragraph({
+            children: [
+              new TextRun({ text: "3. หน่วยงานที่รับผิดชอบ: ", bold: true, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `${project.department}`, size: 30, font: "TH Sarabun PSK" }),
+            ],
+          }),
+
+          // Section 4
+          new Paragraph({
+            children: [
+              new TextRun({ text: "4. ผู้รับผิดชอบโครงการ: ", bold: true, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `${project.leader}`, size: 30, font: "TH Sarabun PSK" }),
+            ],
+          }),
+
+          // Section 5: Rationale
+          new Paragraph({
+            children: [
+              new TextRun({ text: "5. หลักการและเหตุผล:", bold: true, size: 30, font: "TH Sarabun PSK" }),
             ],
           }),
           new Paragraph({
+            indent: { firstLine: 720 },
             children: [
-              new TextRun({ text: "2. ประเด็นยุทธศาสตร์: ", bold: true, size: 32, font: "TH Sarabun PSK" }),
-              new TextRun({ text: project.strategicGoal, size: 32, font: "TH Sarabun PSK" }),
+              new TextRun({ text: project.rationale || "เพื่อพัฒนาและยกระดับศักยภาพตามยุทธศาสตร์ของคณะและมหาวิทยาลัย", size: 30, font: "TH Sarabun PSK" }),
+            ],
+          }),
+
+          // Section 6: Objectives
+          new Paragraph({
+            children: [
+              new TextRun({ text: "6. วัตถุประสงค์ของโครงการ:", bold: true, size: 30, font: "TH Sarabun PSK" }),
+            ],
+          }),
+          ...(project.objectives && project.objectives.length > 0
+            ? project.objectives.map((obj, i) => new Paragraph({ indent: { firstLine: 720 }, children: [new TextRun({ text: `${i + 1}. ${obj}`, size: 30, font: "TH Sarabun PSK" })] }))
+            : [new Paragraph({ indent: { firstLine: 720 }, children: [new TextRun({ text: "1. เพื่อให้บรรลุตามวัตถุประสงค์และตัวชี้วัดของโครงการ", size: 30, font: "TH Sarabun PSK" })] })]
+          ),
+
+          // Section 7: Target Group & Location
+          new Paragraph({
+            children: [
+              new TextRun({ text: "7. กลุ่มเป้าหมายและสถานที่ดำเนินการ:", bold: true, size: 30, font: "TH Sarabun PSK" }),
             ],
           }),
           new Paragraph({
+            indent: { firstLine: 720 },
             children: [
-              new TextRun({ text: "3. หน่วยงานที่รับผิดชอบ: ", bold: true, size: 32, font: "TH Sarabun PSK" }),
-              new TextRun({ text: `${project.department}`, size: 32, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `กลุ่มเป้าหมาย: ${project.targetGroup || "คณาจารย์ บุคลากร และนักศึกษา"} | สถานที่: ${project.location || "คณะศิลปศาสตร์และวิทยาศาสตร์"} (${project.startDate || ""} ถึง ${project.endDate || ""})`, size: 30, font: "TH Sarabun PSK" }),
             ],
           }),
+
+          // Section 8: Activities Table
           new Paragraph({
             children: [
-              new TextRun({ text: "4. ผู้รับผิดชอบโครงการ: ", bold: true, size: 32, font: "TH Sarabun PSK" }),
-              new TextRun({ text: `${project.leader}`, size: 32, font: "TH Sarabun PSK" }),
+              new TextRun({ text: "8. แผนการดำเนินงานและกิจกรรมย่อย:", bold: true, size: 30, font: "TH Sarabun PSK" }),
             ],
           }),
+          ...activitiesTable,
+
+          // Section 9: Budget Table
           new Paragraph({
             children: [
-              new TextRun({ text: "5. งบประมาณที่เสนอขอ: ", bold: true, size: 32, font: "TH Sarabun PSK" }),
-              new TextRun({ text: `${project.budgetApproved.toLocaleString()} บาท`, bold: true, size: 32, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `9. รายละเอียดงบประมาณ (รวมทั้งสิ้น ${project.budgetApproved.toLocaleString()} บาท แหล่งงบ: ${project.budgetSource === "national_budget" ? "งบประมาณแผ่นดิน" : project.budgetSource === "faculty_revenue" ? "งบรายได้คณะ" : "งบประมาณโครงการ"}):`, bold: true, size: 30, font: "TH Sarabun PSK" }),
             ],
           }),
+          ...budgetTable,
+
+          // Section 10: KPIs
           new Paragraph({
             children: [
-              new TextRun({ text: "6. ตัวชี้วัดความสำเร็จ (KPI):", bold: true, size: 32, font: "TH Sarabun PSK" }),
+              new TextRun({ text: "10. ตัวชี้วัดความสำเร็จ (KPI):", bold: true, size: 30, font: "TH Sarabun PSK" }),
             ],
           }),
           ...project.kpis.map((kpi, idx) => new Paragraph({
             indent: { firstLine: 720 },
-            children: [new TextRun({ text: `${idx + 1}. ${kpi}`, size: 32, font: "TH Sarabun PSK" })]
+            children: [new TextRun({ text: `${idx + 1}. ${kpi}`, size: 30, font: "TH Sarabun PSK" })]
           })),
+
+          // Section 11: Expected Outcomes
+          new Paragraph({
+            children: [
+              new TextRun({ text: "11. ประโยชน์ที่คาดว่าจะได้รับ:", bold: true, size: 30, font: "TH Sarabun PSK" }),
+            ],
+          }),
+          new Paragraph({
+            indent: { firstLine: 720 },
+            children: [
+              new TextRun({ text: project.outcomes || "ผู้เข้าร่วมโครงการได้รับองค์ความรู้และสามารถนำไปประยุกต์ใช้ในการปฏิบัติงานจริงได้อย่างมีประสิทธิภาพ", size: 30, font: "TH Sarabun PSK" }),
+            ],
+          }),
+
+          new Paragraph({ text: "" }),
+          new Paragraph({ text: "" }),
+
+          // Signatory Approval Block
+          new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            rows: [
+              new TableRow({
+                children: [
+                  new TableCell({
+                    children: [
+                      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "(ลงชื่อ)........................................................\n", size: 28, font: "TH Sarabun PSK" })] }),
+                      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: `(${project.leader})\n`, size: 28, font: "TH Sarabun PSK" })] }),
+                      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "ผู้เสนอโครงการ", size: 28, font: "TH Sarabun PSK" })] })
+                    ]
+                  }),
+                  new TableCell({
+                    children: [
+                      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "(ลงชื่อ)........................................................\n", size: 28, font: "TH Sarabun PSK" })] }),
+                      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "(ผู้ช่วยศาสตราจารย์ ดร.สานนท์ ด่านภักดี)\n", size: 28, font: "TH Sarabun PSK" })] }),
+                      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "คณบดีคณะศิลปศาสตร์และวิทยาศาสตร์", size: 28, font: "TH Sarabun PSK" })] })
+                    ]
+                  })
+                ]
+              })
+            ]
+          })
         ],
       },
     ],
   });
 
   const blob = await Packer.toBlob(doc);
-  downloadBlob(blob, `แบบเสนอโครงการ_${project.title.substring(0, 25)}.docx`);
+  downloadBlob(blob, `แบบเสนอโครงการ_${project.title.substring(0, 30)}.docx`);
+}
+
+// 2.1 Export Project Outcome Report to Word (.docx)
+export async function exportProjectReportToWord(report: {
+  reportType: string;
+  projectCode: string;
+  projectTitle: string;
+  department: string;
+  leader: string;
+  fiscalYear: number;
+  budgetApproved: number;
+  budgetUsed: number;
+  participantCount: number;
+  outcomesSummary?: string;
+  impactEconomy?: string;
+  impactSociety?: string;
+  impactEnvironment?: string;
+  impactEducation?: string;
+  sdgGoals?: number[];
+  problemsAndSuggestions?: string;
+  kpiResults?: Array<{ kpi: string; target: string; actual: string; status: string }>;
+}) {
+  const kpiTable = (report.kpiResults && report.kpiResults.length > 0) ? [
+    new Paragraph({ text: "" }),
+    new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      rows: [
+        new TableRow({
+          children: ["ลำดับ", "ตัวชี้วัดความสำเร็จ (KPI)", "เป้าหมาย", "ผลที่ทำได้จริง", "สถานะ"].map(h => (
+            new TableCell({
+              children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: h, bold: true, size: 26, font: "TH Sarabun PSK" })] })]
+            })
+          ))
+        }),
+        ...report.kpiResults.map((k, idx) => (
+          new TableRow({
+            children: [
+              new TableCell({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: (idx + 1).toString(), size: 26, font: "TH Sarabun PSK" })] })] }),
+              new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: k.kpi, size: 26, font: "TH Sarabun PSK" })] })] }),
+              new TableCell({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: k.target, size: 26, font: "TH Sarabun PSK" })] })] }),
+              new TableCell({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: k.actual, size: 26, font: "TH Sarabun PSK" })] })] }),
+              new TableCell({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: k.status === "passed" ? "บรรลุเป้าหมาย" : "กำลังดำเนินงาน", size: 26, font: "TH Sarabun PSK" })] })] })
+            ]
+          })
+        ))
+      ]
+    }),
+    new Paragraph({ text: "" })
+  ] : [];
+
+  const doc = new Document({
+    sections: [
+      {
+        children: [
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [
+              new TextRun({
+                text: report.reportType === "kings_philosophy" ? "รายงานผลการดำเนินโครงการตามศาสตร์พระราชาเพื่อการพัฒนาท้องถิ่น" :
+                      report.reportType === "one_page" ? "รายงานสรุปสำหรับผู้บริหาร (One Page Summary)" :
+                      `รายงานผลการดำเนินโครงการประจำปีงบประมาณ พ.ศ. ${report.fiscalYear}`,
+                bold: true,
+                size: 36,
+                font: "TH Sarabun PSK",
+              }),
+            ],
+          }),
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [
+              new TextRun({
+                text: `คณะศิลปศาสตร์และวิทยาศาสตร์ มหาวิทยาลัยราชภัฏชัยภูมิ`,
+                bold: true,
+                size: 32,
+                font: "TH Sarabun PSK",
+              }),
+            ],
+          }),
+          new Paragraph({ text: "" }),
+
+          new Paragraph({
+            children: [
+              new TextRun({ text: `รหัสโครงการ: `, bold: true, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `${report.projectCode}  `, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `ชื่อโครงการ: `, bold: true, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `${report.projectTitle}`, size: 30, font: "TH Sarabun PSK" }),
+            ],
+          }),
+
+          new Paragraph({
+            children: [
+              new TextRun({ text: `หน่วยงาน: `, bold: true, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `${report.department}  `, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `หัวหน้าโครงการ: `, bold: true, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `${report.leader}`, size: 30, font: "TH Sarabun PSK" }),
+            ],
+          }),
+
+          new Paragraph({
+            children: [
+              new TextRun({ text: `งบประมาณจัดสรร: `, bold: true, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `${report.budgetApproved.toLocaleString()} บาท  `, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `ใช้จ่ายจริง: `, bold: true, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `${report.budgetUsed.toLocaleString()} บาท (คงเหลือ ${(report.budgetApproved - report.budgetUsed).toLocaleString()} บาท)`, size: 30, font: "TH Sarabun PSK" }),
+            ],
+          }),
+
+          new Paragraph({
+            children: [
+              new TextRun({ text: `ผู้เข้าร่วมโครงการทั้งสิ้น: `, bold: true, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `${report.participantCount} คน  `, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `เป้าหมาย SDG: `, bold: true, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: report.sdgGoals ? report.sdgGoals.map(g => `SDG ${g}`).join(", ") : "SDG 4, SDG 8", size: 30, font: "TH Sarabun PSK" }),
+            ],
+          }),
+
+          new Paragraph({ text: "" }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: "ผลการดำเนินงานเปรียบเทียบตัวชี้วัด (KPIs):", bold: true, size: 30, font: "TH Sarabun PSK" }),
+            ],
+          }),
+          ...kpiTable,
+
+          new Paragraph({
+            children: [
+              new TextRun({ text: "ผลสัมฤทธิ์และผลกระทบของการดำเนินงาน (Impacts):", bold: true, size: 30, font: "TH Sarabun PSK" }),
+            ],
+          }),
+          ...(report.impactEconomy ? [new Paragraph({ indent: { firstLine: 720 }, children: [new TextRun({ text: `• ด้านเศรษฐกิจและรายได้: ${report.impactEconomy}`, size: 30, font: "TH Sarabun PSK" })] })] : []),
+          ...(report.impactSociety ? [new Paragraph({ indent: { firstLine: 720 }, children: [new TextRun({ text: `• ด้านสังคมและชุมชน: ${report.impactSociety}`, size: 30, font: "TH Sarabun PSK" })] })] : []),
+          ...(report.impactEnvironment ? [new Paragraph({ indent: { firstLine: 720 }, children: [new TextRun({ text: `• ด้านสิ่งแวดล้อม: ${report.impactEnvironment}`, size: 30, font: "TH Sarabun PSK" })] })] : []),
+          ...(report.impactEducation ? [new Paragraph({ indent: { firstLine: 720 }, children: [new TextRun({ text: `• ด้านการศึกษาและการเรียนรู้: ${report.impactEducation}`, size: 30, font: "TH Sarabun PSK" })] })] : []),
+          ...(report.outcomesSummary ? [new Paragraph({ indent: { firstLine: 720 }, children: [new TextRun({ text: report.outcomesSummary, size: 30, font: "TH Sarabun PSK" })] })] : []),
+
+          new Paragraph({ text: "" }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: "ปัญหา อุปสรรค และข้อเสนอแนะในการดำเนินงาน:", bold: true, size: 30, font: "TH Sarabun PSK" }),
+            ],
+          }),
+          new Paragraph({
+            indent: { firstLine: 720 },
+            children: [
+              new TextRun({ text: report.problemsAndSuggestions || "ไม่มีปัญหาอุปสรรคสำคัญ และควรส่งเสริมการขยายผลโครงการสู่ชุมชนอื่นต่อไป", size: 30, font: "TH Sarabun PSK" }),
+            ],
+          }),
+
+          new Paragraph({ text: "" }),
+          new Paragraph({ text: "" }),
+
+          new Paragraph({
+            alignment: AlignmentType.RIGHT,
+            children: [
+              new TextRun({ text: "(ลงชื่อ)........................................................\n", size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: `(${report.leader})\n`, size: 30, font: "TH Sarabun PSK" }),
+              new TextRun({ text: "ผู้รายงานผลโครงการ", size: 30, font: "TH Sarabun PSK" }),
+            ],
+          }),
+        ],
+      },
+    ],
+  });
+
+  const blob = await Packer.toBlob(doc);
+  downloadBlob(blob, `รายงานผลโครงการ_${report.projectCode}.docx`);
 }
 
 // 3. Export Budget Ledger / Table to Excel (.xlsx)

@@ -207,26 +207,106 @@ export interface ChecklistSubmission {
 }
 
 // 2. งานโครงการและแผนยุทธศาสตร์
+export interface ProjectBudgetItem {
+  id: string;
+  category: "compensation" | "operating" | "material"; // ค่าตอบแทน, ค่าใช้สอย, ค่าวัสดุ
+  description: string;
+  quantity?: number;
+  unit?: string;
+  unitPrice?: number;
+  amount: number;
+}
+
+export interface ProjectActivityItem {
+  id: string;
+  name: string;
+  quarter: number; // 1, 2, 3, 4
+  targetGroup: string;
+  participantCount: number;
+  location: string;
+  startDate: string;
+  endDate: string;
+  budget: number;
+  kpis?: string[];
+  responsiblePerson?: string;
+}
+
 export interface ProjectProposal {
   id: string;
-  code: string;              // รหัสโครงการ เช่น 69-ART-001
+  code: string;              // รหัสโครงการ เช่น 69-FLAS-001
+  projectType: "faculty_strategy" | "kings_philosophy" | "department_focus" | "academic_service";
+  planType: "in_plan" | "out_of_plan";
   fiscalYear: number;        // 2569
+  academicYear?: number;     // 2568
   title: string;             // ชื่อโครงการ
   strategicGoal: string;     // ประเด็นยุทธศาสตร์ที่ 1-4 หรือ โครงการศาสตร์พระราชา
   department: string;        // สาขาวิชา
   leader: string;            // หัวหน้าโครงการ
   leaderId?: string;
+  teamMembers?: string[];    // ผู้ร่วมรับผิดชอบ
   budgetApproved: number;    // งบประมาณจัดสรร (บาท)
   budgetUsed: number;        // งบประมาณใช้ไป (บาท)
+  budgetSource: "national_budget" | "faculty_revenue" | "external";
+  budgetItems?: ProjectBudgetItem[];
+  activities?: ProjectActivityItem[];
   status: "draft" | "submitted" | "approved" | "in_progress" | "reported" | "closed";
   sdgGoals: number[];        // SDG 1-17
   kpis: string[];
+  objectives?: string[];     // วัตถุประสงค์โครงการ
   rationale?: string;        // หลักการและเหตุผล
   targetGroup?: string;      // กลุ่มเป้าหมาย
   location?: string;         // สถานที่จัด
   startDate: string;
   endDate: string;
-  outcomes?: string;
+  outcomes?: string;         // ผลประโยชน์ที่คาดว่าจะได้รับ
+  evaluationPlan?: string;   // แผนการประเมินผล
+  revisions?: Array<{
+    date: string;
+    reason: string;
+    changedBy: string;
+  }>;
+  createdById?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface ProjectReport {
+  id: string;
+  reportType: "faculty_standard" | "kings_philosophy" | "sdg_summary" | "one_page";
+  projectId: string;
+  projectCode: string;
+  projectTitle: string;
+  department: string;
+  leader: string;
+  fiscalYear: number;
+  budgetApproved: number;
+  budgetUsed: number;
+  participantCount: number;
+  targetAchieved: boolean;
+  kpiResults: Array<{
+    kpi: string;
+    target: string;
+    actual: string;
+    status: "passed" | "failed" | "in_progress";
+  }>;
+  activityResults?: Array<{
+    activityName: string;
+    actualDate: string;
+    actualParticipants: number;
+    outcomeSummary: string;
+  }>;
+  impactEconomy?: string;
+  impactSociety?: string;
+  impactEnvironment?: string;
+  impactEducation?: string;
+  sdgGoals: number[];
+  problemsAndSuggestions?: string;
+  photos?: Array<{
+    url: string;
+    caption: string;
+  }>;
+  evidenceQrUrl?: string;
+  status: "draft" | "submitted" | "approved";
   createdById?: string;
   createdAt: string;
   updatedAt?: string;

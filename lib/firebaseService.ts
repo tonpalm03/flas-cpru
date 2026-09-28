@@ -26,6 +26,7 @@ import {
   ChecklistSubmission,
   RoomBooking, 
   ProjectProposal,
+  ProjectReport,
   PurchaseRequisition,
   LoanContract,
   LeaveRequest,
@@ -604,6 +605,116 @@ export async function createProject(
   const list = getLocalData<ProjectProposal>("projects", MOCK_PROJECTS);
   const created: ProjectProposal = { id: `proj-${Date.now()}`, ...newProject };
   setLocalData("projects", [created, ...list]);
+  return created;
+}
+
+export async function updateProject(
+  id: string,
+  data: Partial<ProjectProposal>,
+  actor?: UserProfile | null
+) {
+  if (isConfigured) {
+    try {
+      const docRef = doc(db, "projects", id);
+      await updateDoc(docRef, {
+        ...data,
+        updatedAt: serverTimestamp()
+      });
+      await logAuditEvent(actor || null, "UPDATE_PROJECT", "projects", id, data);
+      return;
+    } catch (e) {
+      console.error("Firestore updateProject failed:", e);
+      throw e;
+    }
+  }
+
+  const list = getLocalData<ProjectProposal>("projects", MOCK_PROJECTS);
+  const updated = list.map(item => item.id === id ? { ...item, ...data, updatedAt: new Date().toISOString() } : item);
+  setLocalData("projects", updated);
+}
+
+// ==========================================
+// 4.1 PROJECT REPORTS (รายงานผลโครงการ, ศาสตร์พระราชา, SDG, One Page)
+// ==========================================
+export async function getProjectReports(): Promise<ProjectReport[]> {
+  if (isConfigured) {
+    try {
+      const snap = await getDocs(collection(db, "project_reports"));
+      if (!snap.empty) {
+        return snap.docs.map(d => ({ id: d.id, ...d.data() } as ProjectReport));
+      }
+    } catch (e) {
+      console.warn("Firestore getProjectReports fallback:", e);
+    }
+  }
+  return getLocalData("project_reports", [
+    {
+      id: "rep-01",
+      reportType: "kings_philosophy",
+      projectId: "proj-01",
+      projectCode: "69-KING-001",
+      projectTitle: "โครงการเพิ่มมูลค่าสับปะรดด้วยนวัตกรรมการอบแห้งเพื่อพัฒนาเศรษฐกิจฐานราก",
+      department: "สาขาวิชาวิศวกรรมการผลิตและระบบอัตโนมัติ",
+      leader: "ดร.สุรชัย นวัตกร",
+      fiscalYear: 2569,
+      budgetApproved: 250000,
+      budgetUsed: 195000,
+      participantCount: 65,
+      targetAchieved: true,
+      kpiResults: [
+        { kpi: "กลุ่มเกษตรกรมีความรู้การแปรรูป", target: "80%", actual: "92%", status: "passed" },
+        { kpi: "ผลิตภัณฑ์แปรรูปได้มาตรฐาน", target: "2 รายการ", actual: "3 รายการ", status: "passed" }
+      ],
+      impactEconomy: "สร้างรายได้เฉลี่ยเพิ่มขึ้นร้อยละ 18.5 ต่อครัวเรือนในชุมชนเป้าหมาย",
+      impactSociety: "เกิดการรวมกลุ่มวิสาหกิจชุมชนแปรรูปผลผลิตทางการเกษตรอย่างเข้มแข็ง",
+      impactEnvironment: "ลดการสูญเสียผลผลิตสับปะรดตกเกรด (Zero Waste)",
+      impactEducation: "เป็นแหล่งเรียนรู้และฝึกทักษะวิชาชีพแก่นักศึกษาในพื้นที่จริง",
+      sdgGoals: [1, 8, 12],
+      problemsAndSuggestions: "ควรส่งเสริมช่องทางการตลาดออนไลน์และการออกแบบบรรจุภัณฑ์ที่เป็นมิตรต่อสิ่งแวดล้อมเพิ่มเติม",
+      status: "approved",
+      createdAt: "2026-09-20T10:00:00.000Z"
+    }
+  ]);
+}
+
+export async function createProjectReport(
+  data: Omit<ProjectReport, "id" | "createdAt">,
+  actor?: UserProfile | null
+): Promise<ProjectReport> {
+  const newReport: Omit<ProjectReport, "id"> = {
+    ...data,
+    createdById: actor?.id,
+    createdAt: new Date().toISOString()
+  };
+
+  if (isConfigured) {
+    try {
+      const ref = await addDoc(collection(db, "project_reports"), {
+        ...newReport,
+        timestamp: serverTimestamp()
+      });
+      const created: ProjectReport = { id: ref.id, ...newReport };
+      await logAuditEvent(actor || null, "CREATE_PROJECT_REPORT", "project_reports", ref.id, { 
+        projectCode: data.projectCode, 
+        projectTitle: data.projectTitle, 
+        reportType: data.reportType 
+      });
+
+      // Update project status to reported
+      if (data.projectId) {
+        await updateProject(data.projectId, { status: "reported" }, actor);
+      }
+
+      return created;
+    } catch (e) {
+      console.error("Firestore createProjectReport failed:", e);
+      throw e;
+    }
+  }
+
+  const list = getLocalData<ProjectReport>("project_reports", []);
+  const created: ProjectReport = { id: `rep-${Date.now()}`, ...newReport };
+  setLocalData("project_reports", [created, ...list]);
   return created;
 }
 

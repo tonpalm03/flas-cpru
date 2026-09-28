@@ -78,8 +78,15 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // 5. Strategic Projects
+    // 5. Strategic Projects & Reports
     match /projects/{projectId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    match /project_reports/{reportId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated();
       allow update: if isAuthenticated();
