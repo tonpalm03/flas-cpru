@@ -20,6 +20,7 @@ import {
   Clock
 } from "lucide-react";
 import { useRole } from "@/components/RoleContext";
+import { MOCK_INBOUND_DOCS, MOCK_OUTBOUND_DOCS, MOCK_ROOMS } from "@/lib/mockData";
 
 export default function AdminModuleHub() {
   const { currentUser } = useRole();
