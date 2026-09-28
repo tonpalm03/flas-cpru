@@ -18,14 +18,18 @@ export const MOCK_USERS: UserProfile[] = [
     roleTitle: "แอดมิน / เจ้าหน้าที่ธุรการและสารบรรณ",
     department: "สำนักงานคณบดี คณะศิลปศาสตร์และวิทยาศาสตร์",
     email: "admin.saraban@cpru.ac.th",
+    status: "active",
+    createdAt: "2026-09-28T00:00:00Z"
   },
   {
     id: "u-dean",
-    name: "ผศ.ดร. นฤมล อนันตโชค",
+    name: "ผศ.ดร.สานนท์ ด่านภักดี",
     role: "dean",
     roleTitle: "คณบดีคณะศิลปศาสตร์และวิทยาศาสตร์",
     department: "คณะศิลปศาสตร์และวิทยาศาสตร์",
     email: "dean.las@cpru.ac.th",
+    status: "active",
+    createdAt: "2026-09-28T00:00:00Z"
   },
   {
     id: "u-lecturer",
@@ -34,14 +38,18 @@ export const MOCK_USERS: UserProfile[] = [
     roleTitle: "อาจารย์ประจำสาขาวิชารัฐศาสตร์",
     department: "สาขาวิชารัฐศาสตร์และรัฐประศาสนศาสตร์",
     email: "ritthichai.p@cpru.ac.th",
+    status: "active",
+    createdAt: "2026-09-28T00:00:00Z"
   },
   {
     id: "u-gov",
     name: "นางสาวศิริพร เงินคลัง",
-    role: "gov_officer",
-    roleTitle: "พนักงานราชการ (งานการเงินและพัสดุ)",
+    role: "staff_finance",
+    roleTitle: "เจ้าหน้าที่งานการเงินและงบประมาณ",
     department: "งานการเงินและพัสดุ",
     email: "finance@cpru.ac.th",
+    status: "active",
+    createdAt: "2026-09-28T00:00:00Z"
   }
 ];
 
@@ -49,7 +57,7 @@ export const MOCK_INBOUND_DOCS: InboundDocument[] = [
   {
     id: "in-001",
     docNumber: "อว 0604/ว 114",
-    receiveNumber: "042/2569",
+    receiveNumber: "รับ 042/2569",
     receiveDate: "2026-09-28",
     title: "ขอเชิญบุคลากรเข้าร่วมประชุมชี้แจงการดำเนินงานโครงการยุทธศาสตร์ มรภ. ประจำปีงบประมาณ 2569",
     sender: "กองนโยบายและแผน มหาวิทยาลัยราชภัฏชัยภูมิ",
@@ -65,7 +73,7 @@ export const MOCK_INBOUND_DOCS: InboundDocument[] = [
   {
     id: "in-002",
     docNumber: "ชย 0023.1/1042",
-    receiveNumber: "043/2569",
+    receiveNumber: "รับ 043/2569",
     receiveDate: "2026-09-27",
     title: "ขอความอนุเคราะห์วิทยากรและสถานที่จัดโครงการอบรมเชิงปฏิบัติการพัฒนาผู้นำชุมชน",
     sender: "ที่ว่าการอำเภอเนินสง่า จังหวัดชัยภูมิ",
@@ -81,7 +89,7 @@ export const MOCK_INBOUND_DOCS: InboundDocument[] = [
   {
     id: "in-003",
     docNumber: "อว 0604.03/ว 88",
-    receiveNumber: "044/2569",
+    receiveNumber: "รับ 044/2569",
     receiveDate: "2026-09-26",
     title: "การจัดส่งหลักฐานการเบิกจ่ายค่าสอนภาค กศ.ปช. ภาคเรียนที่ 1/2569",
     sender: "กองคลัง สำนักงานอธิการบดี",
@@ -97,7 +105,7 @@ export const MOCK_INBOUND_DOCS: InboundDocument[] = [
   {
     id: "in-004",
     docNumber: "อว 0604/ว 209",
-    receiveNumber: "045/2569",
+    receiveNumber: "รับ 045/2569",
     receiveDate: "2026-09-25",
     title: "แจ้งแนวปฏิบัติที่ดีเกี่ยวกับการยืมเงินทดรองราชการเพื่อดำเนินโครงการ",
     sender: "หน่วยตรวจสอบภายใน มรภ.ชัยภูมิ",
@@ -115,23 +123,25 @@ export const MOCK_INBOUND_DOCS: InboundDocument[] = [
 export const MOCK_OUTBOUND_DOCS: OutboundDocument[] = [
   {
     id: "out-001",
-    docNumber: "อว 0604.05/0112",
+    docNumber: "อว 0643.04/0112",
     sendDate: "2026-09-28",
     title: "ขอเชิญเป็นวิทยากรโครงการ Startup Creator สร้างนวัตกรท่องเที่ยวรุ่นใหม่",
     recipient: "ผู้อำนวยการสำนักงานการท่องเที่ยวและกีฬาจังหวัดชัยภูมิ",
     category: "หนังสือภายนอก",
-    signatory: "คณบดีคณะศิลปศาสตร์และวิทยาศาสตร์",
+    signatory: "ผู้ช่วยศาสตราจารย์ ดร.สานนท์ ด่านภักดี (คณบดี)",
+    urgency: "normal",
     status: "signed",
     createdAt: "2026-09-28T10:00:00Z"
   },
   {
     id: "out-002",
-    docNumber: "อว 0604.05/0113",
+    docNumber: "อว 0643.04/0113",
     sendDate: "2026-09-27",
     title: "ส่งรายงานผลการดำเนินโครงการยกระดับเศรษฐกิจฐานรากบนหลักปรัชญาเศรษฐกิจพอเพียง",
     recipient: "อธิการบดีมหาวิทยาลัยราชภัฏชัยภูมิ",
     category: "หนังสือภายใน",
-    signatory: "คณบดีคณะศิลปศาสตร์และวิทยาศาสตร์",
+    signatory: "ผู้ช่วยศาสตราจารย์ ดร.สานนท์ ด่านภักดี (คณบดี)",
+    urgency: "normal",
     status: "signed",
     createdAt: "2026-09-27T15:30:00Z"
   }
@@ -140,7 +150,7 @@ export const MOCK_OUTBOUND_DOCS: OutboundDocument[] = [
 export const MOCK_PROJECTS: ProjectProposal[] = [
   {
     id: "proj-01",
-    code: "69-STRAT-001",
+    code: "69-FLAS-001",
     fiscalYear: 2569,
     title: "โครงการบูรณาการธุรกิจการค้าสมัยใหม่ ดิจิทัล และสตาร์ทอัพท่องเที่ยวเพื่อพัฒนาเศรษฐกิจสร้างสรรค์",
     strategicGoal: "โครงการตามยุทธศาสตร์เพื่อการพัฒนาท้องถิ่น (ศาสตร์พระราชา)",
@@ -152,11 +162,12 @@ export const MOCK_PROJECTS: ProjectProposal[] = [
     sdgGoals: [4, 8, 11],
     kpis: ["จำนวนผู้เข้ารับการอบรมไม่น้อยกว่า 60 คน", "ได้ต้นแบบธุรกิจสร้างสรรค์ 5 แผนงาน"],
     startDate: "2026-10-01",
-    endDate: "2027-03-31"
+    endDate: "2027-03-31",
+    createdAt: "2026-09-28T00:00:00Z"
   },
   {
     id: "proj-02",
-    code: "69-STRAT-002",
+    code: "69-FLAS-002",
     fiscalYear: 2569,
     title: "โครงการยกระดับคุณภาพการศึกษาเพื่อพัฒนาคุณภาพบัณฑิตให้มีความรู้และทักษะในศตวรรษที่ 21",
     strategicGoal: "ประเด็นยุทธศาสตร์ที่ 3 : ยกระดับคุณภาพการศึกษา",
@@ -168,11 +179,12 @@ export const MOCK_PROJECTS: ProjectProposal[] = [
     sdgGoals: [4, 9],
     kpis: ["นักศึกษาผ่านเกณฑ์มาตรฐานวิชาชีพ 85%"],
     startDate: "2026-11-01",
-    endDate: "2027-04-30"
+    endDate: "2027-04-30",
+    createdAt: "2026-09-28T00:00:00Z"
   },
   {
     id: "proj-03",
-    code: "69-STRAT-003",
+    code: "69-FLAS-003",
     fiscalYear: 2569,
     title: "โครงการเพิ่มมูลค่าสับปะรดด้วยนวัตกรรมการอบแห้งเพื่อพัฒนาเศรษฐกิจฐานราก ต.ท่าหินโงม",
     strategicGoal: "โครงการตามยุทธศาสตร์เพื่อการพัฒนาท้องถิ่น (ศาสตร์พระราชา)",
@@ -184,16 +196,18 @@ export const MOCK_PROJECTS: ProjectProposal[] = [
     sdgGoals: [1, 2, 8, 12],
     kpis: ["กลุ่มวิสาหกิจชุมชนมีรายได้เพิ่มขึ้น 15%"],
     startDate: "2026-01-10",
-    endDate: "2026-08-30"
+    endDate: "2026-08-30",
+    createdAt: "2026-09-28T00:00:00Z"
   }
 ];
 
 export const MOCK_LOANS: LoanContract[] = [
   {
     id: "loan-001",
-    contractNumber: "ยม. 018/2569",
+    contractNumber: "ยม 01/2569",
     borrowerName: "อ.ฤทธิชัย ภาระวิเศษ",
     position: "อาจารย์ประจำสาขาวิชารัฐศาสตร์",
+    department: "สาขาวิชารัฐศาสตร์และรัฐประศาสนศาสตร์",
     purpose: "โครงการติดอาวุธเพื่อเตรียมความพร้อมสำหรับการเข้าสู่ระบบราชการกลุ่มวิชาทางรัฐศาสตร์",
     amount: 35000,
     borrowDate: "2026-09-15",
@@ -204,13 +218,15 @@ export const MOCK_LOANS: LoanContract[] = [
       hasMemo: true,
       hasApprovedProject: true,
       hasEstimate: true
-    }
+    },
+    createdAt: "2026-09-15T00:00:00Z"
   },
   {
     id: "loan-002",
-    contractNumber: "ยม. 019/2569",
+    contractNumber: "ยม 02/2569",
     borrowerName: "ผศ.ดร. นฤมล อนันตโชค",
-    position: "คณบดีคณะศิลปศาสตร์และวิทยาศาสตร์",
+    position: "อาจารย์ประจำสาขาบริหารธุรกิจ",
+    department: "สาขาวิชาบริหารธุรกิจ",
     purpose: "โครงการอบรมเชิงปฏิบัติการ Startup Creator สร้างนวัตกรท่องเที่ยวรุ่นใหม่",
     amount: 50000,
     borrowDate: "2026-09-20",
@@ -221,7 +237,8 @@ export const MOCK_LOANS: LoanContract[] = [
       hasMemo: true,
       hasApprovedProject: true,
       hasEstimate: true
-    }
+    },
+    createdAt: "2026-09-20T00:00:00Z"
   }
 ];
 
@@ -230,6 +247,7 @@ export const MOCK_BUDGET_ITEMS: BudgetLedgerItem[] = [
     id: "bg-01",
     category: "งบดำเนินงาน",
     subCategory: "ค่าตอบแทนใช้สอยและวัสดุ (โครงการคณะ)",
+    fiscalYear: 2569,
     allocatedAmount: 1500000,
     committedAmount: 450000,
     disbursedAmount: 620000,
@@ -240,6 +258,7 @@ export const MOCK_BUDGET_ITEMS: BudgetLedgerItem[] = [
     id: "bg-02",
     category: "งบยุทธศาสตร์ มรภ.",
     subCategory: "โครงการศาสตร์พระราชาเพื่อพัฒนาท้องถิ่น",
+    fiscalYear: 2569,
     allocatedAmount: 2000000,
     committedAmount: 850000,
     disbursedAmount: 780000,
@@ -250,6 +269,7 @@ export const MOCK_BUDGET_ITEMS: BudgetLedgerItem[] = [
     id: "bg-03",
     category: "งบรายได้จัดการศึกษา",
     subCategory: "ค่าตอบแทนการสอนภาคพิเศษ (กศ.ปช.)",
+    fiscalYear: 2569,
     allocatedAmount: 800000,
     committedAmount: 240000,
     disbursedAmount: 310000,
@@ -261,7 +281,7 @@ export const MOCK_BUDGET_ITEMS: BudgetLedgerItem[] = [
 export const MOCK_PURCHASE_REQ: PurchaseRequisition[] = [
   {
     id: "pr-001",
-    prNumber: "พด. 014/2569",
+    prNumber: "PR-69/001",
     projectName: "โครงการพัฒนาทักษะทางวิชาชีพ สาขาวิชาบริหารธุรกิจ",
     requesterName: "อ.ฤทธิชัย ภาระวิเศษ",
     department: "สาขาวิชาบริหารธุรกิจ",
@@ -275,7 +295,8 @@ export const MOCK_PURCHASE_REQ: PurchaseRequisition[] = [
       { itemNumber: 1, description: "กระดาษ A4 80 แกรม (Double A)", quantity: 20, unit: "รีม", unitPrice: 145, totalPrice: 2900 },
       { itemNumber: 2, description: "หมึกพิมพ์เลเซอร์ HP LaserJet MFP", quantity: 2, unit: "กล่อง", unitPrice: 3800, totalPrice: 7600 },
       { itemNumber: 3, description: "แฟ้มเสนอเซ็นและเครื่องเขียนจัดอบรม", quantity: 40, unit: "ชุด", unitPrice: 200, totalPrice: 8000 }
-    ]
+    ],
+    createdAt: "2026-09-22T00:00:00Z"
   }
 ];
 
@@ -293,7 +314,7 @@ export const MOCK_LEAVE_REQUESTS: LeaveRequest[] = [
     substitutePerson: "อ.สมบัติ วิชาการ",
     contactAddress: "123 ม.2 ต.ในเมือง อ.เมือง จ.ชัยภูมิ โทร 081-xxxxxxx",
     status: "approved",
-    createdAt: "2026-09-25"
+    createdAt: "2026-09-25T00:00:00Z"
   }
 ];
 
@@ -308,7 +329,8 @@ export const MOCK_ROOMS: RoomBooking[] = [
     startTime: "09:00",
     endTime: "12:00",
     purpose: "ประชุมคณะกรรมการบริหารคณะศิลปศาสตร์และวิทยาศาสตร์ ประจำเดือนกันยายน 2569",
-    status: "approved"
+    status: "approved",
+    createdAt: "2026-09-28T00:00:00Z"
   },
   {
     id: "rm-02",
@@ -320,6 +342,7 @@ export const MOCK_ROOMS: RoomBooking[] = [
     startTime: "13:00",
     endTime: "16:30",
     purpose: "อบรมเชิงปฏิบัติการเตรียมความพร้อมสหกิจศึกษา",
-    status: "approved"
+    status: "approved",
+    createdAt: "2026-09-28T00:00:00Z"
   }
 ];
