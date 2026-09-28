@@ -29,7 +29,7 @@ export default function AdminModuleHub() {
         <div>
           <div className="flex items-center gap-2">
             <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-900">
-              โมดูลงานของคุณ (Primary Module)
+              สำนักงานคณบดี
             </span>
             <span className="text-xs text-slate-400">• งานสารบรรณและธุรการ</span>
           </div>

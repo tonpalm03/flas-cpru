@@ -35,7 +35,6 @@ export default function FacultyPortalDashboard() {
       icon: FileText,
       href: "/admin/inbound",
       color: "text-blue-700 bg-blue-50 border-blue-100",
-      badge: "งานของคุณ",
     },
     {
       title: "โครงการยุทธศาสตร์ 2569",

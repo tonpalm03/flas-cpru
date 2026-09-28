@@ -179,11 +179,6 @@ export default function Sidebar() {
                   <span className="truncate">{section.label}</span>
                 </div>
                 <div className="flex items-center gap-1.5 flex-shrink-0">
-                  {section.isMyPart && viewMode === "full_suite" && (
-                    <span className="text-[10px] bg-blue-100 text-blue-800 font-semibold px-1.5 py-0.5 rounded-full">
-                      งานของคุณ
-                    </span>
-                  )}
                   {isOpen ? (
                     <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
                   ) : (
