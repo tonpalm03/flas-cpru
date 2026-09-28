@@ -28,7 +28,7 @@ export default function LoginPage() {
   const [regEmail, setRegEmail] = useState("");
   const [regPassword, setRegPassword] = useState("");
   const [regConfirmPassword, setRegConfirmPassword] = useState("");
-  const [regRole, setRegRole] = useState<UserRole>("admin");
+  const [regRole, setRegRole] = useState<UserRole>("lecturer");
   const [regDepartment, setRegDepartment] = useState("");
 
   const [loading, setLoading] = useState(false);
@@ -204,17 +204,16 @@ export default function LoginPage() {
             </div>
 
             <div>
-              <label className="block font-medium text-slate-700 mb-1">บทบาทหน้าที่ในระบบ (Role)</label>
+              <label className="block font-medium text-slate-700 mb-1">ประเภทบุคลากร</label>
               <select
                 value={regRole}
                 onChange={(e) => setRegRole(e.target.value as UserRole)}
                 className="w-full border border-slate-200 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:border-blue-900 bg-white"
               >
-                <option value="admin">แอดมิน (เจ้าหน้าที่ธุรการและสารบรรณ)</option>
-                <option value="dean">คณบดี (ผู้บริหารคณะ)</option>
                 <option value="lecturer">อาจารย์ประจำสาขาวิชา</option>
-                <option value="gov_officer">พนักงานราชการ (สายสนับสนุน / การเงิน / พัสดุ)</option>
+                <option value="gov_officer">บุคลากรสายสนับสนุน / พนักงานราชการ</option>
               </select>
+              <p className="text-[10px] text-slate-400 mt-1">* สิทธิ์ผู้ดูแลระบบ (Admin) และผู้บริหารจะได้รับการอนุมัติแต่งตั้งจากคณะ</p>
             </div>
 
             <div>

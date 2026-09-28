@@ -26,9 +26,9 @@ export const DEFAULT_TEMPLATES_CONFIG: SystemTemplatesConfig = {
   universityName: "มหาวิทยาลัยราชภัฏชัยภูมิ",
   officeName: "สำนักงานคณบดี คณะศิลปศาสตร์และวิทยาศาสตร์",
   telephone: "044-811-xxx",
-  deanName: "ผู้ช่วยศาสตราจารย์ ดร.นฤมล อนันตโชค",
+  deanName: "ผู้ช่วยศาสตราจารย์ ดร.สานนท์ ด่านภักดี",
   deanPosition: "คณบดีคณะศิลปศาสตร์และวิทยาศาสตร์",
-  defaultDocPrefix: "อว 0604.05",
+  defaultDocPrefix: "อว 0643.04/",
   defaultFiscalYear: 2569,
   vatRate: 7,
   memoStandardParagraphs: {

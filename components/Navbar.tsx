@@ -24,11 +24,19 @@ export default function Navbar() {
   const getRoleBadge = (role: UserRole) => {
     switch (role) {
       case "admin":
-        return { label: "แอดมิน / ธุรการ", style: "bg-blue-100 text-blue-900 border-blue-200" };
+        return { label: "แอดมิน / ธุรการ", style: "bg-blue-100 text-blue-900 border-blue-200 font-bold" };
       case "dean":
-        return { label: "คณบดี", style: "bg-slate-100 text-slate-800 border-slate-300" };
+        return { label: "คณบดี", style: "bg-indigo-100 text-indigo-900 border-indigo-200 font-bold" };
       case "lecturer":
         return { label: "อาจารย์", style: "bg-slate-100 text-slate-800 border-slate-300" };
+      case "staff_finance":
+        return { label: "เจ้าหน้าที่การเงิน", style: "bg-amber-100 text-amber-900 border-amber-200" };
+      case "staff_procurement":
+        return { label: "เจ้าหน้าที่พัสดุ", style: "bg-orange-100 text-orange-900 border-orange-200" };
+      case "staff_hr":
+        return { label: "เจ้าหน้าที่บุคคล", style: "bg-purple-100 text-purple-900 border-purple-200" };
+      case "staff_plan":
+        return { label: "เจ้าหน้าที่แผน", style: "bg-emerald-100 text-emerald-900 border-emerald-200" };
       case "gov_officer":
         return { label: "พนักงานราชการ", style: "bg-slate-100 text-slate-800 border-slate-300" };
       default:

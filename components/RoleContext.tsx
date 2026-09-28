@@ -3,22 +3,20 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { UserProfile, UserRole } from "@/lib/types";
-import { MOCK_USERS } from "@/lib/mockData";
-import { logoutUser } from "@/lib/firebaseAuthService";
-
-export type ViewMode = "admin_only" | "full_suite";
+import { logoutUser, subscribeToAuthChanges } from "@/lib/firebaseAuthService";
 
 interface RoleContextType {
   currentUser: UserProfile | null;
   setCurrentUser: (user: UserProfile | null) => void;
-  switchRole: (role: UserRole) => void;
-  allUsers: UserProfile[];
-  viewMode: ViewMode;
-  setViewMode: (mode: ViewMode) => void;
-  toggleViewMode: () => void;
   logout: () => Promise<void>;
   isLoggedIn: boolean;
   isLoading: boolean;
+  isAdmin: boolean;
+  isDean: boolean;
+  isFinance: boolean;
+  isProcurement: boolean;
+  isHR: boolean;
+  isPlan: boolean;
 }
 
 const RoleContext = createContext<RoleContextType | undefined>(undefined);
@@ -28,29 +26,19 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   const [currentUser, setCurrentUserState] = useState<UserProfile | null>(null);
-  const [viewMode, setViewModeState] = useState<ViewMode>("full_suite");
   const [isLoading, setIsLoading] = useState(true);
 
+  // 1. Subscribe to Firebase Auth State (True Source of Truth)
   useEffect(() => {
-    // Check local session
-    const savedUser = localStorage.getItem("faculty_erp_current_user");
-    const savedMode = localStorage.getItem("faculty_erp_view_mode") as ViewMode;
+    const unsubscribe = subscribeToAuthChanges((profile) => {
+      setCurrentUserState(profile);
+      setIsLoading(false);
+    });
 
-    if (savedMode) {
-      setViewModeState(savedMode);
-    }
-
-    if (savedUser) {
-      try {
-        setCurrentUserState(JSON.parse(savedUser));
-      } catch {
-        localStorage.removeItem("faculty_erp_current_user");
-      }
-    }
-    setIsLoading(false);
+    return () => unsubscribe();
   }, []);
 
-  // Auth Guard: If not logged in and on a protected internal route, redirect to /login
+  // 2. Auth Guard: If not logged in and navigating to a protected internal route, redirect to /login
   useEffect(() => {
     if (!isLoading) {
       const isPublic = 
@@ -72,49 +60,38 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
 
   const setCurrentUser = (user: UserProfile | null) => {
     setCurrentUserState(user);
-    if (user) {
-      localStorage.setItem("faculty_erp_current_user", JSON.stringify(user));
-    } else {
-      localStorage.removeItem("faculty_erp_current_user");
-    }
-  };
-
-  const setViewMode = (mode: ViewMode) => {
-    setViewModeState(mode);
-    localStorage.setItem("faculty_erp_view_mode", mode);
-  };
-
-  const toggleViewMode = () => {
-    const next = viewMode === "admin_only" ? "full_suite" : "admin_only";
-    setViewMode(next);
-  };
-
-  const switchRole = (role: UserRole) => {
-    const found = MOCK_USERS.find((u) => u.role === role);
-    if (found) {
-      setCurrentUser(found);
-    }
   };
 
   const logout = async () => {
+    setIsLoading(true);
     await logoutUser();
-    setCurrentUser(null);
+    setCurrentUserState(null);
+    setIsLoading(false);
     router.replace("/login");
   };
+
+  const role = currentUser?.role;
+  const isAdmin = role === "admin";
+  const isDean = role === "dean" || isAdmin;
+  const isFinance = role === "staff_finance" || isAdmin;
+  const isProcurement = role === "staff_procurement" || isAdmin;
+  const isHR = role === "staff_hr" || isAdmin;
+  const isPlan = role === "staff_plan" || isAdmin;
 
   return (
     <RoleContext.Provider
       value={{
         currentUser,
         setCurrentUser,
-        switchRole,
-        allUsers: MOCK_USERS,
-        viewMode,
-        setViewMode,
-        toggleViewMode,
         logout,
-        isLoggedIn: Boolean(currentUser),
+        isLoggedIn: !!currentUser,
         isLoading,
+        isAdmin,
+        isDean,
+        isFinance,
+        isProcurement,
+        isHR,
+        isPlan,
       }}
     >
       {children}
