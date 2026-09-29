@@ -24,6 +24,7 @@ import { exportMemoToWord, printDocumentView } from "@/lib/documentGenerator";
 import { fetchSystemTemplatesConfig } from "@/lib/templateConfig";
 import { getMemos, createMemo, updateMemo } from "@/lib/firebaseService";
 import { OfficialMemo } from "@/lib/types";
+import GarudaEmblem from "@/components/GarudaEmblem";
 
 interface SpeakerItem {
   name: string;
@@ -527,11 +528,9 @@ export default function MemoGeneratorPage() {
             style={{ fontFamily: "'TH Sarabun PSK', 'Sarabun', sans-serif" }}
           >
             <div>
-              {/* Header with Center Garuda Text */}
+              {/* Header with Center Garuda */}
               <div className="text-center pb-4">
-                <div className="w-16 h-16 mx-auto mb-2 bg-slate-100 rounded-full border border-slate-300 flex items-center justify-center text-[10px] font-bold text-slate-500">
-                  ตราครุฑ
-                </div>
+                <GarudaEmblem size={72} className="mx-auto mb-2" />
                 <h2 className="text-2xl font-bold tracking-tight text-slate-900">
                   บันทึกข้อความ
                 </h2>

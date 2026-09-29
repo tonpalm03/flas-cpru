@@ -26,6 +26,7 @@ import { useRole } from "@/components/RoleContext";
 import { printDocumentView, exportMemoToWord } from "@/lib/documentGenerator";
 import { getResponses, createResponse } from "@/lib/firebaseService";
 import { OfficialResponse } from "@/lib/types";
+import GarudaEmblem from "@/components/GarudaEmblem";
 
 interface ParticipantItem {
   name: string;
@@ -448,9 +449,7 @@ export default function ResponsesGeneratorPage() {
           >
             <div>
               <div className="text-center pb-4">
-                <div className="w-14 h-14 mx-auto mb-2 bg-slate-100 rounded-full border border-slate-300 flex items-center justify-center text-[10px] font-bold text-slate-500">
-                  ตราครุฑ
-                </div>
+                <GarudaEmblem size={64} className="mx-auto mb-2" />
                 <h2 className="text-2xl font-bold tracking-tight text-slate-900">
                   แบบตอบรับหนังสือราชการ
                 </h2>
