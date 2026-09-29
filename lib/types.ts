@@ -11,18 +11,28 @@ export type UserRole =
   | "staff_plan"         // เจ้าหน้าที่งานแผนและยุทธศาสตร์
   | "gov_officer";       // เจ้าหน้าที่สายสนับสนุนทั่วไป
 
-export type UserAccountStatus = "pending_approval" | "active" | "suspended";
+export type UserAccountStatus = "pending_approval" | "active" | "suspended" | "archived";
 
 export interface UserProfile {
   id: string;
+  employeeId?: string;
   name: string;
   role: UserRole;
   roleTitle: string;
   department: string;
+  position?: string;
   email: string;
+  phoneNumber?: string;
+  officeRoom?: string;
+  bio?: string;
   status: UserAccountStatus;
   permissions?: string[];
   avatarUrl?: string;
+  avatarVersion?: number;
+  supervisorId?: string;
+  supervisorName?: string;
+  attendanceEligible?: boolean;
+  requestedRole?: UserRole;
   createdAt: string;
   updatedAt?: string;
 }
@@ -742,8 +752,203 @@ export interface AppNotification {
   targetRole?: UserRole | "all";
   title: string;
   message: string;
-  category: "admin" | "project" | "finance" | "procurement" | "hr" | "plan";
+  category: "admin" | "project" | "finance" | "procurement" | "hr" | "plan" | "attendance" | "account";
   linkHref?: string;
   read: boolean;
   createdAt: string;
 }
+
+// ==========================================
+// 8. บัญชีผู้ใช้ ทะเบียนบุคลากร และระบบลงเวลาทำงาน (User Access & Attendance)
+// ==========================================
+
+// 8.1 ทะเบียนบุคลากร (Employee Record)
+export interface EmployeeRecord {
+  id: string;                  // รหัสบุคลากรถาวร เช่น EMP-2569-001
+  userId?: string;             // ผูกกับ Firebase Auth UID
+  prefix: string;              // นาย / นาง / นางสาว / ผศ.ดร. / อ.
+  firstName: string;
+  lastName: string;
+  officialName: string;        // เช่น ผู้ช่วยศาสตราจารย์ ดร.สานนท์ ด่านภักดี
+  department: string;          // สำนักงานคณบดี, สาขาวิชารัฐประศาสนศาสตร์, ฯลฯ
+  position: string;            // คณบดี, อาจารย์ประจำ, เจ้าหน้าที่บริหารงานทั่วไป
+  academicRank?: string;       // อาจารย์, ผู้ช่วยศาสตราจารย์, รองศาสตราจารย์
+  employeeType: "civil_servant" | "university_staff" | "contract_academic" | "temporary_employee";
+  supervisorId?: string;       // รหัสบุคลากรของหัวหน้างานโดยตรง
+  supervisorName?: string;     // ชื่อหัวหน้างาน
+  startDate: string;           // วันที่เริ่มปฏิบัติงาน
+  endDate?: string;            // วันที่สิ้นสุดสัญญา (กรณีสัญญาจ้าง)
+  status: "active" | "resigned" | "retired" | "on_leave";
+  attendanceEligible: boolean; // บุคลากรที่ต้องลงเวลาทำงานหรือไม่
+  workScheduleId?: string;     // รหัสตารางงาน/กะที่กำหนด
+  email: string;
+  phone?: string;
+  avatarUrl?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+// 8.2 คำเชิญเข้าใช้งานระบบ (Account Invitation)
+export interface AccountInvitation {
+  id: string;
+  email: string;
+  employeeId: string;
+  employeeName: string;
+  intendedRole: UserRole;
+  department: string;
+  invitationToken: string;
+  expiresAt: string;
+  status: "pending" | "accepted" | "expired" | "revoked";
+  invitedBy: string;
+  invitedByName: string;
+  createdAt: string;
+  acceptedAt?: string;
+}
+
+// 8.3 นโยบายการทำงาน กะเวลา และวันหยุด (Work Policy, Shifts & Holidays)
+export interface WorkShift {
+  id: string;
+  name: string;                // กะปกติ (08.30 - 16.30 น.), กะพิเศษ
+  code: string;                // SHIFT-NORMAL, SHIFT-FLEX
+  startTime: string;           // "08:30"
+  endTime: string;             // "16:30"
+  lateGraceMinutes: number;    // เวลาผ่อนผัน เช่น 15 นาที (สายหลังจาก 08:45)
+  earlyLeaveThreshold: string; // "16:00"
+  halfDayThreshold: string;    // "12:00"
+  isOvernight: boolean;        // กะข้ามเที่ยงคืนหรือไม่
+  isDefault: boolean;
+}
+
+export interface WorkPolicy {
+  id: string;
+  version: string;             // "2569.1"
+  title: string;
+  timezone: string;            // "Asia/Bangkok"
+  shifts: WorkShift[];
+  workDays: number[];          // [1, 2, 3, 4, 5] (จันทร์-ศุกร์)
+  locationModes: Array<"web" | "gps" | "qr">;
+  gpsCenterLat?: number;       // พิกัดคณะ เช่น 15.8083 (CPRU)
+  gpsCenterLng?: number;       // 102.0315
+  gpsRadiusMeters?: number;    // รัศมีอนุญาต เช่น 500 เมตร
+  qrSecretKey?: string;        // คีย์สำหรับ Dynamic QR
+  effectiveDate: string;
+  updatedAt: string;
+  updatedBy: string;
+}
+
+export interface PublicHoliday {
+  id: string;
+  date: string;                // "2026-10-13" (YYYY-MM-DD)
+  name: string;                // วันนวมินทรมหาราช
+  year: number;                // 2569
+  isOfficial: boolean;
+}
+
+// 8.4 รายการลงเวลาดิบ และเซสชันรายวัน (Attendance Raw Events & Work Sessions)
+export interface AttendanceEvent {
+  id: string;
+  userId: string;
+  employeeId: string;
+  staffName: string;
+  eventType: "check_in" | "check_out";
+  serverTimestamp: string;     // ISO timestamp จาก Server
+  workDate: string;            // "YYYY-MM-DD"
+  source: "web" | "gps" | "qr";
+  locationCoords?: {
+    latitude: number;
+    longitude: number;
+    accuracy?: number;
+  };
+  locationName?: string;       // "คณะศิลปศาสตร์และวิทยาศาสตร์"
+  sessionId: string;
+  requestId: string;           // Idempotency key ป้องกันกดซ้ำ
+  isFlagged?: boolean;
+  flagReason?: string;
+}
+
+export interface AttendanceSession {
+  id: string;                  // `att-${employeeId}-${workDate}`
+  userId: string;
+  employeeId: string;
+  staffName: string;
+  department: string;
+  workDate: string;            // "YYYY-MM-DD"
+  shiftId: string;
+  shiftName: string;
+  checkInTime?: string;        // "08:25"
+  checkOutTime?: string;       // "16:35"
+  checkInEventId?: string;
+  checkOutEventId?: string;
+  checkInStatus?: "on_time" | "late";
+  checkOutStatus?: "normal" | "early_leave";
+  sessionStatus: "open" | "closed" | "incomplete"; // incomplete = ลืมออกงาน/รอตรวจสอบ
+  workType: "work" | "holiday" | "approved_leave" | "official_duty" | "unexcused_absence";
+  lateMinutes: number;         // จำนวนนาทีที่สาย
+  earlyMinutes: number;        // จำนวนนาทีที่ออกก่อน
+  totalWorkMinutes: number;    // นาทีทำงานจริง
+  leaveRequestId?: string;     // ลิงก์ใบลา e-Leave ถ้ามี
+  leaveType?: string;
+  hasCorrection?: boolean;
+  correctionId?: string;
+  updatedAt: string;
+}
+
+// 8.5 คำขอแก้ไขเวลาย้อนหลัง (Attendance Correction Request)
+export interface AttendanceCorrection {
+  id: string;
+  employeeId: string;
+  userId: string;
+  staffName: string;
+  department: string;
+  workDate: string;
+  originalCheckIn?: string;
+  originalCheckOut?: string;
+  requestedCheckIn: string;
+  requestedCheckOut: string;
+  reason: string;
+  evidenceUrl?: string;
+  status: "pending" | "approved" | "rejected";
+  reviewerId?: string;
+  reviewerName?: string;
+  reviewerComment?: string;
+  reviewedAt?: string;
+  initiatedBy: "employee" | "admin";
+  createdAt: string;
+}
+
+// 8.6 สรุปเวลารายเดือน และการปิดงวด (Monthly Report & Period Lock)
+export interface MonthlyAttendanceReport {
+  id: string;                  // `mrep-${employeeId}-${period}`
+  period: string;              // "2569-10" หรือ "2026-10"
+  fiscalYear: number;
+  employeeId: string;
+  staffName: string;
+  department: string;
+  position: string;
+  expectedWorkDays: number;
+  actualWorkDays: number;
+  lateDaysCount: number;
+  lateTotalMinutes: number;
+  earlyLeaveDaysCount: number;
+  leaveDaysCount: number;
+  officialDutyDaysCount: number;
+  absentDaysCount: number;
+  incompleteDaysCount: number;
+  status: "unreviewed" | "verified" | "locked";
+  verifiedBy?: string;
+  verifiedAt?: string;
+}
+
+export interface AttendancePeriodLock {
+  id: string;                  // `lock-${period}`
+  period: string;              // "2569-10"
+  isLocked: boolean;
+  lockedBy: string;
+  lockedByName: string;
+  lockedAt: string;
+  reopenedBy?: string;
+  reopenedByName?: string;
+  reopenReason?: string;
+  reopenedAt?: string;
+}
+

@@ -405,9 +405,17 @@ export default function Navbar() {
             onClick={() => setShowProfileDropdown(!showProfileDropdown)}
             className="flex items-center gap-2.5 pl-2 pr-3 py-1.5 rounded-xl border border-slate-200 hover:border-blue-900 hover:bg-slate-50 transition-all text-left"
           >
-            <div className="w-8 h-8 rounded-lg bg-blue-900 text-white flex items-center justify-center font-semibold text-xs shadow-sm">
-              {currentUser.name.charAt(0)}
-            </div>
+            {currentUser.avatarUrl ? (
+              <img
+                src={currentUser.avatarUrl}
+                alt={currentUser.name}
+                className="w-8 h-8 rounded-lg object-cover border border-slate-200 shadow-sm"
+              />
+            ) : (
+              <div className="w-8 h-8 rounded-lg bg-blue-900 text-white flex items-center justify-center font-semibold text-xs shadow-sm">
+                {currentUser.name.charAt(0)}
+              </div>
+            )}
             <div className="hidden sm:block">
               <div className="flex items-center gap-1.5">
                 <p className="text-xs font-semibold text-slate-900 truncate max-w-[130px]">
@@ -426,11 +434,56 @@ export default function Navbar() {
 
           {/* Profile Dropdown */}
           {showProfileDropdown && (
-            <div className="absolute right-0 mt-2 w-64 bg-white border border-slate-200 rounded-2xl shadow-float p-3 z-50 animate-in fade-in zoom-in-95 space-y-3 text-xs">
-              <div className="pb-2 border-b border-slate-100">
-                <p className="font-bold text-slate-900">{currentUser.name}</p>
-                <p className="text-[11px] text-slate-500">{currentUser.roleTitle}</p>
-                <p className="text-[10px] text-slate-400 mt-0.5">{currentUser.email}</p>
+            <div className="absolute right-0 mt-2 w-64 bg-white border border-slate-200 rounded-2xl shadow-float p-3 z-50 animate-in fade-in zoom-in-95 space-y-2 text-xs">
+              <div className="pb-2 border-b border-slate-100 flex items-center gap-2.5">
+                {currentUser.avatarUrl ? (
+                  <img
+                    src={currentUser.avatarUrl}
+                    alt={currentUser.name}
+                    className="w-10 h-10 rounded-xl object-cover border border-slate-200"
+                  />
+                ) : (
+                  <div className="w-10 h-10 rounded-xl bg-blue-900 text-white flex items-center justify-center font-bold text-sm">
+                    {currentUser.name.charAt(0)}
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="font-bold text-slate-900 truncate">{currentUser.name}</p>
+                  <p className="text-[11px] text-slate-500 truncate">{currentUser.roleTitle}</p>
+                  <p className="text-[10px] text-slate-400 truncate">{currentUser.email}</p>
+                </div>
+              </div>
+
+              {/* Navigation Links inside Dropdown */}
+              <div className="space-y-0.5 py-1 border-b border-slate-100">
+                <Link
+                  href="/account/profile"
+                  onClick={() => setShowProfileDropdown(false)}
+                  className="w-full text-left px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-50 hover:text-blue-900 flex items-center gap-2.5 font-medium transition-colors"
+                >
+                  <User className="w-3.5 h-3.5 text-slate-400" />
+                  <span>ข้อมูลส่วนตัว (My Profile)</span>
+                </Link>
+
+                <Link
+                  href="/attendance"
+                  onClick={() => setShowProfileDropdown(false)}
+                  className="w-full text-left px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-50 hover:text-blue-900 flex items-center gap-2.5 font-medium transition-colors"
+                >
+                  <Clock className="w-3.5 h-3.5 text-slate-400" />
+                  <span>ลงเวลาปฏิบัติงาน (Attendance)</span>
+                </Link>
+
+                {currentUser.role === "admin" && (
+                  <Link
+                    href="/settings/users"
+                    onClick={() => setShowProfileDropdown(false)}
+                    className="w-full text-left px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-50 hover:text-blue-900 flex items-center gap-2.5 font-medium transition-colors"
+                  >
+                    <Building2 className="w-3.5 h-3.5 text-slate-400" />
+                    <span>จัดการบัญชีผู้ใช้ (Users)</span>
+                  </Link>
+                )}
               </div>
 
               {/* Logout Button */}

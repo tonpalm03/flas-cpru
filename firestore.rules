@@ -184,6 +184,60 @@ service cloud.firestore {
       allow read, write: if isAuthenticated();
     }
 
+    // 14. Employees Registry & Account Invitations
+    match /hr_employees/{employeeId} {
+      allow read: if isAuthenticated();
+      allow write: if isHRStaff() || isAdmin();
+    }
+
+    match /invitations/{invitationId} {
+      allow read: if isAuthenticated();
+      allow write: if isHRStaff() || isAdmin();
+    }
+
+    // 15. Work Policies, Shifts & Public Holidays
+    match /work_policies/{policyId} {
+      allow read: if isAuthenticated();
+      allow write: if isHRStaff() || isAdmin();
+    }
+
+    match /public_holidays/{holidayId} {
+      allow read: if isAuthenticated();
+      allow write: if isHRStaff() || isAdmin();
+    }
+
+    // 16. Attendance Events (Raw logs - Immutable append-only)
+    match /attendance_events/{eventId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if false;
+    }
+
+    // 17. Attendance Sessions & Corrections
+    match /attendance_sessions/{sessionId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    match /attendance_corrections/{correctionId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    // 18. Monthly Attendance Reports & Period Locks
+    match /attendance_monthly_reports/{reportId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isHRStaff() || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /attendance_period_locks/{lockId} {
+      allow read: if isAuthenticated();
+      allow write: if isHRStaff() || isAdmin();
+    }
+
     // 10. Audit Logs (Immutable append-only)
     match /audit_logs/{logId} {
       allow read: if isAdmin() || isDean();

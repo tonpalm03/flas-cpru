@@ -25,40 +25,59 @@ import {
   OfficialResponse,
   ChecklistSubmission,
   RoomBooking, 
-  ProjectProposal,
-  ProjectReport,
-  PurchaseRequisition,
-  LoanContract,
-  BudgetLedgerItem,
-  LedgerTransaction,
-  TeachingDisbursement,
-  LeaveRequest,
-  UserLeaveQuota,
-  FacultyPortfolio,
-  EmploymentContract,
-  StrategicPlan,
-  StrategicKPI,
-  AppNotification,
-  UserRole,
-  MasterSystemConfig,
-  UserProfile
+  ProjectProposal, 
+  ProjectReport, 
+  PurchaseRequisition, 
+  LoanContract, 
+  BudgetLedgerItem, 
+  LedgerTransaction, 
+  TeachingDisbursement, 
+  LeaveRequest, 
+  UserLeaveQuota, 
+  FacultyPortfolio, 
+  EmploymentContract, 
+  StrategicPlan, 
+  StrategicKPI, 
+  AppNotification, 
+  UserRole, 
+  MasterSystemConfig, 
+  UserProfile,
+  EmployeeRecord,
+  AccountInvitation,
+  WorkShift,
+  WorkPolicy,
+  PublicHoliday,
+  AttendanceEvent,
+  AttendanceSession,
+  AttendanceCorrection,
+  MonthlyAttendanceReport,
+  AttendancePeriodLock
 } from "./types";
 import { 
   MOCK_INBOUND_DOCS, 
   MOCK_OUTBOUND_DOCS, 
   MOCK_PROJECTS, 
-  MOCK_ROOMS,
-  MOCK_BUDGET_ITEMS,
-  MOCK_LEDGER_TRANSACTIONS,
-  MOCK_LOANS,
-  MOCK_DISBURSEMENTS,
-  MOCK_PURCHASE_REQ,
-  MOCK_LEAVE_REQUESTS,
-  MOCK_USER_QUOTAS,
-  MOCK_FACULTY_PORTFOLIOS,
-  MOCK_EMPLOYMENT_CONTRACTS,
-  MOCK_STRATEGIC_PLAN,
-  MOCK_NOTIFICATIONS
+  MOCK_ROOMS, 
+  MOCK_BUDGET_ITEMS, 
+  MOCK_LEDGER_TRANSACTIONS, 
+  MOCK_LOANS, 
+  MOCK_DISBURSEMENTS, 
+  MOCK_PURCHASE_REQ, 
+  MOCK_LEAVE_REQUESTS, 
+  MOCK_USER_QUOTAS, 
+  MOCK_FACULTY_PORTFOLIOS, 
+  MOCK_EMPLOYMENT_CONTRACTS, 
+  MOCK_STRATEGIC_PLAN, 
+  MOCK_NOTIFICATIONS,
+  MOCK_USERS,
+  MOCK_EMPLOYEES,
+  MOCK_INVITATIONS,
+  MOCK_WORK_POLICY,
+  MOCK_HOLIDAYS_2569,
+  MOCK_ATTENDANCE_SESSIONS,
+  MOCK_ATTENDANCE_CORRECTIONS,
+  MOCK_MONTHLY_ATTENDANCE_REPORTS,
+  MOCK_ATTENDANCE_PERIOD_LOCKS
 } from "./mockData";
 import { getNextAtomicNumber } from "./numberingService";
 import { logAuditEvent } from "./auditService";
@@ -1700,3 +1719,949 @@ export async function markAllNotificationsAsRead(userId?: string): Promise<void>
   const updated = list.map(n => ({ ...n, read: true }));
   setLocalData("notifications", updated);
 }
+
+// ==========================================
+// 12. USER ACCOUNTS, ROLES & INVITATIONS (ระบบบัญชีผู้ใช้ และสิทธิ์)
+// ==========================================
+
+export async function getAllUsers(): Promise<UserProfile[]> {
+  if (isConfigured) {
+    try {
+      const snap = await getDocs(collection(db, "users"));
+      if (!snap.empty) {
+        return snap.docs.map(d => ({ id: d.id, ...d.data() } as UserProfile));
+      }
+    } catch (e) {
+      console.warn("Firestore getAllUsers fallback:", e);
+    }
+  }
+  return getLocalData("users", MOCK_USERS);
+}
+
+export async function updateUserProfile(
+  userId: string,
+  data: Partial<UserProfile>,
+  reason?: string,
+  actor?: UserProfile | null
+): Promise<void> {
+  const users = await getAllUsers();
+  const targetUser = users.find(u => u.id === userId);
+  
+  // Guard: Protect last active Super Admin from demotion or suspension
+  if (targetUser?.role === "admin" && (data.role && data.role !== "admin" || data.status === "suspended")) {
+    const activeAdmins = users.filter(u => u.role === "admin" && u.status === "active");
+    if (activeAdmins.length <= 1 && activeAdmins[0]?.id === userId) {
+      throw new Error("ไม่สามารถระงับการใช้งานหรือลดสิทธิ์ผู้ดูแลระบบหลัก (Super Admin) คนสุดท้ายของคณะได้");
+    }
+  }
+
+  const payload = {
+    ...data,
+    updatedAt: new Date().toISOString()
+  };
+
+  if (isConfigured) {
+    try {
+      const docRef = doc(db, "users", userId);
+      await updateDoc(docRef, {
+        ...payload,
+        timestamp: serverTimestamp()
+      });
+      await logAuditEvent(actor || null, "UPDATE_USER_PROFILE", "users", userId, { 
+        before: targetUser, 
+        after: data, 
+        reason: reason || "ผู้ดูแลระบบปรับปรุงข้อมูลบัญชี" 
+      });
+      return;
+    } catch (e) {
+      console.error("Firestore updateUserProfile error:", e);
+      throw e;
+    }
+  }
+
+  const list = getLocalData<UserProfile>("users", MOCK_USERS);
+  const updated = list.map(u => u.id === userId ? { ...u, ...payload } : u);
+  setLocalData("users", updated);
+  await logAuditEvent(actor || null, "UPDATE_USER_PROFILE", "users", userId, { before: targetUser, after: data, reason });
+}
+
+export async function approvePendingUser(
+  userId: string,
+  role: UserRole,
+  employeeId?: string,
+  actor?: UserProfile | null
+): Promise<void> {
+  const updateData: Partial<UserProfile> = {
+    status: "active",
+    role,
+    ...(employeeId && { employeeId }),
+    updatedAt: new Date().toISOString()
+  };
+  await updateUserProfile(userId, updateData, "อนุมัติเปิดใช้งานบัญชีผู้ใช้ใหม่", actor);
+}
+
+export async function updateMyProfile(
+  userId: string,
+  data: Pick<UserProfile, "phoneNumber" | "officeRoom" | "bio" | "avatarUrl" | "avatarVersion">,
+  actor?: UserProfile | null
+): Promise<void> {
+  const payload = {
+    ...data,
+    updatedAt: new Date().toISOString()
+  };
+
+  if (isConfigured) {
+    try {
+      const docRef = doc(db, "users", userId);
+      await updateDoc(docRef, payload);
+      await logAuditEvent(actor || null, "UPDATE_MY_PROFILE", "users", userId, data);
+      return;
+    } catch (e) {
+      console.error("Firestore updateMyProfile error:", e);
+      throw e;
+    }
+  }
+
+  const list = getLocalData<UserProfile>("users", MOCK_USERS);
+  const updated = list.map(u => u.id === userId ? { ...u, ...payload } : u);
+  setLocalData("users", updated);
+}
+
+export async function getAccountInvitations(): Promise<AccountInvitation[]> {
+  if (isConfigured) {
+    try {
+      const snap = await getDocs(collection(db, "invitations"));
+      if (!snap.empty) {
+        return snap.docs.map(d => ({ id: d.id, ...d.data() } as AccountInvitation));
+      }
+    } catch (e) {
+      console.warn("Firestore getAccountInvitations fallback:", e);
+    }
+  }
+  return getLocalData("invitations", MOCK_INVITATIONS);
+}
+
+export async function createAccountInvitation(
+  data: Omit<AccountInvitation, "id" | "createdAt" | "invitationToken" | "status">,
+  actor?: UserProfile | null
+): Promise<AccountInvitation> {
+  const token = `tok_flas_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 7)}`;
+  const newInvitation: AccountInvitation = {
+    id: `inv-${Date.now()}`,
+    ...data,
+    invitationToken: token,
+    status: "pending",
+    createdAt: new Date().toISOString()
+  };
+
+  if (isConfigured) {
+    try {
+      const ref = await addDoc(collection(db, "invitations"), {
+        ...newInvitation,
+        timestamp: serverTimestamp()
+      });
+      await logAuditEvent(actor || null, "CREATE_INVITATION", "invitations", ref.id, { email: data.email, employeeId: data.employeeId });
+      return { ...newInvitation, id: ref.id };
+    } catch (e) {
+      console.error("Firestore createAccountInvitation error:", e);
+      throw e;
+    }
+  }
+
+  const list = getLocalData<AccountInvitation>("invitations", MOCK_INVITATIONS);
+  setLocalData("invitations", [newInvitation, ...list]);
+  return newInvitation;
+}
+
+export async function revokeAccountInvitation(
+  invitationId: string,
+  actor?: UserProfile | null
+): Promise<void> {
+  if (isConfigured) {
+    try {
+      await updateDoc(doc(db, "invitations", invitationId), {
+        status: "revoked",
+        updatedAt: serverTimestamp()
+      });
+      await logAuditEvent(actor || null, "REVOKE_INVITATION", "invitations", invitationId, {});
+      return;
+    } catch (e) {
+      console.error("Firestore revokeAccountInvitation error:", e);
+      throw e;
+    }
+  }
+
+  const list = getLocalData<AccountInvitation>("invitations", MOCK_INVITATIONS);
+  const updated = list.map(i => i.id === invitationId ? { ...i, status: "revoked" as const } : i);
+  setLocalData("invitations", updated);
+}
+
+// ==========================================
+// 13. EMPLOYEES REGISTRY (ทะเบียนบุคลากร)
+// ==========================================
+
+export async function getEmployees(): Promise<EmployeeRecord[]> {
+  if (isConfigured) {
+    try {
+      const snap = await getDocs(collection(db, "hr_employees"));
+      if (!snap.empty) {
+        return snap.docs.map(d => ({ id: d.id, ...d.data() } as EmployeeRecord));
+      }
+    } catch (e) {
+      console.warn("Firestore getEmployees fallback:", e);
+    }
+  }
+  return getLocalData("hr_employees", MOCK_EMPLOYEES);
+}
+
+export async function createEmployee(
+  data: Omit<EmployeeRecord, "createdAt">,
+  actor?: UserProfile | null
+): Promise<EmployeeRecord> {
+  const newEmp: EmployeeRecord = {
+    ...data,
+    createdAt: new Date().toISOString()
+  };
+
+  if (isConfigured) {
+    try {
+      await setDoc(doc(db, "hr_employees", data.id), {
+        ...newEmp,
+        timestamp: serverTimestamp()
+      });
+      await logAuditEvent(actor || null, "CREATE_EMPLOYEE", "hr_employees", data.id, { officialName: data.officialName, department: data.department });
+      return newEmp;
+    } catch (e) {
+      console.error("Firestore createEmployee error:", e);
+      throw e;
+    }
+  }
+
+  const list = getLocalData<EmployeeRecord>("hr_employees", MOCK_EMPLOYEES);
+  setLocalData("hr_employees", [newEmp, ...list]);
+  return newEmp;
+}
+
+export async function updateEmployee(
+  id: string,
+  data: Partial<EmployeeRecord>,
+  actor?: UserProfile | null
+): Promise<void> {
+  const payload = {
+    ...data,
+    updatedAt: new Date().toISOString()
+  };
+
+  if (isConfigured) {
+    try {
+      await updateDoc(doc(db, "hr_employees", id), payload);
+      await logAuditEvent(actor || null, "UPDATE_EMPLOYEE", "hr_employees", id, data);
+      return;
+    } catch (e) {
+      console.error("Firestore updateEmployee error:", e);
+      throw e;
+    }
+  }
+
+  const list = getLocalData<EmployeeRecord>("hr_employees", MOCK_EMPLOYEES);
+  const updated = list.map(e => e.id === id ? { ...e, ...payload } : e);
+  setLocalData("hr_employees", updated);
+}
+
+// ==========================================
+// 14. WORK POLICIES & PUBLIC HOLIDAYS (นโยบายตารางงาน กะ และวันหยุด)
+// ==========================================
+
+export async function getWorkPolicy(): Promise<WorkPolicy> {
+  if (isConfigured) {
+    try {
+      const snap = await getDoc(doc(db, "work_policies", "faculty_default_policy"));
+      if (snap.exists()) {
+        return snap.data() as WorkPolicy;
+      }
+    } catch (e) {
+      console.warn("Firestore getWorkPolicy fallback:", e);
+    }
+  }
+  const local = getLocalData<WorkPolicy>("work_policies", [MOCK_WORK_POLICY]);
+  return local[0] || MOCK_WORK_POLICY;
+}
+
+export async function saveWorkPolicy(
+  policy: WorkPolicy,
+  actor?: UserProfile | null
+): Promise<void> {
+  const payload = {
+    ...policy,
+    updatedAt: new Date().toISOString(),
+    updatedBy: actor?.name || "ผู้ดูแลระบบ"
+  };
+
+  if (isConfigured) {
+    try {
+      await setDoc(doc(db, "work_policies", "faculty_default_policy"), {
+        ...payload,
+        timestamp: serverTimestamp()
+      }, { merge: true });
+      await logAuditEvent(actor || null, "SAVE_WORK_POLICY", "work_policies", "faculty_default_policy", { version: policy.version });
+      return;
+    } catch (e) {
+      console.error("Firestore saveWorkPolicy error:", e);
+      throw e;
+    }
+  }
+
+  setLocalData("work_policies", [payload]);
+}
+
+export async function getPublicHolidays(year: number = 2569): Promise<PublicHoliday[]> {
+  if (isConfigured) {
+    try {
+      const snap = await getDocs(collection(db, "public_holidays"));
+      if (!snap.empty) {
+        return snap.docs.map(d => ({ id: d.id, ...d.data() } as PublicHoliday));
+      }
+    } catch (e) {
+      console.warn("Firestore getPublicHolidays fallback:", e);
+    }
+  }
+  return getLocalData("public_holidays", MOCK_HOLIDAYS_2569);
+}
+
+export async function createPublicHoliday(
+  data: Omit<PublicHoliday, "id">,
+  actor?: UserProfile | null
+): Promise<PublicHoliday> {
+  const newHoliday: PublicHoliday = {
+    id: `h-${Date.now()}`,
+    ...data
+  };
+
+  if (isConfigured) {
+    try {
+      const ref = await addDoc(collection(db, "public_holidays"), newHoliday);
+      await logAuditEvent(actor || null, "CREATE_HOLIDAY", "public_holidays", ref.id, data);
+      return { ...newHoliday, id: ref.id };
+    } catch (e) {
+      console.error("Firestore createPublicHoliday error:", e);
+      throw e;
+    }
+  }
+
+  const list = getLocalData<PublicHoliday>("public_holidays", MOCK_HOLIDAYS_2569);
+  setLocalData("public_holidays", [...list, newHoliday]);
+  return newHoliday;
+}
+
+export async function deletePublicHoliday(
+  id: string,
+  actor?: UserProfile | null
+): Promise<void> {
+  if (isConfigured) {
+    try {
+      await deleteDoc(doc(db, "public_holidays", id));
+      await logAuditEvent(actor || null, "DELETE_HOLIDAY", "public_holidays", id, {});
+      return;
+    } catch (e) {
+      console.error("Firestore deletePublicHoliday error:", e);
+      throw e;
+    }
+  }
+
+  const list = getLocalData<PublicHoliday>("public_holidays", MOCK_HOLIDAYS_2569);
+  setLocalData("public_holidays", list.filter(h => h.id !== id));
+}
+
+// ==========================================
+// 15. ATTENDANCE CHECK-IN & CHECK-OUT (ระบบลงเวลาเข้า-ออก)
+// ==========================================
+
+export async function getTodayAttendanceSession(
+  employeeId: string,
+  workDate?: string
+): Promise<AttendanceSession | null> {
+  const targetDate = workDate || new Date().toISOString().split("T")[0];
+  const sessionId = `att-${employeeId}-${targetDate}`;
+
+  if (isConfigured) {
+    try {
+      const snap = await getDoc(doc(db, "attendance_sessions", sessionId));
+      if (snap.exists()) {
+        return snap.data() as AttendanceSession;
+      }
+    } catch (e) {
+      console.warn("Firestore getTodayAttendanceSession fallback:", e);
+    }
+  }
+
+  const sessions = getLocalData<AttendanceSession>("attendance_sessions", MOCK_ATTENDANCE_SESSIONS);
+  return sessions.find(s => s.employeeId === employeeId && s.workDate === targetDate) || null;
+}
+
+export async function getMyAttendanceSessions(
+  employeeId: string,
+  startDate?: string,
+  endDate?: string
+): Promise<AttendanceSession[]> {
+  if (isConfigured) {
+    try {
+      const q = query(
+        collection(db, "attendance_sessions"),
+        where("employeeId", "==", employeeId)
+      );
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        return snap.docs.map(d => ({ id: d.id, ...d.data() } as AttendanceSession));
+      }
+    } catch (e) {
+      console.warn("Firestore getMyAttendanceSessions fallback:", e);
+    }
+  }
+
+  const sessions = getLocalData<AttendanceSession>("attendance_sessions", MOCK_ATTENDANCE_SESSIONS);
+  return sessions.filter(s => s.employeeId === employeeId);
+}
+
+export async function getAllAttendanceSessions(
+  workDate?: string,
+  department?: string
+): Promise<AttendanceSession[]> {
+  const targetDate = workDate || new Date().toISOString().split("T")[0];
+
+  if (isConfigured) {
+    try {
+      const snap = await getDocs(collection(db, "attendance_sessions"));
+      if (!snap.empty) {
+        let list = snap.docs.map(d => ({ id: d.id, ...d.data() } as AttendanceSession));
+        if (targetDate) list = list.filter(s => s.workDate === targetDate);
+        if (department && department !== "all") list = list.filter(s => s.department === department);
+        return list;
+      }
+    } catch (e) {
+      console.warn("Firestore getAllAttendanceSessions fallback:", e);
+    }
+  }
+
+  let list = getLocalData<AttendanceSession>("attendance_sessions", MOCK_ATTENDANCE_SESSIONS);
+  if (targetDate) list = list.filter(s => s.workDate === targetDate);
+  if (department && department !== "all") list = list.filter(s => s.department === department);
+  return list;
+}
+
+export async function recordAttendanceCheckIn(
+  payload: {
+    employeeId: string;
+    userId: string;
+    staffName: string;
+    department: string;
+    shiftId?: string;
+    source: "web" | "gps" | "qr";
+    locationCoords?: { latitude: number; longitude: number; accuracy?: number };
+    locationName?: string;
+    requestId: string;
+  },
+  actor?: UserProfile | null
+): Promise<AttendanceSession> {
+  const now = new Date();
+  const workDate = now.toISOString().split("T")[0];
+  const hours = String(now.getHours()).padStart(2, "0");
+  const minutes = String(now.getMinutes()).padStart(2, "0");
+  const checkInTime = `${hours}:${minutes}`;
+  const sessionId = `att-${payload.employeeId}-${workDate}`;
+
+  // Check if session already exists for today
+  const existingSession = await getTodayAttendanceSession(payload.employeeId, workDate);
+  if (existingSession && existingSession.checkInTime) {
+    return existingSession; // Idempotent check
+  }
+
+  const policy = await getWorkPolicy();
+  const shift = policy.shifts.find(s => s.id === (payload.shiftId || "SHIFT-NORMAL")) || policy.shifts[0];
+
+  // Calculate late status
+  const [shiftHour, shiftMin] = shift.startTime.split(":").map(Number);
+  const shiftStartTotalMin = shiftHour * 60 + shiftMin + shift.lateGraceMinutes;
+  const currentTotalMin = now.getHours() * 60 + now.getMinutes();
+  const isLate = currentTotalMin > shiftStartTotalMin;
+  const lateMinutes = isLate ? currentTotalMin - (shiftHour * 60 + shiftMin) : 0;
+
+  const rawEventId = `ev-in-${Date.now()}`;
+  const rawEvent: AttendanceEvent = {
+    id: rawEventId,
+    userId: payload.userId,
+    employeeId: payload.employeeId,
+    staffName: payload.staffName,
+    eventType: "check_in",
+    serverTimestamp: now.toISOString(),
+    workDate,
+    source: payload.source,
+    locationCoords: payload.locationCoords,
+    locationName: payload.locationName || "คณะศิลปศาสตร์และวิทยาศาสตร์ CPRU",
+    sessionId,
+    requestId: payload.requestId
+  };
+
+  const newSession: AttendanceSession = {
+    id: sessionId,
+    userId: payload.userId,
+    employeeId: payload.employeeId,
+    staffName: payload.staffName,
+    department: payload.department,
+    workDate,
+    shiftId: shift.id,
+    shiftName: shift.name,
+    checkInTime,
+    checkInEventId: rawEventId,
+    checkInStatus: isLate ? "late" : "on_time",
+    sessionStatus: "open",
+    workType: "work",
+    lateMinutes,
+    earlyMinutes: 0,
+    totalWorkMinutes: 0,
+    updatedAt: now.toISOString()
+  };
+
+  if (isConfigured) {
+    try {
+      await addDoc(collection(db, "attendance_events"), rawEvent);
+      await setDoc(doc(db, "attendance_sessions", sessionId), {
+        ...newSession,
+        timestamp: serverTimestamp()
+      }, { merge: true });
+
+      await logAuditEvent(actor || null, "ATTENDANCE_CHECK_IN", "attendance_sessions", sessionId, {
+        checkInTime,
+        checkInStatus: newSession.checkInStatus,
+        lateMinutes
+      });
+      return newSession;
+    } catch (e) {
+      console.error("Firestore recordAttendanceCheckIn error:", e);
+      throw e;
+    }
+  }
+
+  const events = getLocalData<AttendanceEvent>("attendance_events", []);
+  setLocalData("attendance_events", [rawEvent, ...events]);
+
+  const sessions = getLocalData<AttendanceSession>("attendance_sessions", MOCK_ATTENDANCE_SESSIONS);
+  const updatedSessions = sessions.some(s => s.id === sessionId)
+    ? sessions.map(s => s.id === sessionId ? newSession : s)
+    : [newSession, ...sessions];
+  setLocalData("attendance_sessions", updatedSessions);
+
+  return newSession;
+}
+
+export async function recordAttendanceCheckOut(
+  payload: {
+    employeeId: string;
+    userId: string;
+    source: "web" | "gps" | "qr";
+    locationCoords?: { latitude: number; longitude: number; accuracy?: number };
+    locationName?: string;
+    requestId: string;
+  },
+  actor?: UserProfile | null
+): Promise<AttendanceSession> {
+  const now = new Date();
+  const workDate = now.toISOString().split("T")[0];
+  const hours = String(now.getHours()).padStart(2, "0");
+  const minutes = String(now.getMinutes()).padStart(2, "0");
+  const checkOutTime = `${hours}:${minutes}`;
+  const sessionId = `att-${payload.employeeId}-${workDate}`;
+
+  const currentSession = await getTodayAttendanceSession(payload.employeeId, workDate);
+  if (!currentSession) {
+    throw new Error("ยังไม่มีข้อมูลการลงเวลาเข้างานในวันนี้ กรุณากดลงเวลาเข้างานก่อน");
+  }
+
+  const policy = await getWorkPolicy();
+  const shift = policy.shifts.find(s => s.id === currentSession.shiftId) || policy.shifts[0];
+
+  // Calculate early leave
+  const [shiftEndH, shiftEndM] = shift.endTime.split(":").map(Number);
+  const shiftEndTotalMin = shiftEndH * 60 + shiftEndM;
+  const currentTotalMin = now.getHours() * 60 + now.getMinutes();
+  const isEarly = currentTotalMin < shiftEndTotalMin;
+  const earlyMinutes = isEarly ? shiftEndTotalMin - currentTotalMin : 0;
+
+  // Calculate total work minutes
+  let totalWorkMinutes = 0;
+  if (currentSession.checkInTime) {
+    const [inH, inM] = currentSession.checkInTime.split(":").map(Number);
+    const inTotalMin = inH * 60 + inM;
+    totalWorkMinutes = Math.max(0, currentTotalMin - inTotalMin);
+  }
+
+  const rawEventId = `ev-out-${Date.now()}`;
+  const rawEvent: AttendanceEvent = {
+    id: rawEventId,
+    userId: payload.userId,
+    employeeId: payload.employeeId,
+    staffName: currentSession.staffName,
+    eventType: "check_out",
+    serverTimestamp: now.toISOString(),
+    workDate,
+    source: payload.source,
+    locationCoords: payload.locationCoords,
+    locationName: payload.locationName || "คณะศิลปศาสตร์และวิทยาศาสตร์ CPRU",
+    sessionId,
+    requestId: payload.requestId
+  };
+
+  const updatedSession: AttendanceSession = {
+    ...currentSession,
+    checkOutTime,
+    checkOutEventId: rawEventId,
+    checkOutStatus: isEarly ? "early_leave" : "normal",
+    sessionStatus: "closed",
+    earlyMinutes,
+    totalWorkMinutes,
+    updatedAt: now.toISOString()
+  };
+
+  if (isConfigured) {
+    try {
+      await addDoc(collection(db, "attendance_events"), rawEvent);
+      await setDoc(doc(db, "attendance_sessions", sessionId), {
+        ...updatedSession,
+        timestamp: serverTimestamp()
+      }, { merge: true });
+
+      await logAuditEvent(actor || null, "ATTENDANCE_CHECK_OUT", "attendance_sessions", sessionId, {
+        checkOutTime,
+        checkOutStatus: updatedSession.checkOutStatus,
+        totalWorkMinutes
+      });
+      return updatedSession;
+    } catch (e) {
+      console.error("Firestore recordAttendanceCheckOut error:", e);
+      throw e;
+    }
+  }
+
+  const events = getLocalData<AttendanceEvent>("attendance_events", []);
+  setLocalData("attendance_events", [rawEvent, ...events]);
+
+  const sessions = getLocalData<AttendanceSession>("attendance_sessions", MOCK_ATTENDANCE_SESSIONS);
+  setLocalData("attendance_sessions", sessions.map(s => s.id === sessionId ? updatedSession : s));
+
+  return updatedSession;
+}
+
+// ==========================================
+// 16. ATTENDANCE CORRECTIONS (คำขอแก้ไขเวลาย้อนหลัง)
+// ==========================================
+
+export async function getAttendanceCorrections(
+  statusFilter?: string,
+  department?: string
+): Promise<AttendanceCorrection[]> {
+  if (isConfigured) {
+    try {
+      const snap = await getDocs(collection(db, "attendance_corrections"));
+      if (!snap.empty) {
+        let list = snap.docs.map(d => ({ id: d.id, ...d.data() } as AttendanceCorrection));
+        if (statusFilter && statusFilter !== "all") list = list.filter(c => c.status === statusFilter);
+        if (department && department !== "all") list = list.filter(c => c.department === department);
+        return list;
+      }
+    } catch (e) {
+      console.warn("Firestore getAttendanceCorrections fallback:", e);
+    }
+  }
+
+  let list = getLocalData<AttendanceCorrection>("attendance_corrections", MOCK_ATTENDANCE_CORRECTIONS);
+  if (statusFilter && statusFilter !== "all") list = list.filter(c => c.status === statusFilter);
+  if (department && department !== "all") list = list.filter(c => c.department === department);
+  return list;
+}
+
+export async function requestAttendanceCorrection(
+  data: Omit<AttendanceCorrection, "id" | "createdAt" | "status">,
+  actor?: UserProfile | null
+): Promise<AttendanceCorrection> {
+  const newCorr: AttendanceCorrection = {
+    id: `corr-${Date.now()}`,
+    ...data,
+    status: "pending",
+    createdAt: new Date().toISOString()
+  };
+
+  // Update corresponding attendance session flag
+  const sessionId = `att-${data.employeeId}-${data.workDate}`;
+
+  if (isConfigured) {
+    try {
+      const ref = await addDoc(collection(db, "attendance_corrections"), {
+        ...newCorr,
+        timestamp: serverTimestamp()
+      });
+      await updateDoc(doc(db, "attendance_sessions", sessionId), {
+        hasCorrection: true,
+        correctionId: ref.id,
+        updatedAt: serverTimestamp()
+      });
+      await logAuditEvent(actor || null, "REQUEST_ATTENDANCE_CORRECTION", "attendance_corrections", ref.id, {
+        workDate: data.workDate,
+        reason: data.reason
+      });
+
+      // Create Notification for Supervisor / HR
+      await createAppNotification({
+        title: "คำขอแก้ไขเวลาทำงานใหม่",
+        message: `${data.staffName} ยื่นขอแก้ไขเวลาทำงานวันที่ ${data.workDate}`,
+        category: "attendance",
+        linkHref: "/hr/attendance"
+      });
+
+      return { ...newCorr, id: ref.id };
+    } catch (e) {
+      console.error("Firestore requestAttendanceCorrection error:", e);
+      throw e;
+    }
+  }
+
+  const list = getLocalData<AttendanceCorrection>("attendance_corrections", MOCK_ATTENDANCE_CORRECTIONS);
+  setLocalData("attendance_corrections", [newCorr, ...list]);
+
+  const sessions = getLocalData<AttendanceSession>("attendance_sessions", MOCK_ATTENDANCE_SESSIONS);
+  setLocalData("attendance_sessions", sessions.map(s => s.id === sessionId ? { ...s, hasCorrection: true, correctionId: newCorr.id } : s));
+
+  return newCorr;
+}
+
+export async function reviewAttendanceCorrection(
+  correctionId: string,
+  decision: "approved" | "rejected",
+  comment?: string,
+  actor?: UserProfile | null
+): Promise<void> {
+  const corrections = await getAttendanceCorrections();
+  const correction = corrections.find(c => c.id === correctionId);
+  if (!correction) throw new Error("Correction request not found");
+
+  // Prevent self approval
+  if (actor && actor.id === correction.userId) {
+    throw new Error("ไม่อนุญาตให้อนุมัติคำขอแก้ไขเวลาทำงานของตนเอง ต้องให้หัวหน้างานหรือเจ้าหน้าที่บุคคลเป็นผู้ตรวจรับรอง");
+  }
+
+  const reviewedAt = new Date().toISOString();
+  const updatePayload = {
+    status: decision,
+    reviewerId: actor?.employeeId || actor?.id,
+    reviewerName: actor?.name || "ผู้บังคับบัญชา",
+    reviewerComment: comment || (decision === "approved" ? "อนุมัติการแก้ไขเวลา" : "ไม่อนุมัติ"),
+    reviewedAt
+  };
+
+  // If approved, update the session times without overwriting raw punch logs
+  if (decision === "approved") {
+    const sessionId = `att-${correction.employeeId}-${correction.workDate}`;
+    const session = await getTodayAttendanceSession(correction.employeeId, correction.workDate);
+    if (session) {
+      const [inH, inM] = correction.requestedCheckIn.split(":").map(Number);
+      const [outH, outM] = (correction.requestedCheckOut || "16:30").split(":").map(Number);
+      const totalWorkMin = Math.max(0, (outH * 60 + outM) - (inH * 60 + inM));
+
+      const updatedSessionData: Partial<AttendanceSession> = {
+        checkInTime: correction.requestedCheckIn,
+        checkOutTime: correction.requestedCheckOut,
+        checkInStatus: "on_time",
+        checkOutStatus: "normal",
+        sessionStatus: "closed",
+        lateMinutes: 0,
+        earlyMinutes: 0,
+        totalWorkMinutes: totalWorkMin,
+        updatedAt: reviewedAt
+      };
+
+      if (isConfigured) {
+        await updateDoc(doc(db, "attendance_sessions", sessionId), updatedSessionData);
+      } else {
+        const sessions = getLocalData<AttendanceSession>("attendance_sessions", MOCK_ATTENDANCE_SESSIONS);
+        setLocalData("attendance_sessions", sessions.map(s => s.id === sessionId ? { ...s, ...updatedSessionData } : s));
+      }
+    }
+  }
+
+  if (isConfigured) {
+    try {
+      await updateDoc(doc(db, "attendance_corrections", correctionId), {
+        ...updatePayload,
+        timestamp: serverTimestamp()
+      });
+      await logAuditEvent(actor || null, "REVIEW_ATTENDANCE_CORRECTION", "attendance_corrections", correctionId, {
+        decision,
+        comment
+      });
+      return;
+    } catch (e) {
+      console.error("Firestore reviewAttendanceCorrection error:", e);
+      throw e;
+    }
+  }
+
+  setLocalData("attendance_corrections", corrections.map(c => c.id === correctionId ? { ...c, ...updatePayload } : c));
+}
+
+// ==========================================
+// 17. MONTHLY ATTENDANCE REPORTS & PERIOD LOCK (ตรวจรายเดือนและปิดงวด)
+// ==========================================
+
+export async function getAttendancePeriodLock(period: string): Promise<AttendancePeriodLock> {
+  const lockId = `lock-${period}`;
+  if (isConfigured) {
+    try {
+      const snap = await getDoc(doc(db, "attendance_period_locks", lockId));
+      if (snap.exists()) {
+        return snap.data() as AttendancePeriodLock;
+      }
+    } catch (e) {
+      console.warn("Firestore getAttendancePeriodLock fallback:", e);
+    }
+  }
+
+  const locks = getLocalData<AttendancePeriodLock>("attendance_period_locks", MOCK_ATTENDANCE_PERIOD_LOCKS);
+  return locks.find(l => l.period === period) || {
+    id: lockId,
+    period,
+    isLocked: false,
+    lockedBy: "",
+    lockedByName: "",
+    lockedAt: ""
+  };
+}
+
+export async function lockAttendancePeriod(
+  period: string,
+  actor?: UserProfile | null
+): Promise<AttendancePeriodLock> {
+  const lockId = `lock-${period}`;
+  const lockData: AttendancePeriodLock = {
+    id: lockId,
+    period,
+    isLocked: true,
+    lockedBy: actor?.id || "u-hr",
+    lockedByName: actor?.name || "เจ้าหน้าที่บริหารงานบุคคล",
+    lockedAt: new Date().toISOString()
+  };
+
+  if (isConfigured) {
+    try {
+      await setDoc(doc(db, "attendance_period_locks", lockId), {
+        ...lockData,
+        timestamp: serverTimestamp()
+      });
+      await logAuditEvent(actor || null, "LOCK_ATTENDANCE_PERIOD", "attendance_period_locks", lockId, { period });
+      return lockData;
+    } catch (e) {
+      console.error("Firestore lockAttendancePeriod error:", e);
+      throw e;
+    }
+  }
+
+  const list = getLocalData<AttendancePeriodLock>("attendance_period_locks", MOCK_ATTENDANCE_PERIOD_LOCKS);
+  setLocalData("attendance_period_locks", list.some(l => l.period === period) ? list.map(l => l.period === period ? lockData : l) : [...list, lockData]);
+  return lockData;
+}
+
+export async function reopenAttendancePeriod(
+  period: string,
+  reason: string,
+  actor?: UserProfile | null
+): Promise<AttendancePeriodLock> {
+  const lockId = `lock-${period}`;
+  const lockData: AttendancePeriodLock = {
+    id: lockId,
+    period,
+    isLocked: false,
+    lockedBy: "",
+    lockedByName: "",
+    lockedAt: "",
+    reopenedBy: actor?.id || "u-hr",
+    reopenedByName: actor?.name || "เจ้าหน้าที่บริหารงานบุคคล",
+    reopenReason: reason,
+    reopenedAt: new Date().toISOString()
+  };
+
+  if (isConfigured) {
+    try {
+      await setDoc(doc(db, "attendance_period_locks", lockId), {
+        ...lockData,
+        timestamp: serverTimestamp()
+      });
+      await logAuditEvent(actor || null, "REOPEN_ATTENDANCE_PERIOD", "attendance_period_locks", lockId, { period, reason });
+      return lockData;
+    } catch (e) {
+      console.error("Firestore reopenAttendancePeriod error:", e);
+      throw e;
+    }
+  }
+
+  const list = getLocalData<AttendancePeriodLock>("attendance_period_locks", MOCK_ATTENDANCE_PERIOD_LOCKS);
+  setLocalData("attendance_period_locks", list.map(l => l.period === period ? lockData : l));
+  return lockData;
+}
+
+export async function getMonthlyAttendanceReports(
+  period: string,
+  department?: string
+): Promise<MonthlyAttendanceReport[]> {
+  const employees = await getEmployees();
+  const eligibleEmployees = employees.filter(e => e.attendanceEligible && e.status === "active");
+  const filteredEmployees = (department && department !== "all") 
+    ? eligibleEmployees.filter(e => e.department === department) 
+    : eligibleEmployees;
+
+  const approvedLeaves = await getHRLeaves();
+  const allSessions = await getAllAttendanceSessions();
+
+  // Compute monthly report dynamically per employee
+  const reports: MonthlyAttendanceReport[] = filteredEmployees.map(emp => {
+    const empSessions = allSessions.filter(s => s.employeeId === emp.id && s.workDate.startsWith(period));
+    const empLeaves = approvedLeaves.filter(l => l.staffName === emp.officialName && l.status === "approved");
+
+    const actualWorkDays = empSessions.filter(s => s.checkInTime).length;
+    const lateDaysCount = empSessions.filter(s => s.checkInStatus === "late").length;
+    const lateTotalMinutes = empSessions.reduce((acc, s) => acc + (s.lateMinutes || 0), 0);
+    const earlyLeaveDaysCount = empSessions.filter(s => s.checkOutStatus === "early_leave").length;
+    const incompleteDaysCount = empSessions.filter(s => s.sessionStatus === "incomplete").length;
+
+    // Calculate approved leave days in this period
+    let leaveDaysCount = 0;
+    empLeaves.forEach(lv => {
+      if (lv.startDate.startsWith(period) || lv.endDate.startsWith(period)) {
+        leaveDaysCount += lv.totalDays;
+      }
+    });
+
+    const expectedWorkDays = 21; // Normal working days in month
+    const accountedDays = actualWorkDays + leaveDaysCount;
+    const absentDaysCount = Math.max(0, expectedWorkDays - accountedDays);
+
+    return {
+      id: `mrep-${emp.id}-${period}`,
+      period,
+      fiscalYear: 2569,
+      employeeId: emp.id,
+      staffName: emp.officialName,
+      department: emp.department,
+      position: emp.position,
+      expectedWorkDays,
+      actualWorkDays,
+      lateDaysCount,
+      lateTotalMinutes,
+      earlyLeaveDaysCount,
+      leaveDaysCount,
+      officialDutyDaysCount: 0,
+      absentDaysCount,
+      incompleteDaysCount,
+      status: "verified"
+    };
+  });
+
+  return reports;
+}
+

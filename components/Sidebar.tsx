@@ -96,11 +96,25 @@ export default function Sidebar() {
     },
     {
       key: "hr",
-      label: "งานบริหารงานบุคคล",
+      label: "งานบริหารงานบุคคล & ลงเวลา",
       icon: Users,
       subItems: [
+        { title: "ลงเวลาเข้า-ออกงาน", href: "/attendance" },
+        { title: "ประวัติลงเวลา / ขอแก้ไข", href: "/attendance/history" },
         { title: "ยื่นใบลา (พักผ่อน/ป่วย/กิจ)", href: "/hr" },
+        { title: "ตรวจรับรองเวลา & คำขอ (HR)", href: "/hr/attendance" },
+        { title: "สรุปเวลารายเดือน & ปิดงวด (HR)", href: "/hr/attendance/reports" },
+        { title: "ตั้งตารางงาน & นโยบาย (HR)", href: "/hr/work-schedules" },
         { title: "แฟ้มประวัติและผลงาน (SAR)", href: "/hr/portfolio" },
+      ]
+    },
+    {
+      key: "settings",
+      label: "ตั้งค่าระบบและผู้ใช้งาน",
+      icon: Settings,
+      subItems: [
+        { title: "ข้อมูลส่วนตัว (Profile)", href: "/account/profile" },
+        { title: "จัดการบัญชีผู้ใช้ & สิทธิ์", href: "/settings/users" },
       ]
     },
     {
