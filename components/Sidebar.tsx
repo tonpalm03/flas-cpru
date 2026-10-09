@@ -1,131 +1,84 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { 
-  FileText, 
-  FolderKanban, 
-  Wallet, 
-  Package, 
-  Users, 
-  LineChart, 
   Home, 
-  Inbox, 
-  Send, 
-  FileEdit, 
-  BookmarkCheck, 
-  CalendarDays,
-  ChevronDown,
-  ChevronRight,
-  GraduationCap,
-  Layers,
-  Settings,
-  CheckSquare,
-  FileCheck
+  ChevronDown, 
+  ChevronRight, 
+  GraduationCap
 } from "lucide-react";
 import { useRole } from "./RoleContext";
-
-interface NavSubItem {
-  title: string;
-  href: string;
-  badge?: string;
-}
+import { DynamicNavIcon } from "./DynamicNavIcon";
+import { getNavigationLayout, DEFAULT_NAVIGATION_SECTIONS } from "@/lib/navigationService";
+import { getAdminCategories } from "@/lib/adminCategoryService";
+import { NavSection, NavItem } from "@/lib/navigationTypes";
+import type { AdminDocCategoryConfig } from "@/lib/types";
 
 export default function Sidebar() {
   const pathname = usePathname();
   const { currentUser } = useRole();
+  const [sections, setSections] = useState<NavSection[]>(DEFAULT_NAVIGATION_SECTIONS);
+  const [customCategories, setCustomCategories] = useState<AdminDocCategoryConfig[]>([]);
+
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     admin: true,
     projects: true,
     finance: true,
     procurement: false,
     hr: false,
-    plan: false,
+    settings: true
   });
+
+  // Load layout and subscribe to updates
+  useEffect(() => {
+    let mounted = true;
+
+    const loadData = async () => {
+      try {
+        const layout = await getNavigationLayout();
+        if (mounted) setSections(layout);
+      } catch (err) {
+        console.error("Sidebar load navigation error:", err);
+      }
+    };
+
+    loadData();
+
+    // Listen for instant cross-component updates from Navigation Studio
+    const handleNavUpdated = (e: Event) => {
+      const customEvt = e as CustomEvent<NavSection[]>;
+      if (customEvt.detail && Array.isArray(customEvt.detail)) {
+        setSections(customEvt.detail);
+      } else {
+        loadData();
+      }
+    };
+
+    window.addEventListener("flas_navigation_updated", handleNavUpdated);
+    window.addEventListener("storage", loadData);
+
+    return () => {
+      mounted = false;
+      window.removeEventListener("flas_navigation_updated", handleNavUpdated);
+      window.removeEventListener("storage", loadData);
+    };
+  }, []);
+
+  // Load dynamic document categories
+  useEffect(() => {
+    getAdminCategories()
+      .then((cats) => {
+        const customOnes = cats.filter((c) => !c.isBuiltIn && c.isActive);
+        setCustomCategories(customOnes);
+      })
+      .catch(() => {});
+  }, [pathname]);
 
   const toggleSection = (key: string) => {
     setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
   };
-
-  const allSections: Array<{ key: string; label: string; icon: any; isMyPart?: boolean; subItems: NavSubItem[] }> = [
-    {
-      key: "admin",
-      label: "งานธุรการและสารบรรณ",
-      icon: FileText,
-      isMyPart: true,
-      subItems: [
-        { title: "แดชบอร์ดงานธุรการ", href: "/admin" },
-        { title: "ทะเบียนหนังสือรับ", href: "/admin/inbound", badge: "4 ใหม่" },
-        { title: "ทะเบียนหนังสือส่ง", href: "/admin/outbound" },
-        { title: "สร้างบันทึกข้อความ (Word/PDF)", href: "/admin/memo-generator" },
-        { title: "แบบตอบรับวิทยากร/สถานที่", href: "/admin/responses" },
-        { title: "เช็คลิสต์ตรวจเอกสาร", href: "/admin/checklists" },
-        { title: "จัดการแม่แบบเอกสาร (แอดมิน)", href: "/admin/templates" },
-        { title: "ทะเบียนคำสั่ง/ประกาศคณะ", href: "/admin/orders" },
-        { title: "จองห้องประชุม/ยานพาหนะ", href: "/admin/rooms" },
-      ]
-    },
-    {
-      key: "projects",
-      label: "งานโครงการและกิจกรรม",
-      icon: FolderKanban,
-      subItems: [
-        { title: "โครงการยุทธศาสตร์ 2569", href: "/projects" },
-        { title: "เขียนเสนอโครงการ (Word)", href: "/projects/new" },
-        { title: "รายงานผลโครงการ & SDG", href: "/projects/reports" },
-      ]
-    },
-    {
-      key: "finance",
-      label: "งานการเงินและงบประมาณ",
-      icon: Wallet,
-      subItems: [
-        { title: "คุมงบประมาณรายได้ 2568", href: "/finance" },
-        { title: "สัญญายืมเงินทดรอง", href: "/finance/loans" },
-        { title: "เบิกค่าสอน / ค่านิเทศ", href: "/finance/disbursement" },
-      ]
-    },
-    {
-      key: "procurement",
-      label: "งานพัสดุและจัดซื้อ",
-      icon: Package,
-      subItems: [
-        { title: "ขอซื้อ-ขอจ้าง (จัดซื้อ)", href: "/procurement" },
-      ]
-    },
-    {
-      key: "hr",
-      label: "งานบริหารงานบุคคล & ลงเวลา",
-      icon: Users,
-      subItems: [
-        { title: "ลงเวลาเข้า-ออกงาน", href: "/attendance" },
-        { title: "ประวัติลงเวลา / ขอแก้ไข", href: "/attendance/history" },
-        { title: "ยื่นใบลา (พักผ่อน/ป่วย/กิจ)", href: "/hr" },
-        { title: "ตรวจรับรองเวลา & คำขอ (HR)", href: "/hr/attendance" },
-        { title: "สรุปเวลารายเดือน & ปิดงวด (HR)", href: "/hr/attendance/reports" },
-        { title: "ตั้งตารางงาน & นโยบาย (HR)", href: "/hr/work-schedules" },
-        { title: "แฟ้มประวัติและผลงาน (SAR)", href: "/hr/portfolio" },
-      ]
-    },
-    {
-      key: "settings",
-      label: "ตั้งค่าระบบและผู้ใช้งาน",
-      icon: Settings,
-      subItems: [
-        { title: "ข้อมูลส่วนตัว (Profile)", href: "/account/profile" },
-        { title: "จัดการบัญชีผู้ใช้ & สิทธิ์", href: "/settings/users" },
-      ]
-    },
-    {
-      key: "plan",
-      label: "งานแผนและตัวชี้วัด",
-      icon: LineChart,
-      subItems: [
-        { title: "ยุทธศาสตร์คณะ 4 ด้าน", href: "/plan" },
-      ]
-    },
-  ];
 
   return (
     <aside className="w-64 bg-white border-r border-slate-200 flex flex-col h-screen sticky top-0 select-none z-30">
@@ -146,7 +99,7 @@ export default function Sidebar() {
 
       {/* Navigation List */}
       <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1.5 scrollbar-thin">
-        {/* Main Portal Dashboard */}
+        {/* Main Portal Dashboard Link */}
         <Link
           href="/"
           className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
@@ -165,75 +118,93 @@ export default function Sidebar() {
           </p>
         </div>
 
-        {/* Core Modules List */}
-        {allSections.map((section) => {
-          const Icon = section.icon;
-          const isOpen = openSections[section.key];
-          const hasActiveChild = section.subItems.some((sub) => pathname === sub.href);
+        {/* Dynamic Modules List */}
+        {sections
+          .filter((section) => section.isVisible)
+          .map((section) => {
+            const isOpen = openSections[section.key] ?? false;
 
-          return (
-            <div key={section.key} className="space-y-1">
-              <button
-                type="button"
-                onClick={() => toggleSection(section.key)}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                  hasActiveChild
-                    ? "bg-blue-50/70 text-blue-900 font-semibold"
-                    : "text-slate-700 hover:bg-slate-50 hover:text-slate-900"
-                }`}
-              >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <Icon
-                    className={`w-4 h-4 flex-shrink-0 ${
-                      hasActiveChild ? "text-blue-700" : "text-slate-400"
-                    }`}
-                  />
-                  <span className="truncate">{section.label}</span>
-                </div>
-                <div className="flex items-center gap-1.5 flex-shrink-0">
-                  {isOpen ? (
-                    <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-                  ) : (
-                    <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-                  )}
-                </div>
-              </button>
+            // Merge dynamic custom categories into the admin section if present
+            let subItemsToRender: Array<{ id?: string; title: string; href: string; badge?: string }> = [
+              ...(section.subItems || [])
+            ];
 
-              {/* Sub items */}
-              {isOpen && (
-                <div className="pl-6 pr-1 space-y-0.5">
-                  {section.subItems.map((sub) => {
-                    const isActive = pathname === sub.href;
-                    return (
-                      <Link
-                        key={sub.href}
-                        href={sub.href}
-                        className={`flex items-center justify-between px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                          isActive
-                            ? "bg-blue-900 text-white shadow-sm font-medium"
-                            : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-                        }`}
-                      >
-                        <span className="truncate">{sub.title}</span>
-                        {sub.badge && (
-                          <span
-                            className={`text-[9px] px-1.5 py-0.2 rounded-full font-semibold ${
-                              isActive
-                                ? "bg-white text-blue-900"
-                                : "bg-blue-100 text-blue-800"
-                            }`}
-                          >
-                            {sub.badge}
-                          </span>
-                        )}
-                      </Link>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          );
-        })}
+            if (section.key === "admin" && customCategories.length > 0) {
+              const customCategoryLinks = customCategories.map((c) => ({
+                id: `dyn_${c.id}`,
+                title: c.title,
+                href: `/admin/doc/${c.id}`,
+                badge: "ใหม่"
+              }));
+              subItemsToRender.push(...customCategoryLinks);
+            }
+
+            const hasActiveChild = subItemsToRender.some((sub) => pathname === sub.href);
+
+            return (
+              <div key={section.id} className="space-y-1">
+                <button
+                  type="button"
+                  onClick={() => toggleSection(section.key)}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                    hasActiveChild
+                      ? "bg-blue-50/70 text-blue-900 font-semibold"
+                      : "text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <DynamicNavIcon
+                      name={section.iconName}
+                      className={`w-4 h-4 flex-shrink-0 ${
+                        hasActiveChild ? "text-blue-700" : "text-slate-400"
+                      }`}
+                    />
+                    <span className="truncate">{section.label}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    {isOpen ? (
+                      <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                    ) : (
+                      <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                    )}
+                  </div>
+                </button>
+
+                {/* Sub items */}
+                {isOpen && (
+                  <div className="pl-6 pr-1 space-y-0.5">
+                    {subItemsToRender.map((sub, idx) => {
+                      const isActive = pathname === sub.href;
+                      return (
+                        <Link
+                          key={sub.id || `${sub.href}_${idx}`}
+                          href={sub.href}
+                          className={`flex items-center justify-between px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                            isActive
+                              ? "bg-blue-900 text-white shadow-sm font-medium"
+                              : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                          }`}
+                        >
+                          <span className="truncate">{sub.title}</span>
+                          {sub.badge && (
+                            <span
+                              className={`text-[9px] px-1.5 py-0.2 rounded-full font-semibold ${
+                                isActive
+                                  ? "bg-white text-blue-900"
+                                  : "bg-blue-100 text-blue-800"
+                              }`}
+                            >
+                              {sub.badge}
+                            </span>
+                          )}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
       </div>
 
       {/* Footer */}
