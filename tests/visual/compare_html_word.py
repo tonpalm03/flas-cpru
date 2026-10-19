@@ -27,17 +27,32 @@ def word_to_pdf(files):
 
 
 def html_to_pdf(src, dst):
-    subprocess.run([CHROME, '--headless', '--disable-gpu', '--no-pdf-header-footer', f'--print-to-pdf={dst}',
+    # รอสคริปต์ในหน้า (วาดเส้นหัวบันทึกข้อความหลังโหลดฟอนต์) ก่อนพิมพ์
+    subprocess.run([CHROME, '--headless', '--disable-gpu', '--no-pdf-header-footer', '--virtual-time-budget=5000', f'--print-to-pdf={dst}',
                     'file:///' + os.path.abspath(src).replace(os.sep, '/')],
                    check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
-def lines(page):
-    """บรรทัดข้อความของหน้า: (บน, ซ้าย, ข้อความ) เป็นมิลลิเมตร ไม่นับช่องว่างนำหน้า"""
-    by = {}
-    for w in page.get_text('words'):
-        by.setdefault((w[5], w[6]), []).append(w)
-    return sorted((min(x[1] for x in v) * MM, min(x[0] for x in v) * MM, ' '.join(x[4] for x in v)) for v in by.values())
+def words(page):
+    """คำในหน้า: (บน, ซ้าย, ข้อความ) เป็นมิลลิเมตร เรียงจากบนลงล่าง ซ้ายไปขวา"""
+    return sorted((w[1] * MM, w[0] * MM, w[4]) for w in page.get_text('words'))
+
+
+def rule_rows(page):
+    """ตำแหน่งแนวตั้ง (มม.) ของเส้นบาง ๆ ยาวในหัวเอกสาร (บน 62 มม.) รวมเส้นที่อยู่แถวเดียวกัน"""
+    ys = []
+    for d in page.get_drawings():
+        for it in d['items']:
+            r = it[1] if it[0] == 're' else (fitz.Rect(it[1], it[2]) if it[0] == 'l' else None)
+            if r is not None and r.y0 * MM < 62 and r.height * MM < 1:
+                ys.append((r.y0 + r.y1) / 2 * MM)
+    rows = []
+    for y in sorted(ys):
+        if rows and y - rows[-1][-1] < 1.0:
+            rows[-1].append(y)
+        else:
+            rows.append([y])
+    return [round(sum(v) / len(v), 2) for v in rows if len(v) >= 5]
 
 
 def main(folder):
@@ -54,14 +69,23 @@ def main(folder):
             failed = True
             print(f'FAIL {n}: pages word {len(word)} html {len(html)}')
         for wp, hp in zip(word, html):
-            hl = lines(hp)
+            # จับคู่คำที่เหมือนกันทุกตัวอักษร (คำที่ตัดบรรทัดต่างกันจะไม่ตรงกันและถูกข้าม)
+            hw = words(hp)
             used = set()
-            for y, x, t in lines(wp):
-                m = next((i for i, l in enumerate(hl) if i not in used and l[2][:6] == t[:6]), None)
+            for y, x, t in words(wp):
+                m = next((i for i, l in enumerate(hw) if i not in used and l[2] == t and abs(l[0] - y) < 5), None)
                 if m is None:
                     continue
                 used.add(m)
-                worst = max(worst, abs(hl[m][0] - y))
+                worst = max(worst, abs(hw[m][0] - y))
+        # เส้นหัวบันทึกข้อความ (เส้นเวกเตอร์ใน PDF ทั้งสองฝั่ง): ตำแหน่งแนวตั้งของทุกเส้นต้องตรงกับ Word
+        if n.startswith('memo'):
+            wl, hl2 = rule_rows(word[0]), rule_rows(html[0])
+            if len(wl) != len(hl2):
+                worst = max(worst, 99.0)
+                print(f'      header lines word {wl} html {hl2}')
+            else:
+                worst = max([worst] + [abs(a - b) for a, b in zip(wl, hl2)])
         ok = worst <= TOL_MM
         failed |= not ok
         print(f"{'PASS' if ok else 'FAIL'} {n}: pages {len(word)} | worst line offset html vs word {worst:.1f} mm")

@@ -200,8 +200,8 @@ interface PreviewTune {
   coordinatorAdjMm?: number;
 }
 const PREVIEW_TUNE: Record<string, PreviewTune> = {
-  memo: { memoHeadMm: 9.7, memoTitleNudgeMm: -0.15, memoTitlePt: 28, bodyGapMm: 4, signAdjMm: 0 },
-  memo_circular: { memoHeadMm: 10.7, memoTitleNudgeMm: -0.45, memoTitlePt: 29, bodyGapMm: 4, signAdjMm: 0 },
+  memo: { memoHeadMm: 9.7, memoTitleNudgeMm: -0.15, memoTitlePt: 28, bodyGapMm: 2.2, signAdjMm: 0 },
+  memo_circular: { memoHeadMm: 10.7, memoTitleNudgeMm: -0.45, memoTitlePt: 29, bodyGapMm: 2.2, signAdjMm: 0 },
   external: { extHeaderShiftMm: -3.5, extHeaderTextTopMm: 22.9, extDateGapMm: 1.6, bodyGapMm: 2.2, closingAdjMm: 0, signAdjMm: 0, coordinatorAdjMm: 0 },
   external_circular: { extHeaderShiftMm: 0, extHeaderTextTopMm: 21.9, extDateGapMm: 1.7, bodyGapMm: 1.8, closingAdjMm: 0, signAdjMm: 0, coordinatorAdjMm: 0 },
   order: { orderGarudaTopMm: -1.7, orderHeaderBlockMm: 29.0, bodyGapMm: -1.0, signAdjMm: 0 }
@@ -230,11 +230,11 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
     subject: r.lineVisibility?.subject ?? true
   };
 
-  const getLineClass = (visible: boolean) => {
-    if (!visible || lineStyle === 'none') return '';
-    if (lineStyle === 'solid') return 'border-solid';
-    return 'border-dotted';
-  };
+  // เส้นหัวบันทึกข้อความ: ประจุด (ค่าเริ่มต้น) หรือเส้นทึบ ตามที่ตั้งในเอกสาร
+  const headerDash = lineStyle === 'solid' ? 'none' : '0.51 0.51';
+  const uClass = (visible: boolean) => (visible && lineStyle !== 'none' ? 'mh-u' : '');
+  // ช่องว่างหลังป้ายตามต้นฉบับ: ช่องว่างขนาด 11 พอยต์ (ขนาดเริ่มต้นของเอกสาร) บางช่องขีดเส้นใต้ด้วย
+  const gap = (n: number) => `<span class="mh-gap">${' '.repeat(n)}</span>`;
 
   const bodyBlocks = getBodyBlocks(r);
   const bodyItems = isOrder ? orderItems(bodyBlocks) : bodyBlocks.map(b => ({ text: b.text, block: b }));
@@ -259,6 +259,12 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
   // ระยะบรรทัดเดี่ยวของ Word กับ TH SarabunIT๙ (hhea 850+250+30 ต่อ 1000) วัดจริงได้ 6.4 มม. ต่อบรรทัด 16 พอยต์
   const WORD_LH = 1.134;
   const MEMO_GARUDA_TOP_MM = 10;
+  // ตำแหน่งเส้นใต้: ระยะจากขอบล่างกล่องข้อความ 16 พอยต์ (วัดเทียบ Word)
+  const MH_U_BOTTOM_MM = 1.05;
+  // แท็บเติมจุดจบที่ตำแหน่งแท็บของต้นฉบับ (บันทึกข้อความ 9360 twips ไม่ชิดขอบขวา)
+  const headerFillRightMm = (getPaper(r.category).mm.width - spec.margins.left - spec.margins.right - getHeaderFillTwips(r.category) / 56.693).toFixed(2);
+  // ต้นฉบับบันทึกข้อความ (ว): วันที่ 15 พอยต์ และเรื่องบีบระยะตัวอักษร (w:spacing -6 ใน Word เท่ากับราว -0.21 พอยต์ต่อกลุ่มอักษรใน Chrome)
+  const isMemoCircular = r.category === 'memo_circular';
   const tune = PREVIEW_TUNE[r.category] || PREVIEW_TUNE.memo;
   // หน้าเอกสารเปิดเป็น blob: ซึ่งหาไฟล์จากพาธ /... ไม่ได้ จึงต้องใส่โดเมนเต็มให้รูปครุฑและรูปลายเซ็น
   const absUrl = (u: string) => (/^\/(?!\/)/.test(u) ? origin + u : u);
@@ -439,17 +445,27 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
       line-height: ${tune.memoHeadMm ?? 12}mm;
       margin-bottom: 0;
     }
+    /* แถวหัวบันทึกข้อความเลียนแบบย่อหน้าใน Word: ป้าย 20 พอยต์ ช่องว่างตามต้นฉบับ ค่าที่ขีดเส้นใต้
+       เส้นคือขีดเส้นใต้แบบจุดของ Word (จุดดำ 0.51 มม. เว้น 0.51 มม. หนา 0.17 มม.) ใต้ข้อความทุกบรรทัดที่ตัดขึ้นใหม่
+       และบรรทัดสุดท้ายต่อด้วยแท็บเติมจุดจนถึงตำแหน่งแท็บ สคริปต์ท้ายหน้าวาดเป็นเส้น SVG (เวกเตอร์ใน PDF) */
+    .mh-row {
+      position: relative;
+      font-size: 16pt;
+      line-height: ${WORD_LH};
+      overflow-x: clip;
+      white-space: pre-wrap;
+    }
+    .mh-label { font-size: 20pt; font-weight: bold; white-space: pre; }
+    .mh-gap { font-size: 15pt; }
+    .mh-line { position: absolute; overflow: visible; pointer-events: none; }
+    .mh-split { display: flex; }
+    .mh-split > .mh-row:first-child { width: 69.9mm; flex: none; }
+    .mh-split > .mh-row:last-child { flex: 1; min-width: 0; }
     .memo-row {
       display: flex;
       padding: 0;
       line-height: ${WORD_LH};
       align-items: baseline;
-    }
-    .memo-row b {
-      font-size: 20pt;
-      margin-right: 1.7mm;
-      white-space: nowrap;
-      flex-shrink: 0;
     }
     .memo-label-regular {
       font-size: 16pt;
@@ -466,21 +482,11 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
       align-items: baseline;
       min-width: 0;
     }
-    .memo-val-line.border-dotted {
-      border-bottom: 1px dotted #555;
-    }
-    .memo-val-line.border-solid {
-      border-bottom: 1px solid #333;
-    }
     .val-text {
       font-size: 16pt;
       line-height: ${WORD_LH};
       white-space: pre-wrap;
     }
-    /* "วันที่" อยู่ที่แท็บ 3960 twips (6.99 ซม. จากขอบเนื้อหา) เหมือนต้นฉบับ */
-    .split-memo { display: flex; }
-    .split-memo > div:first-child { width: 69.9mm; flex: none; }
-    .split-memo > div:last-child { flex: 1; min-width: 0; }
     .body-para {
       text-indent: 25mm;
       text-align: justify;
@@ -527,7 +533,7 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
     }
   </style>
 </head>
-<body ${autoPrint ? 'onload="document.fonts.ready.then(function () { window.print(); });"' : ''}>
+<body ${autoPrint ? 'onload="document.fonts.ready.then(function () { if (window.placeHeaderFills) window.placeHeaderFills(); window.print(); });"' : ''}>
   ${!autoPrint ? `
   <div class="print-bar">
     <button class="print-btn" onclick="window.print();">พิมพ์เอกสาร / บันทึกเป็น PDF</button>
@@ -543,36 +549,18 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
         <span style="position: relative; top: ${tune.memoTitleNudgeMm ?? 0}mm;">บันทึกข้อความ</span>
       </div>
 
-      <div class="memo-row">
-        <b>ส่วนราชการ</b>
-        <div class="memo-val-line ${getLineClass(lineVis.govOrg)}">
-          <span class="val-text">${escape(displayDigits(r.from))}</span>
+      <div data-mh-dash="${headerDash}" style="margin-right: ${headerFillRightMm}mm;">
+        <div class="mh-row"><span class="mh-label">ส่วนราชการ</span><span class="${uClass(lineVis.govOrg)}">${gap(2)}${escape(displayDigits((r.from || '').trim()))}</span></div>
+        <div class="mh-split">
+          <div class="mh-row"><span class="mh-label">ที่</span>${gap(isMemoCircular ? 1 : 2)}<span class="${uClass(lineVis.docNumber)}">${escape(displayDigits(displayNum.trim()))}</span></div>
+          <div class="mh-row"><span class="mh-label">วันที่</span><span class="${uClass(lineVis.docDate)}">${gap(isMemoCircular ? 2 : 1)}<span style="font-size: 15pt;"> ${isMemoCircular ? '' : '</span><span>'}${escape(thaiGovDate(r.date, digitType, 'memo'))}</span></span></div>
         </div>
+        ${isMemoCircular
+          ? `<div class="mh-row"><span class="mh-label">เรื่อง  </span><span class="${uClass(lineVis.subject)}" style="letter-spacing: -0.21pt;">${escape(displayDigits(cleanSubject.trim()))}</span></div>`
+          : `<div class="mh-row" style="padding-left: 12.5mm; text-indent: -12.5mm;"><span class="mh-label" style="display: inline-block; width: 12.5mm; text-indent: 0;">เรื่อง</span><span class="${uClass(lineVis.subject)}">${escape(displayDigits(cleanSubject.trim()))}</span></div>`}
       </div>
 
-      <div class="split-memo">
-        <div class="memo-row">
-          <b>ที่</b>
-          <div class="memo-val-line ${getLineClass(lineVis.docNumber)}">
-            <span class="val-text">${escape(displayDigits(displayNum))}</span>
-          </div>
-        </div>
-        <div class="memo-row">
-          <b>วันที่</b>
-          <div class="memo-val-line ${getLineClass(lineVis.docDate)}">
-            <span class="val-text">${escape(thaiGovDate(r.date, digitType, 'memo'))}</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="memo-row">
-        <b style="width: 12.7mm; margin-right: 0;">เรื่อง</b>
-        <div class="memo-val-line ${getLineClass(lineVis.subject)}">
-          <span class="val-text">${escape(displayDigits(cleanSubject))}</span>
-        </div>
-      </div>
-
-      <div class="memo-row" style="margin-top: 0;">
+      <div class="memo-row" style="margin-top: 2.1mm;">
         <span class="memo-label-regular">เรียน</span>
         <div class="memo-val-line">
           <span class="val-text">${escape(displayDigits(targetTo || r.to))}</span>
@@ -677,6 +665,46 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
     ` : ''}
   </article>
   `).join('')}
+  <script>
+    // เส้นหัวบันทึกข้อความแบบ Word: ใต้ข้อความทุกบรรทัด และบรรทัดสุดท้ายต่อแท็บเติมจุดจนถึงขอบแถว (ตำแหน่งแท็บ)
+    // หน่วย มม. แปลงเป็น px (96 dpi) ความสูงอิงขอบล่างกล่องข้อความ ${MH_U_BOTTOM_MM} มม. เส้นหนา 0.17 มม.
+    window.placeHeaderFills = function () {
+      var MM = 96 / 25.4, NS = 'http://www.w3.org/2000/svg';
+      document.querySelectorAll('.mh-line').forEach(function (e) { e.remove(); });
+      document.querySelectorAll('.mh-u').forEach(function (u) {
+        var row = u.closest('.mh-row');
+        var box = u.closest('[data-mh-dash]');
+        var rects = u.getClientRects();
+        if (!row || !rects.length) return;
+        var dash = box ? box.getAttribute('data-mh-dash') : '0.51 0.51';
+        var rr = row.getBoundingClientRect();
+        for (var i = 0; i < rects.length; i++) {
+          var r = rects[i];
+          var x0 = r.left - rr.left;
+          var x1 = i === rects.length - 1 ? rr.width : r.right - rr.left;
+          var y = r.bottom - rr.top - (${MH_U_BOTTOM_MM} + 0.085) * MM;
+          var svg = document.createElementNS(NS, 'svg');
+          svg.setAttribute('class', 'mh-line');
+          svg.setAttribute('width', String(Math.max(0, x1 - x0)));
+          svg.setAttribute('height', String(MM));
+          svg.style.left = x0 + 'px';
+          svg.style.top = (y - MM / 2) + 'px';
+          var line = document.createElementNS(NS, 'line');
+          line.setAttribute('x1', '0');
+          line.setAttribute('x2', String(Math.max(0, x1 - x0)));
+          line.setAttribute('y1', String(MM / 2));
+          line.setAttribute('y2', String(MM / 2));
+          line.setAttribute('stroke', '#000');
+          line.setAttribute('stroke-width', String(0.17 * MM));
+          if (dash !== 'none') line.setAttribute('stroke-dasharray', dash.split(' ').map(function (v) { return String(Number(v) * MM); }).join(' '));
+          svg.appendChild(line);
+          row.appendChild(svg);
+        }
+      });
+    };
+    document.fonts.ready.then(window.placeHeaderFills);
+    window.addEventListener('resize', window.placeHeaderFills);
+  </script>
 </body>
 </html>`;
 }

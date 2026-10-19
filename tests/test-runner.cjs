@@ -229,7 +229,9 @@ async function runAllTests() {
     subject: '<script>alert("xss")</script>',
     bodyParagraphs: ['ย่อหน้าที่ 1', 'ย่อหน้าที่ 2']
   }, 'http://localhost');
-  assert.equal(generatedHtml.includes('<script>'), false, 'XSS stripped/escaped');
+  // หน้าเอกสารมีสคริปต์ของระบบเอง (วางแท็บเติมจุด) แต่ข้อความที่ผู้ใช้กรอกต้องถูก escape เสมอ
+  assert.equal(generatedHtml.includes('<script>alert'), false, 'XSS stripped/escaped');
+  assert.ok(generatedHtml.includes('&lt;script&gt;alert'), 'user text is HTML-escaped');
   // Test 8: Template Fidelity & CPRU-66-001 in Footer
   console.log('\n[TEST 8] Code-Defined Standard Templates & CPRU-66-001 in Footer:');
   const memoHtml = documentHtml({
