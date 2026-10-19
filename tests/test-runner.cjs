@@ -844,6 +844,21 @@ async function runAllTests() {
     assert.equal(st[5].firstLine, 1843); assert.equal(st[5].left, 0, 'duty item wraps back to the margin');
     assert.equal(st[6].before, 240); assert.equal(st[7].before, 120);
   }
+  {
+    // ตัวแบ่งหน้า (ปุ่ม "ขึ้นหน้าใหม่"): เก็บใน HTML/ข้อความล้วน แล้วขึ้นหน้าใหม่ทั้ง Word และ Preview/PDF
+    const rich = require('../lib/richBody.ts');
+    const html = rich.sanitizeBodyHtml('<p>ก่อน</p><p data-page-break="1">ข้อความที่ไม่ควรมี</p><p>หลัง</p>');
+    assert.ok(html.includes('<p data-page-break="1"></p>'), 'page break survives sanitising and drops stray text');
+    assert.deepEqual(rich.bodyHtmlToParagraphs(html), ['ก่อน', rich.PAGE_BREAK_TEXT, 'หลัง'], 'page break round-trips as plain text');
+    assert.ok(rich.newBlock(rich.PAGE_BREAK_TEXT).pageBreak, 'plain-text marker becomes a page break block');
+    const pb = { ...orderRec, bodyParagraphs: ['ด้วยคณะ ทดสอบ', rich.PAGE_BREAK_TEXT, '๒. คณะกรรมการดำเนินงาน'] };
+    const pbXml = new PizZip(Buffer.from(await (await buildAdminWord(pb)).arrayBuffer())).file('word/document.xml').asText();
+    assert.ok(/<w:br w:type="page"\/>(?:(?!คณะกรรมการดำเนินงาน).)*คณะกรรมการดำเนินงาน/.test(pbXml), 'order: Word page break before the next committee');
+    assert.ok(documentHtml(pb, 'http://localhost').includes('break-before: page'), 'order preview: page break');
+    const memoPb = { ...baseRec, category: 'memo', bodyParagraphs: ['หน้า ๑', rich.PAGE_BREAK_TEXT, 'หน้า ๒'] };
+    const memoPbXml = new PizZip(Buffer.from(await (await buildAdminWord(memoPb)).arrayBuffer())).file('word/document.xml').asText();
+    assert.ok(memoPbXml.includes('<w:br w:type="page"/>'), 'memo: Word page break');
+  }
   // ชื่อเรื่องที่ผู้ร่างขึ้นบรรทัดใหม่เอง: บรรทัดถัดไปเป็นย่อหน้ากึ่งกลางเต็มบรรทัดเหมือนต้นฉบับ ทั้ง Word และ Preview
   const brokenTitle = { ...orderRec, subject: 'แต่งตั้งคณะกรรมการ และสตาร์ทอัพ\nท่องเที่ยวเพื่อพัฒนา' };
   const brokenXml = new PizZip(Buffer.from(await (await buildAdminWord(brokenTitle)).arrayBuffer())).file('word/document.xml').asText();

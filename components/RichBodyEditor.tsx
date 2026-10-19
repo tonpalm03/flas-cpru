@@ -17,6 +17,7 @@ import {
   Italic,
   Pilcrow,
   Redo2,
+  ScissorsLineDashed,
   Underline as UnderlineIcon,
   Undo2
 } from "lucide-react";
@@ -36,6 +37,12 @@ const BodyParagraph = Paragraph.extend({
         default: true,
         parseHTML: (el: HTMLElement) => el.getAttribute("data-first") !== "0",
         renderHTML: (attrs: Record<string, unknown>) => (attrs.firstLine ? {} : { "data-first": "0" })
+      },
+      // ตัวแบ่งหน้า (เหมือน Ctrl+Enter ใน Word) เนื้อหาถัดไปขึ้นหน้าใหม่ทั้งใน Word และ PDF
+      pageBreak: {
+        default: false,
+        parseHTML: (el: HTMLElement) => el.getAttribute("data-page-break") === "1",
+        renderHTML: (attrs: Record<string, unknown>) => (attrs.pageBreak ? { "data-page-break": "1" } : {})
       }
     };
   }
@@ -162,6 +169,14 @@ export default function RichBodyEditor({ value, onChange, placeholder, minHeight
   }
 
   const chain = () => editor.chain().focus();
+  // แทรกตัวแบ่งหน้าหลังย่อหน้าปัจจุบัน แล้ววางเคอร์เซอร์ในย่อหน้าใหม่ถัดไป
+  const insertPageBreak = () => {
+    const after = editor.state.selection.$from.after(1);
+    chain()
+      .insertContentAt(after, [{ type: "paragraph", attrs: { pageBreak: true, firstLine: false } }, { type: "paragraph" }])
+      .setTextSelection(after + 3)
+      .run();
+  };
   const setIndent = (level: number) =>
     chain().updateAttributes("paragraph", { indent: Math.max(0, Math.min(MAX_INDENT_LEVEL, level)) }).run();
 
@@ -204,6 +219,9 @@ export default function RichBodyEditor({ value, onChange, placeholder, minHeight
         >
           <Pilcrow className="w-4 h-4" />
         </ToolButton>
+        <ToolButton label="ขึ้นหน้าใหม่ (แบ่งหน้า)" onClick={insertPageBreak}>
+          <ScissorsLineDashed className="w-4 h-4" />
+        </ToolButton>
         <span className="w-px h-5 bg-slate-200 mx-1" />
         <ToolButton label="เลิกทำ" disabled={!state.canUndo} onClick={() => chain().undo().run()}>
           <Undo2 className="w-4 h-4" />
@@ -234,6 +252,25 @@ export default function RichBodyEditor({ value, onChange, placeholder, minHeight
           min-height: 1.35em;
         }
         .rich-body-content p[data-first="0"] { text-indent: 0; }
+        .rich-body-content p[data-page-break="1"] {
+          text-indent: 0;
+          margin: 10px 0;
+          border-top: 1px dashed #94a3b8;
+          height: 0;
+          min-height: 0;
+          overflow: visible;
+          text-align: center;
+          caret-color: transparent;
+        }
+        .rich-body-content p[data-page-break="1"]::before {
+          content: "ขึ้นหน้าใหม่";
+          position: relative;
+          top: -0.75em;
+          padding: 0 8px;
+          background: #fff;
+          color: #64748b;
+          font-size: 11pt;
+        }
         ${Array.from({ length: MAX_INDENT_LEVEL }, (_, i) =>
           `.rich-body-content p[data-indent="${i + 1}"] { margin-left: ${(i + 1) * INDENT_STEP_MM}mm; }`
         ).join("\n")}

@@ -22,7 +22,12 @@ export interface RichBlock {
   firstLine: boolean;
   /** ระดับย่อหน้าเยื้องซ้าย ระดับละ 1.27 ซม. */
   indent: number;
+  /** ตัวแบ่งหน้า (Ctrl+Enter ใน Word): เนื้อหาถัดไปขึ้นหน้าใหม่ ไม่มีข้อความ */
+  pageBreak?: boolean;
 }
+
+/** ตัวแบ่งหน้าในรูปข้อความล้วน (bodyParagraphs และข้อความต้นแบบ) */
+export const PAGE_BREAK_TEXT = '[ขึ้นหน้าใหม่]';
 
 export const MAX_INDENT_LEVEL = 6;
 export const INDENT_STEP_MM = 12.7;
@@ -45,6 +50,7 @@ const escapeHtml = (s: string) =>
   s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 
 export function newBlock(text = '', patch: Partial<RichBlock> = {}): RichBlock {
+  if (text.trim() === PAGE_BREAK_TEXT) return { runs: [], text: '', align: 'justify', firstLine: false, indent: 0, pageBreak: true };
   return {
     runs: text ? [{ text }] : [],
     text,
@@ -56,7 +62,7 @@ export function newBlock(text = '', patch: Partial<RichBlock> = {}): RichBlock {
 }
 
 function pushRun(block: RichBlock, text: string, bold: boolean, italic: boolean, underline: boolean) {
-  if (!text) return;
+  if (!text || block.pageBreak) return;
   const last = block.runs[block.runs.length - 1];
   if (last && !!last.bold === bold && !!last.italic === italic && !!last.underline === underline) {
     last.text += text;
@@ -73,6 +79,7 @@ function readBlockAttrs(attrs: string): Partial<RichBlock> {
   if (/data-first\s*=\s*["']?0/i.test(attrs)) patch.firstLine = false;
   const indent = /data-indent\s*=\s*["']?(\d+)/i.exec(attrs);
   if (indent) patch.indent = Math.min(MAX_INDENT_LEVEL, parseInt(indent[1], 10));
+  if (/data-page-break\s*=\s*["']?1/i.test(attrs)) patch.pageBreak = true;
   return patch;
 }
 
@@ -127,6 +134,7 @@ function runHtml(run: RichRun): string {
 }
 
 export function blockAttrs(block: RichBlock): string {
+  if (block.pageBreak) return ' data-page-break="1"';
   let attrs = '';
   if (block.align !== 'justify') attrs += ` style="text-align:${block.align}"`;
   if (!block.firstLine) attrs += ' data-first="0"';
@@ -151,7 +159,7 @@ export function paragraphsToBodyHtml(paragraphs: string[]): string {
 /** ข้อความล้วนแยกย่อหน้า ใช้กับตรวจสอบเอกสาร ค้นหา และข้อมูลเดิมใน bodyParagraphs */
 export function bodyHtmlToParagraphs(html: string): string[] {
   return parseBodyHtml(html)
-    .map(b => b.text.trim())
+    .map(b => (b.pageBreak ? PAGE_BREAK_TEXT : b.text.trim()))
     .filter(Boolean);
 }
 

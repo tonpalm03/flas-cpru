@@ -72,6 +72,7 @@ export function blocksToWordXml(
   const alignOf = { left: 'left', center: 'center', right: 'right', justify: 'distribute' } as const;
   return blocks
     .map(b =>
+      b.pageBreak ? PAGE_BREAK_BLOCK_XML :
       xmlPara(
         b.runs.map(r => xmlRun(display(r.text), { bold: r.bold, italic: r.italic, underline: r.underline })).join('') || xmlRun(' '),
         {
@@ -151,6 +152,15 @@ export function xmlFloatingImageRun(rId: string, widthMm: number, heightMm: numb
 }
 
 export const PAGE_BREAK_XML ='<w:p><w:r><w:br w:type="page"/></w:r></w:p>';
+
+/**
+ * ตัวแบ่งหน้าในเนื้อหา (ปุ่ม "ขึ้นหน้าใหม่"): ย่อหน้าตัวแบ่งหน้า + บรรทัดว่าง 16 พอยต์บนหน้าใหม่
+ * เหมือนต้นฉบับคำสั่งที่กด Ctrl+Enter แล้วเว้นหนึ่งบรรทัดก่อนเนื้อหาถัดไป (Preview/PDF เว้น 6.4 มม. เท่ากัน)
+ */
+export const PAGE_BREAK_BLOCK_XML =
+  PAGE_BREAK_XML +
+  // ย่อหน้าว่างขนาด 16 พอยต์ เว้นก่อน 6 พอยต์ ตามต้นฉบับ (เครื่องหมายย่อหน้าต้องกำหนดขนาด ไม่เช่นนั้น Word ใช้ 11 พอยต์)
+  `<w:p><w:pPr><w:spacing w:before="120" w:after="0" w:line="240" w:lineRule="auto"/><w:rPr>${RFONTS}<w:sz w:val="32"/><w:szCs w:val="32"/><w:cs/></w:rPr></w:pPr></w:p>`;
 
 /** แทนค่าในแม่แบบ: ค่าธรรมดาใช้ {{tag}} ค่า XML ใช้ {{@tag}} ลูปใช้ {{#list}}...{{/list}} */
 export async function renderWordTemplate(

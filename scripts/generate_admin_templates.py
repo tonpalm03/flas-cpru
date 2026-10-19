@@ -19,24 +19,29 @@ FILES = {
 ROLES = ('ประธานกรรมการ', 'รองประธานกรรมการ', 'กรรมการและเลขานุการ', 'กรรมการและผู้ช่วยเลขานุการ', 'ผู้ช่วยเลขานุการ', 'กรรมการ', 'ที่ปรึกษา')
 
 
-def para_text(p):
+PAGE_BREAK = '[ขึ้นหน้าใหม่]'  # ตรงกับ PAGE_BREAK_TEXT ใน lib/richBody.ts
+
+
+def para_text(p, page_breaks=False):
+    if page_breaks and 'w:type="page"' in p and not re.search(r'<w:t[^>]*>[^<]*\S', p):
+        return PAGE_BREAK  # ย่อหน้าตัวแบ่งหน้า (Ctrl+Enter) ของต้นฉบับ
     out = []
     for m in re.finditer(r'<w:t[^>]*>([^<]*)</w:t>|<w:tab/>|<w:br/>', p):
         out.append(m.group(1) if m.group(1) is not None else ('\t' if m.group(0) == '<w:tab/>' else '\n'))
     return html.unescape(''.join(out)).replace('​', '')
 
 
-def paragraphs(xml):
-    return [para_text(p) for p in re.findall(r'<w:p[ >].*?</w:p>', xml, re.S)]
+def paragraphs(xml, page_breaks=False):
+    return [para_text(p, page_breaks) for p in re.findall(r'<w:p[ >].*?</w:p>', xml, re.S)]
 
 
 def squash(s):
     return re.sub(r'\s+', ' ', s.replace('\t', ' ')).strip()
 
 
-def load(path):
+def load(path, page_breaks=False):
     z = zipfile.ZipFile(path)
-    body = paragraphs(z.read('word/document.xml').decode('utf8'))
+    body = paragraphs(z.read('word/document.xml').decode('utf8'), page_breaks)
     header = []
     for n in z.namelist():
         if re.match(r'word/header\d*\.xml', n):
@@ -126,7 +131,7 @@ def letter(path, first_only=False):
 
 
 def order(path):
-    _, body = load(path)
+    _, body = load(path, page_breaks=True)
     b = [x for x in body if x.strip()]
     org_i = next(i for i, x in enumerate(b) if squash(x).startswith('คำสั่ง'))
     frm = strip_label(b[org_i], 'คำสั่ง')

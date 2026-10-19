@@ -1,6 +1,6 @@
 import type { AdminDocCategory, AdminDocRegistryRecord } from './types';
-import { PAGE_BREAK_XML, blocksToWordXml, imagePixelSize, loadWordTemplate, renderWordTemplate, xmlFloatingImageRun, xmlPara, xmlRun, xmlTab, type TemplateImage, type XmlParaOptions } from './wordTemplate';
-import { INDENT_STEP_MM, INDENT_STEP_TWIPS, getBodyBlocks, newBlock, type RichBlock } from './richBody';
+import { PAGE_BREAK_BLOCK_XML, PAGE_BREAK_XML, blocksToWordXml, imagePixelSize, loadWordTemplate, renderWordTemplate, xmlFloatingImageRun, xmlPara, xmlRun, xmlTab, type TemplateImage, type XmlParaOptions } from './wordTemplate';
+import { INDENT_STEP_MM, INDENT_STEP_TWIPS, PAGE_BREAK_TEXT, getBodyBlocks, newBlock, type RichBlock } from './richBody';
 import { SIGNATURE_BOX, cssMargin, fitSignatureMm, getHeaderFillTwips, getPaper, getTemplateSpec, mmToTwips, wordMargin } from './adminTemplateSpec';
 
 export function garudaPath(category: string, garudaImage?: string) {
@@ -111,6 +111,9 @@ export function sanitizeFieldText(text: string, keyword?: string): string {
   return clean;
 }
 
+/** ตัวแบ่งหน้าใน Preview/PDF: เนื้อหาถัดไปเริ่มหน้าใหม่ เว้นหนึ่งบรรทัดเหมือนย่อหน้าตัวแบ่งหน้าใน Word */
+const PAGE_BREAK_HTML = '<div class="page-break" style="break-before: page; height: 0; margin: 0;"></div><div style="height: 6.4mm; margin: 0;"></div>';
+
 const escape = (v: unknown) => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 const lines = (v: unknown) => escape(v).replace(/\n/g, '<br>');
 
@@ -135,6 +138,10 @@ export function orderBlocks(paragraphs: string[]) {
 export function orderItems(blocks: RichBlock[]): { text: string; block: RichBlock }[] {
   const out: { text: string; block: RichBlock }[] = [];
   for (const b of blocks) {
+    if (b.pageBreak) {
+      out.push({ text: PAGE_BREAK_TEXT, block: b });
+      continue;
+    }
     const ls = orderBlocks([b.text]);
     if (ls.length === 1 && ls[0] === b.text.trim().replace(/[ \t]{2,}/g, ' ')) {
       out.push({ text: ls[0], block: b });
@@ -152,7 +159,7 @@ export function orderItems(blocks: RichBlock[]): { text: string; block: RichBloc
  * - ย่อหน้าหลังรายชื่อ ("ให้คณะกรรมการ..."): เยื้อง 2.5 ซม. เว้นก่อน 12 พอยต์ หลัง 8 พอยต์
  * - "หน้าที่ ..." และข้อหน้าที่ "๑. ...": เยื้องเฉพาะบรรทัดแรก (แท็บ) บรรทัดถัดไปชิดขอบซ้าย เว้นก่อน/หลัง 6 พอยต์
  */
-export type OrderParaKind = 'intro' | 'prose' | 'closing' | 'heading' | 'member' | 'duty' | 'dutyItem' | 'date';
+export type OrderParaKind = 'intro' | 'prose' | 'closing' | 'heading' | 'member' | 'duty' | 'dutyItem' | 'date' | 'break';
 export interface OrderParaStyle { kind: OrderParaKind; firstLine: number; left: number; before: number; after: number; line: number }
 const ORDER_INTRO_FIRST_LINE = 1106; // 16 วรรคของ TH SarabunIT๙ 16 พอยต์
 export function orderParaStyles(texts: string[], headingIndent: number, dateIndent: number): OrderParaStyle[] {
@@ -161,6 +168,7 @@ export function orderParaStyles(texts: string[], headingIndent: number, dateInde
   return texts.map(text => {
     const s = (kind: OrderParaKind, o: Partial<OrderParaStyle>): OrderParaStyle =>
       ({ kind, firstLine: 0, left: 0, before: 0, after: 0, line: 240, ...o });
+    if (text === PAGE_BREAK_TEXT) return s('break', {});
     if (parseCommitteeRow(text).isMember) return s('member', { left: 1843 });
     if (/^[๐-๙0-9]+(?:\.[๐-๙0-9]+)*[\.\s]\s*คณะกรรมการ/.test(text)) {
       seenList = true;
@@ -319,7 +327,7 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
       return t;
     }).join('') || '&nbsp;';
   // บันทึกข้อความ: ย่อหน้า "จึงเรียน..." เว้นก่อน 12 พอยต์ (ประเภทอื่น 6 พอยต์) เหมือนไฟล์ Word
-  const bodyParaHtml = (b: RichBlock) =>
+  const bodyParaHtml = (b: RichBlock) => b.pageBreak ? PAGE_BREAK_HTML :
     `<div class="body-para" style="${isMemo && b.text.startsWith('จึงเรียน') ? 'margin-top: 4.2mm; ' : ''}text-align: ${b.align};${b.firstLine ? '' : ' text-indent: 0;'}${b.indent ? ` margin-left: ${b.indent * INDENT_STEP_MM}mm;` : ''}">${richRunsHtml(b)}</div>`;
   const spec = getTemplateSpec(r.category);
   const letter = spec.letter;
@@ -702,6 +710,7 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
           const st = orderStyles[k];
           const tw = (v: number) => (v / 56.693).toFixed(2);
           const box = `margin: ${tw(st.before)}mm 0 ${tw(st.after)}mm; padding-left: ${tw(st.left)}mm; text-indent: ${tw(st.firstLine)}mm; line-height: ${(WORD_LH * st.line / 240).toFixed(4)};`;
+          if (st.kind === 'break') return PAGE_BREAK_HTML;
           if (st.kind === 'member') {
             const mem = parseCommitteeRow(p);
             return `<div style="display: flex; ${box}">
@@ -930,7 +939,9 @@ async function buildFromTemplate(r: AdminDocRegistryRecord): Promise<Blob | null
         items.forEach(({ text, block }, k) => {
           const st = styles[k];
           const pos = { firstLine: st.firstLine, left: st.left, before: st.before, after: st.after, line: st.line };
-          if (st.kind === 'member') {
+          if (st.kind === 'break') {
+            parts.push(PAGE_BREAK_BLOCK_XML);
+          } else if (st.kind === 'member') {
             const mem = parseCommitteeRow(text);
             parts.push(xmlPara(xmlRun(display(mem.name)) + xmlTab() + xmlRun(display(mem.role)), { ...pos, tabs: [6460] }));
           } else if (st.kind === 'heading') {
@@ -988,7 +999,7 @@ export async function buildAdminWord(r: AdminDocRegistryRecord): Promise<Blob> {
 
   const {
     Document, Paragraph, TextRun, ImageRun, Packer, AlignmentType, Table, TableRow, TableCell,
-    BorderStyle, WidthType, LineRuleType, VerticalAlign, TabStopType, UnderlineType,
+    BorderStyle, WidthType, LineRuleType, PageBreak, VerticalAlign, TabStopType, UnderlineType,
     Footer, Header, PageNumber, HorizontalPositionRelativeFrom, VerticalPositionRelativeFrom, TextWrappingType, HorizontalPositionAlign
   } = await import('docx');
 
@@ -1107,7 +1118,7 @@ export async function buildAdminWord(r: AdminDocRegistryRecord): Promise<Blob> {
   };
 
   const body = (b: RichBlock, spacing: Record<string, unknown> = { ...SINGLE, before: 120, after: 0 }) =>
-    new Paragraph({
+    b.pageBreak ? [new Paragraph({ children: [new PageBreak()] }), para(' ')] : new Paragraph({
       children: blockRuns(b),
       alignment: alignMap[b.align],
       indent: { firstLine: b.firstLine ? 1417 : 0, left: b.indent * INDENT_STEP_TWIPS }, // 2.5 cm
@@ -1273,7 +1284,7 @@ export async function buildAdminWord(r: AdminDocRegistryRecord): Promise<Blob> {
         }),
         ...(!cleanReference ? [] : [para('อ้างถึง  ' + cleanReference)]),
         ...(r.attachmentsList || []).map((item, i) => para((i === 0 ? 'สิ่งที่ส่งมาด้วย  ' : '                  ') + (i + 1) + '. ' + item)),
-        ...getBodyBlocks(r).map(b => body(b, { ...SINGLE, before: b.text.startsWith('จึงเรียน') ? 240 : 120, after: 0 })),
+        ...getBodyBlocks(r).flatMap(b => body(b, { ...SINGLE, before: b.text.startsWith('จึงเรียน') ? 240 : 120, after: 0 })),
         ...signatureParagraphs,
         ...(r.coordinatorInfo ? [para(r.coordinatorInfo, { spacing: { before: 240, after: 0 } })] : [])
       ]
@@ -1288,8 +1299,9 @@ export async function buildAdminWord(r: AdminDocRegistryRecord): Promise<Blob> {
     // รูปแบบย่อหน้าชุดเดียวกับแม่แบบ Word และ Preview (orderParaStyles)
     const orderList = orderItems(getBodyBlocks(r));
     const orderStyleList = orderParaStyles(orderList.map(i => i.text), orderHeadingIndent, orderDateIndent);
-    const orderBody = orderList.map(({ text: block, block: rich }, k) => {
+    const orderBody = orderList.flatMap(({ text: block, block: rich }, k) => {
       const st = orderStyleList[k];
+      if (st.kind === 'break') return [new Paragraph({ children: [new PageBreak()] }), para(' ')];
       const spacing = { before: st.before, after: st.after, line: st.line, lineRule: LineRuleType.AUTO };
       const indent = { firstLine: st.firstLine, left: st.left };
       if (st.kind === 'member') {
@@ -1473,7 +1485,7 @@ export async function buildAdminWord(r: AdminDocRegistryRecord): Promise<Blob> {
         }
         return extField(i === 0 ? 'สิ่งที่ส่งมาด้วย' : '', numText, 1417);
       }),
-      ...getBodyBlocks(r).map(b => body(b)),
+      ...getBodyBlocks(r).flatMap(b => body(b)),
       para('ขอแสดงความนับถือ', { alignment: AlignmentType.CENTER, indent: { left: closingIndent }, keepNext: true, spacing: { before: letterSpec ? mmToTwips(letterSpec.closingGapMm) : 240, after: 60, ...SINGLE } }),
       ...signatureParagraphs,
       ...(r.coordinatorInfo ? [new Paragraph({
