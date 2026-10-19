@@ -744,7 +744,45 @@ async function runAllTests() {
   assert.deepEqual(merged.map(i => i.t).sort(), ['cloud', 'new'], 'merge keeps newest, adds cloud-only, drops deleted');
   console.log(' PASS: Module permissions, calendar, meetings, newsletters and store merge verified.');
 
-  console.log('\n=== ALL 17 CORE TEST GROUPS PASSED WITH 100% ACCURACY! ===');
+  console.log('\n[TEST 18] Word export from the original Word templates (memo):');
+  const PizZip = require('pizzip');
+  const memoRecord = {
+    ...signingDoc,
+    category: 'memo',
+    action: 'รอตรวจ',
+    from: 'มหาวิทยาลัยราชภัฏชัยภูมิ คณะศิลปศาสตร์และวิทยาศาสตร์ โทร ๔๑๐๐',
+    to: 'อาจารย์ ดร.วราวุฒิ มหามิตร',
+    subject: 'ขอเชิญเป็นผู้เชี่ยวชาญ <ทดสอบ> & ตรวจสอบ',
+    date: '2026-10-19',
+    docNumber: '',
+    bodyParagraphs: ['ย่อหน้าหนึ่ง ตัวหนา', 'จึงเรียนมาเพื่อพิจารณา'],
+    bodyHtml: '<p>ย่อหน้าหนึ่ง <strong>ตัวหนา</strong></p><p style="text-align:center">จึงเรียนมาเพื่อพิจารณา</p>',
+    signatoryName: 'ผู้ช่วยศาสตราจารย์ ดร.สิริศักดิ์ อาจวิชัย',
+    signatoryPosition: 'คณบดีคณะศิลปศาสตร์และวิทยาศาสตร์',
+    referenceDoc: 'หนังสือที่ อว ๑๒๓',
+    attachmentsList: ['กำหนดการ'],
+    coordinatorInfo: 'ผู้ประสานงาน ทดสอบ',
+    signatureUrl: undefined
+  };
+  const memoBlob = await buildAdminWord(memoRecord);
+  const memoZip = new PizZip(Buffer.from(await memoBlob.arrayBuffer()));
+  const memoDoc = memoZip.file('word/document.xml').asText();
+  const memoHeader = memoZip.file('word/header1.xml').asText();
+  assert.equal(/\{\{|\}\}/.test(memoDoc + memoHeader), false, 'no unreplaced template tags remain');
+  assert.ok(memoHeader.includes('ขอเชิญเป็นผู้เชี่ยวชาญ &lt;ทดสอบ&gt; &amp; ตรวจสอบ'), 'subject placed in original header and XML-escaped');
+  assert.ok(memoHeader.includes('๑๙ ตุลาคม ๒๕๖๙'), 'date placed with single spaces in header');
+  assert.ok(memoDoc.includes('วราวุฒิ') && memoDoc.includes('ย่อหน้าหนึ่ง') && memoDoc.includes('(ผู้ช่วยศาสตราจารย์ ดร.สิริศักดิ์ อาจวิชัย)'), 'recipient, body and single-spaced signatory placed');
+  assert.ok(memoDoc.includes('<w:b/>') && memoDoc.includes('w:val="center"'), 'rich body formatting carried into WordprocessingML');
+  assert.ok(memoDoc.includes('อ้างถึง') && memoDoc.includes('สิ่งที่ส่งมาด้วย') && memoDoc.includes('ผู้ประสานงาน ทดสอบ'), 'optional reference, attachments and coordinator are rendered');
+  assert.ok(/w:w="11906"[^>]*w:h="16838"/.test(memoDoc), 'template page size is A4');
+  assert.ok(memoZip.file('word/footer1.xml').asText().includes('CPRU-66-001'), 'footer code comes from the original file');
+  const noTemplateBlob = await buildAdminWord({ ...memoRecord, category: 'order', bodyHtml: undefined });
+  assert.ok(noTemplateBlob.size > 1000, 'categories without a template still use the generated document');
+  const signedBlob = await buildAdminWord({ ...memoRecord, signatureUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==' });
+  assert.ok(signedBlob.size > 1000, 'documents with a digital signature fall back to the generated document');
+  console.log(' PASS: Memo Word export renders from the original template and falls back safely.');
+
+  console.log('\n=== ALL 18 CORE TEST GROUPS PASSED WITH 100% ACCURACY! ===');
 }
 
 runAllTests().catch(err => {

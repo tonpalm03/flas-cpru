@@ -1,4 +1,5 @@
 import type { AdminDocCategory, AdminDocRegistryRecord } from './types';
+import { blocksToWordXml, loadWordTemplate, renderWordTemplate, xmlPara, xmlRun, xmlTab } from './wordTemplate';
 import { INDENT_STEP_MM, INDENT_STEP_TWIPS, getBodyBlocks, newBlock, type RichBlock } from './richBody';
 import { A4_MM, A4_TWIPS, cssMargin, getTemplateSpec, mmToTwips, wordMargin } from './adminTemplateSpec';
 
@@ -658,10 +659,59 @@ export function exportAdminPdf(r: AdminDocRegistryRecord) {
 /**
  * High-fidelity Word (.docx) builder
  */
+/**
+ * บันทึกข้อความ: ส่งออก Word จากไฟล์แม่แบบต้นฉบับของคณะ (ส่วนหัว ตราครุฑ ฟอนต์ หน้ากระดาษตรงต้นฉบับ)
+ * คืน null เพื่อให้ใช้ตัวสร้างเดิมแทน เมื่อ: ไม่ใช่บันทึกข้อความ, มีลายเซ็นดิจิทัลฝังรูป,
+ * บันทึกข้อความ (ว) ที่มีผู้รับหลายราย (ต้องแยกหลายฉบับ) หรือโหลดแม่แบบไม่ได้
+ */
+async function buildMemoFromTemplate(r: AdminDocRegistryRecord): Promise<Blob | null> {
+  if (r.category !== 'memo' && r.category !== 'memo_circular') return null;
+  if (r.signatureUrl) return null;
+  const recipients = (r.recipients || []).filter(x => x.trim());
+  if (r.category === 'memo_circular' && recipients.length > 1) return null;
+  const template = await loadWordTemplate(r.category);
+  if (!template) return null;
+  try {
+    const digitType = getRecordDigitType(r);
+    const display = (t: string) => formatDocDigits(t, digitType);
+    const to = r.category === 'memo_circular' && recipients.length === 1 ? recipients[0] : r.to || '';
+    const reference = sanitizeFieldText(r.referenceDoc || '', 'อ้างถึง');
+    const labelLine = (label: string, text: string, indent: number) =>
+      xmlPara(xmlRun(label) + xmlTab() + xmlRun(display(text)), { left: indent, hanging: indent, tabs: [indent], before: 120 });
+    const extra =
+      (reference ? labelLine('อ้างถึง', reference, 720) : '') +
+      (r.attachmentsList || [])
+        .map((att, i) => labelLine(i === 0 ? 'สิ่งที่ส่งมาด้วย' : '', `${i + 1}. ${att}`, 1417))
+        .join('');
+    const signatory = formatSignatoryName(r.signedByName || r.signatoryName || '');
+    const position = r.signedByPosition || r.signatoryPosition || '';
+    const signature =
+      xmlPara(xmlRun(`(${display(signatory)})`), { align: 'center', left: 2835, before: 2055, keepNext: true }) +
+      xmlPara(xmlRun(display(position)), { align: 'center', left: 2835 });
+    return await renderWordTemplate(template, {
+      from: display(r.from || ''),
+      docNumber: display(getDisplayDocNumber(r)),
+      date: thaiGovDate(r.date, digitType, 'memo'),
+      subject: display(sanitizeFieldText(r.subject, 'เรื่อง')),
+      to: display(to),
+      extra,
+      body: blocksToWordXml(getBodyBlocks(r), display, b => (b.text.startsWith('จึงเรียน') ? 240 : 120)),
+      signature,
+      coordinator: r.coordinatorInfo ? xmlPara(xmlRun(display(r.coordinatorInfo)), { before: 240 }) : ''
+    });
+  } catch (err) {
+    console.warn('แม่แบบ Word ใช้งานไม่ได้ ใช้ตัวสร้างเดิมแทน:', err);
+    return null;
+  }
+}
+
 export async function buildAdminWord(r: AdminDocRegistryRecord): Promise<Blob> {
   if (r.action === 'รอลงนาม') {
     throw new Error('เอกสารอยู่ในขั้นตอน "รอลงนาม" ไม่อนุญาตให้ดาวน์โหลดไฟล์ Word เพื่อป้องกันการแก้ไขก่อนลงนาม');
   }
+
+  const fromTemplate = await buildMemoFromTemplate(r);
+  if (fromTemplate) return fromTemplate;
 
   const {
     Document, Paragraph, TextRun, ImageRun, Packer, AlignmentType, Table, TableRow, TableCell,

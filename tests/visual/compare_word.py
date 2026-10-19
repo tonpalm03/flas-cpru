@@ -61,7 +61,12 @@ def main(orig_dir, ours_dir, out_dir):
     for n in NAMES:
         swap_font(os.path.join(orig_dir, f'real-{n}.docx'), os.path.join(tmp, f'real-{n}.docx'))
     to_pdf(sorted(glob.glob(os.path.join(tmp, '*.docx'))), os.path.join(out_dir, 'pdf_orig'))
-    to_pdf(sorted(glob.glob(os.path.join(ours_dir, '*.docx'))), os.path.join(out_dir, 'pdf_ours'))
+    # ไฟล์ที่ระบบสร้างจากแม่แบบต้นฉบับใช้ TH SarabunIT๙ เช่นเดียวกับต้นฉบับ สลับเป็น PSK ตอนเรนเดอร์เทียบเหมือนกัน
+    ours_tmp = os.path.join(out_dir, '_ours_psk')
+    os.makedirs(ours_tmp, exist_ok=True)
+    for f in glob.glob(os.path.join(ours_dir, '*.docx')):
+        swap_font(f, os.path.join(ours_tmp, os.path.basename(f)))
+    to_pdf(sorted(glob.glob(os.path.join(ours_tmp, '*.docx'))), os.path.join(out_dir, 'pdf_ours'))
     html_to_pdf(ours_dir, out_dir)
     failed = False
     for n in NAMES:
