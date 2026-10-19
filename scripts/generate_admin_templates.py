@@ -134,7 +134,10 @@ def order(path):
     while k < len(b) and not squash(b[k]).startswith('...'):
         t = squash(b[k])
         if not t.startswith('ที่ '):
-            subj.append(strip_label(t, 'เรื่อง'))
+            # เก็บการขึ้นบรรทัดใหม่ (Shift+Enter) ของต้นฉบับไว้ ไม่เช่นนั้นเบราว์เซอร์จะตัดคำเองต่างจาก Word
+            parts = [squash(x) for x in b[k].split('\n') if x.strip()]
+            parts[0] = strip_label(parts[0], 'เรื่อง')
+            subj.append('\n'.join(parts))
         k += 1
     blocks, group = [], []
 
@@ -163,7 +166,7 @@ def order(path):
             blocks.append(t)
     flush()
     name, position, _ = signature(b, 0)
-    return dict(**{'from': frm}, to='-', subject=' '.join(subj), bodyText='\n\n'.join(blocks),
+    return dict(**{'from': frm}, to='-', subject='\n'.join(subj), bodyText='\n\n'.join(blocks),
                 signatoryName=name, signatoryPosition=position)
 
 

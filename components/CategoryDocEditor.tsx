@@ -787,9 +787,10 @@ export default function CategoryDocEditor({
                   <label className={labelStyle}>
                     เรื่อง <span className="text-rose-500">*</span>
                   </label>
-                  <input
-                    type="text"
-                    className={inputStyle + " font-semibold"}
+                  {/* กด Enter เพื่อขึ้นบรรทัดใหม่ตรงจุดที่ต้องการ (เหมือน Shift+Enter ใน Word) ใช้ทั้ง Preview, PDF และ Word */}
+                  <textarea
+                    rows={subject.includes("\n") ? 2 : 1}
+                    className={inputStyle + " font-semibold resize-y"}
                     placeholder={
                       isOrder
                         ? "เช่น แต่งตั้งคณะกรรมการตรวจรับพัสดุสำหรับโครงการ..."
@@ -798,6 +799,7 @@ export default function CategoryDocEditor({
                     value={subject}
                     onChange={e => setSubject(e.target.value)}
                   />
+                  <p className="mt-1 text-[11px] text-slate-500">กด Enter เพื่อขึ้นบรรทัดใหม่ในชื่อเรื่อง</p>
                 </div>
 
                 {/* To (Hidden for Order) */}

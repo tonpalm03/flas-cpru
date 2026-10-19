@@ -280,7 +280,7 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
 <html lang="th">
 <head>
   <meta charset="utf-8">
-  <title>${escape(displayDigits(displayNum))} ${escape(cleanSubject)}</title>
+  <title>${escape(displayDigits(displayNum))} ${escape(cleanSubject.replace(/\s*\n\s*/g, ' '))}</title>
   <style>
     /* ฟอนต์เดียวกับไฟล์ Word ต้นฉบับ (TH SarabunIT๙) เพื่อให้ความกว้างตัวอักษรและการตัดบรรทัดตรงกับ Word */
     @font-face {
@@ -571,7 +571,9 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
       <div style="text-align: center; font-weight: bold; font-size: 16pt; line-height: ${WORD_LH}; margin-bottom: 3mm;">
         <div>คำสั่ง${escape(displayDigits((r.from || '').trim().replace(/^คำสั่ง\s*/, '')))}</div>
         <div>${escape(displayDigits(formattedOrderNum))}</div>
-        <div style="padding-left: 25mm; text-indent: -25mm; white-space: pre-wrap;">เรื่อง  ${escape(displayDigits(cleanSubject))}</div>
+        ${cleanSubject.split('\n').map((line, i) => i === 0
+          ? `<div style="padding-left: 25mm; text-indent: -25mm; white-space: pre-wrap;">เรื่อง  ${escape(displayDigits(line))}</div>`
+          : `<div>${escape(displayDigits(line))}</div>`).join('')}
         <div style="font-size: 16pt;">........................................................</div>
       </div>
     ` : `
@@ -587,7 +589,7 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
       <div class="ext-date" style="margin-top: ${tune.extDateGapMm ?? 4}mm;">
         ${escape(thaiGovDate(r.date, digitType, 'external'))}
       </div>
-      <div class="ext-row"><b class="ext-label">เรื่อง</b><span>${escape(displayDigits(cleanSubject))}</span></div>
+      <div class="ext-row"><b class="ext-label">เรื่อง</b><span>${lines(displayDigits(cleanSubject))}</span></div>
       <div class="ext-row"><b class="ext-label">เรียน</b><span>${escape(displayDigits(targetTo || r.to))}</span></div>
     `}
 
@@ -837,7 +839,9 @@ async function buildFromTemplate(r: AdminDocRegistryRecord): Promise<Blob | null
         const parts: string[] = [
           centered('คำสั่ง' + display((r.from || '').trim().replace(/^คำสั่ง\s*/, ''))),
           centered(display(docNumber)),
-          centered('เรื่อง  ' + display(subject), { left: 1418, hanging: 1418 }),
+          // บรรทัดที่ผู้ร่างขึ้นใหม่เองเป็นย่อหน้ากึ่งกลางเต็มบรรทัด เหมือนต้นฉบับ (บรรทัดที่ตัดอัตโนมัติยังเยื้องแบบแขวน)
+          ...subject.split('\n').map((line, i) =>
+            i === 0 ? centered('เรื่อง  ' + display(line), { left: 1418, hanging: 1418 }) : centered(display(line))),
           centered('........................................................', { after: 120 })
         ];
         for (const { text, block } of items) {
@@ -1268,7 +1272,13 @@ export async function buildAdminWord(r: AdminDocRegistryRecord): Promise<Blob> {
         }),
         new Paragraph({ children: [run('คำสั่ง' + (r.from || '').trim().replace(/^คำสั่ง\s*/, ''), true)], alignment: AlignmentType.CENTER, spacing: { ...SINGLE, after: 0 }, keepNext: true }),
         new Paragraph({ children: [run(formattedOrderNum, true)], alignment: AlignmentType.CENTER, spacing: { ...SINGLE, after: 0 }, keepNext: true }),
-        new Paragraph({ children: [run('เรื่อง  ' + cleanSubject, true)], alignment: AlignmentType.CENTER, indent: { left: 1418, hanging: 1418 }, spacing: { ...SINGLE, after: 0 }, keepNext: true }),
+        ...cleanSubject.split('\n').map((line, i) => new Paragraph({
+          children: [run(i === 0 ? 'เรื่อง  ' + line : line, true)],
+          alignment: AlignmentType.CENTER,
+          ...(i === 0 ? { indent: { left: 1418, hanging: 1418 } } : {}),
+          spacing: { ...SINGLE, after: 0 },
+          keepNext: true
+        })),
         new Paragraph({ children: [run('........................................................', true)], alignment: AlignmentType.CENTER, spacing: { ...SINGLE, after: 120 }, keepNext: true }),
         ...orderBody,
         ...(!hasDateInBody ? [new Paragraph({ children: [run(thaiGovDate(r.date, digitType, 'order'))], indent: { left: orderDateIndent }, spacing: { before: 180, after: 60, ...SINGLE }, keepNext: true })] : []),

@@ -835,6 +835,12 @@ async function runAllTests() {
   assert.equal(/\{\{|\}\}/.test(orderXml), false, 'order: no unreplaced tags');
   assert.ok(orderXml.includes('ประธานกรรมการ') && orderXml.includes('หน้าที่') && orderXml.includes('คำสั่งคณะศิลปศาสตร์'), 'order: committee row, duty label and title placed');
   assert.ok(orderXml.includes('<wp:anchor'), 'order: floating garuda comes from the original file');
+  // ชื่อเรื่องที่ผู้ร่างขึ้นบรรทัดใหม่เอง: บรรทัดถัดไปเป็นย่อหน้ากึ่งกลางเต็มบรรทัดเหมือนต้นฉบับ ทั้ง Word และ Preview
+  const brokenTitle = { ...orderRec, subject: 'แต่งตั้งคณะกรรมการ และสตาร์ทอัพ\nท่องเที่ยวเพื่อพัฒนา' };
+  const brokenXml = new PizZip(Buffer.from(await (await buildAdminWord(brokenTitle)).arrayBuffer())).file('word/document.xml').asText();
+  assert.ok(/เรื่อง  แต่งตั้งคณะกรรมการ และสตาร์ทอัพ<\/w:t><\/w:r><\/w:p><w:p>(?:(?!<\/w:p>).)*ท่องเที่ยวเพื่อพัฒนา/.test(brokenXml), 'order: manual title break becomes its own centered paragraph');
+  const brokenHtml = documentHtml(brokenTitle, 'http://localhost');
+  assert.ok(brokenHtml.includes('<div>ท่องเที่ยวเพื่อพัฒนา</div>'), 'order preview: manual title break becomes its own centered line');
 
   const circ = await buildAdminWord({ ...baseRec, category: 'external_circular', recipients: ['ผู้รับ หนึ่ง', 'ผู้รับ สอง', 'ผู้รับ สาม'] });
   const circXml = new PizZip(Buffer.from(await circ.arrayBuffer())).file('word/document.xml').asText();
