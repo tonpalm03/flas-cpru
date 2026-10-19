@@ -72,32 +72,40 @@ def rebuild(p, parts, tabs):
 GAP = '<w:r><w:rPr><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t xml:space="preserve">  </w:t></w:r>'
 
 
-def tab_run(rpr):
-    return f'<w:r>{rpr}<w:tab/></w:r>'
+def small(rpr):
+    """ตัดขนาดตัวอักษรออกเพื่อใช้ขนาดเริ่มต้นของเอกสาร (11 พอยต์) เหมือนรันแท็บเติมเส้นประของต้นฉบับ
+    เส้นประของรันเล็กอยู่ชิดตัวอักษรและจุดถี่ ถ้าใช้ 16 พอยต์ จุดจะห่างและเส้นต่ำลง"""
+    return re.sub(r'<w:sz w:val="\d+"/>|<w:szCs w:val="\d+"/>', '', rpr)
+
+
+def tab_run(rpr, tiny=True):
+    return f'<w:r>{small(rpr) if tiny else rpr}<w:tab/></w:r>'
 
 
 def build_header(h):
+    """ช่องว่างหลังป้ายหัวข้อ (ส่วนราชการ/ที่/วันที่/เรื่อง) ใช้รันของต้นฉบับตามเดิม เพื่อให้ระยะเว้นวรรคเท่าต้นฉบับ"""
     out = h
     done = 0
     for m in reversed(list(re.finditer(r'<w:p[ >].*?</w:p>', h, re.S))):
         p = m.group(0)
         rs = runs_of(p)
         texts = [text_of(r.group(0)).strip() for r in rs]
+        gap = lambda a, b: [r.group(0) for r in rs[a:b]]
         new = None
         if texts and texts[0] == 'ส่วนราชการ':
             a, _ = value_span(rs, 0)
             vr = rpr_of(rs[a].group(0))
-            new = rebuild(p, [rs[0].group(0), GAP, tag_run(vr, 'from'), tab_run(vr)], [9070])
+            new = rebuild(p, [rs[0].group(0), *gap(1, a), tag_run(vr, 'from'), tab_run(vr)], [9070])
         elif texts and texts[0] == 'ที่':
             d = next(i for i, t in enumerate(texts) if t == 'วันที่')
             na, _ = value_span(rs, 0)
             da, _ = value_span(rs, d)
             nr, dr = rpr_of(rs[na].group(0)), rpr_of(rs[da].group(0))
-            new = rebuild(p, [rs[0].group(0), GAP, tag_run(nr, 'docNumber'), tab_run(nr), rs[d].group(0), GAP, tag_run(dr, 'date'), tab_run(dr)], [3960, 9070])
+            new = rebuild(p, [rs[0].group(0), *gap(1, na), tag_run(nr, 'docNumber'), tab_run(nr), rs[d].group(0), *gap(d + 1, da), tag_run(dr, 'date'), tab_run(dr)], [3960, 9070])
         elif texts and texts[0] == 'เรื่อง':
             a, _ = value_span(rs, 0)
             vr = rpr_of(rs[a].group(0))
-            new = rebuild(p, [rs[0].group(0), tab_run(rpr_of(rs[0].group(0))), tag_run(vr, 'subject'), tab_run(vr)], [720, 9070])
+            new = rebuild(p, [rs[0].group(0), *gap(1, a), tag_run(vr, 'subject'), tab_run(vr, tiny=False)], [720, 9070])
         if new:
             out = out[:m.start()] + new + out[m.end():]
             done += 1
