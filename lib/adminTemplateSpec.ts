@@ -14,6 +14,8 @@ export type PaperKey = 'a4' | 'letter';
 export interface AdminTemplateSpec {
   /** ขนาดกระดาษตามต้นฉบับ: บันทึกข้อความตั้ง Letter ที่เหลือ A4 (ค่าเริ่มต้น) */
   paper?: PaperKey;
+  /** บันทึกข้อความ: จุดสิ้นสุดเส้นประหัวเรื่อง (twips จากขอบซ้ายเนื้อหา) ไม่กำหนด = ชิดขอบขวา */
+  headerFillTwips?: number;
   margins: TemplateMarginsMm;
   /** ขอบบนเฉพาะหน้าแรก (มม.) ใช้เมื่อหัวเอกสารอยู่สูงกว่าขอบบนของหน้าถัดไป ต้นฉบับบันทึกข้อความวางครุฑสูงกว่าขอบ */
   firstPageTop?: number;
@@ -59,11 +61,19 @@ export function getPaper(category = 'memo') {
     : { key: 'a4' as const, label: 'A4', cssSize: 'A4 portrait', mm: A4_MM, twips: A4_TWIPS };
 }
 
+/** จุดสิ้นสุดเส้นประหัวเรื่องบันทึกข้อความ (twips) ใช้ทั้งแม่แบบ Word และตัวสร้างสำรอง */
+export function getHeaderFillTwips(category = 'memo'): number {
+  const spec = getTemplateSpec(category);
+  const m = wordMargin(spec.margins);
+  return spec.headerFillTwips ?? getPaper(category).twips.width - m.left - m.right - 1;
+}
+
 const SIDE = { right: 20, left: 30 };
 
 const SPECS: Record<string, AdminTemplateSpec> = {
   // ต้นฉบับบันทึกข้อความตั้งกระดาษ Letter (12240 x 15840 twips)
-  memo: { paper: 'letter', margins: { top: 25, bottom: 22.5, ...SIDE }, firstPageTop: 16.5 },
+  // เส้นประหัวเรื่องในต้นฉบับจบที่ 19.51 ซม. จากขอบกระดาษ (วัดจาก PDF ที่ Word พิมพ์) = 9360 twips จากขอบเนื้อหา
+  memo: { paper: 'letter', headerFillTwips: 9360, margins: { top: 25, bottom: 22.5, ...SIDE }, firstPageTop: 16.5 },
   memo_circular: { margins: { top: 20, bottom: 20, ...SIDE }, firstPageTop: 16 },
   order: {
     margins: { top: 17.5, bottom: 20, ...SIDE },

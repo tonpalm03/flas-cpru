@@ -201,7 +201,7 @@ def write(dst, files, infos):
 
 
 os.makedirs(OUT, exist_ok=True)
-memo_template(f'{ROOT}/{SOURCES["memo"]}', f'{OUT}/memo.docx', LETTER, 9404)  # 12240 - 1701 - 1134 - 1
+memo_template(f'{ROOT}/{SOURCES["memo"]}', f'{OUT}/memo.docx', LETTER, 9360)  # ตรงกับ headerFillTwips ใน lib/adminTemplateSpec.ts
 memo_template(f'{ROOT}/{SOURCES["memo_circular"]}', f'{OUT}/memo_circular.docx')
 leading_template(f'{ROOT}/{SOURCES["external"]}', f'{OUT}/external.docx', 'ที่ อว')
 leading_template(f'{ROOT}/{SOURCES["external_circular"]}', f'{OUT}/external_circular.docx', 'ที่ อว')

@@ -1,7 +1,7 @@
 import type { AdminDocCategory, AdminDocRegistryRecord } from './types';
 import { PAGE_BREAK_XML, blocksToWordXml, loadWordTemplate, renderWordTemplate, xmlImagePara, xmlPara, xmlRun, xmlTab, type TemplateImage, type XmlParaOptions } from './wordTemplate';
 import { INDENT_STEP_MM, INDENT_STEP_TWIPS, getBodyBlocks, newBlock, type RichBlock } from './richBody';
-import { cssMargin, getPaper, getTemplateSpec, mmToTwips, wordMargin } from './adminTemplateSpec';
+import { cssMargin, getHeaderFillTwips, getPaper, getTemplateSpec, mmToTwips, wordMargin } from './adminTemplateSpec';
 
 export function garudaPath(category: string, garudaImage?: string) {
   if (garudaImage) return garudaImage;
@@ -1008,7 +1008,7 @@ export async function buildAdminWord(r: AdminDocRegistryRecord): Promise<Blob> {
         ],
         tabStops: [
           ...(gap === 'tab' ? [{ type: TabStopType.LEFT, position: 720 }] : []),
-          { type: TabStopType.RIGHT, position: isHalfCell ? 4500 : 9070 }
+          { type: TabStopType.RIGHT, position: isHalfCell ? 4500 : getHeaderFillTwips(r.category) }
         ],
         spacing: { line: 520, lineRule: LineRuleType.EXACT, after: 0 }
       });

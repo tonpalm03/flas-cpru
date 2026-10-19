@@ -775,6 +775,11 @@ async function runAllTests() {
   assert.ok(memoDoc.includes('<w:b/>') && memoDoc.includes('w:val="center"'), 'rich body formatting carried into WordprocessingML');
   assert.ok(memoDoc.includes('อ้างถึง') && memoDoc.includes('สิ่งที่ส่งมาด้วย') && memoDoc.includes('ผู้ประสานงาน ทดสอบ'), 'optional reference, attachments and coordinator are rendered');
   assert.ok(/w:w="12240"[^>]*w:h="15840"/.test(memoDoc), 'memo template page size is Letter like the original');
+  {
+    const { getHeaderFillTwips } = require('../lib/adminTemplateSpec.ts');
+    const memoHeader = Object.keys(memoZip.files).filter(n => /^word\/header\d*\.xml$/.test(n)).map(n => memoZip.file(n).asText()).join('');
+    assert.ok(memoHeader.includes(`w:pos="${getHeaderFillTwips('memo')}"`), 'memo header fill lines end where the original does (spec headerFillTwips)');
+  }
   assert.ok(memoZip.file('word/footer1.xml').asText().includes('CPRU-66-001'), 'footer code comes from the original file');
   const noTemplateBlob = await buildAdminWord({ ...memoRecord, category: 'order', bodyHtml: undefined });
   assert.ok(noTemplateBlob.size > 1000, 'categories without a template still use the generated document');
