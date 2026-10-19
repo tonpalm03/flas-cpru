@@ -857,6 +857,21 @@ async function runAllTests() {
   assert.ok(signedZip.file('word/media/rIdSignature1.png'), 'e-signature image embedded in the package');
   assert.ok(signedZip.file('word/_rels/document.xml.rels').asText().includes('rIdSignature1'), 'e-signature relationship registered');
   assert.ok(signedZip.file('word/document.xml').asText().includes('r:embed="rIdSignature1"'), 'e-signature drawing placed above the signatory name');
+  {
+    // ลงนาม = ประทับลายเซ็นลอยเหนือชื่อ ชื่อ/ตำแหน่งในเอกสารไม่เปลี่ยน ระยะก่อนชื่อเท่าเดิม
+    const { isSamePerson } = require('../lib/adminDocument.ts');
+    const signedRec = { ...baseRec, category: 'external', signatureUrl: tinyPng, signedByName: 'tonpalm03@cpru.ac.th', signedByPosition: 'แอดมิน' };
+    const sx = new PizZip(Buffer.from(await (await buildAdminWord(signedRec)).arrayBuffer())).file('word/document.xml').asText();
+    const ux = new PizZip(Buffer.from(await (await buildAdminWord({ ...baseRec, category: 'external' })).arrayBuffer())).file('word/document.xml').asText();
+    assert.ok(sx.includes('<wp:anchor') && /<wp:anchor(?:(?!<\/w:drawing>).)*<wp:wrapNone\/>/.test(sx), 'signature floats (wrapNone) so it does not push text');
+    assert.ok(sx.includes('ผู้ช่วยศาสตราจารย์ ดร.สิริศักดิ์ อาจวิชัย') && !sx.includes('tonpalm03@cpru.ac.th'), 'printed name stays the drafted signatory, not the signer account');
+    const spacing = x => (x.match(/<w:spacing w:before="(\d+)"[^>]*\/><w:ind w:left="\d+"\/><w:jc w:val="center"\/><\/w:pPr>(?:<w:r><w:drawing>.*?<\/w:drawing><\/w:r>)?<w:r><w:rPr>(?:(?!<\/w:rPr>).)*<\/w:rPr><w:t xml:space="preserve">\(/) || [])[1];
+    assert.ok(spacing(ux), 'found the signatory name paragraph');
+    assert.equal(spacing(sx), spacing(ux), 'space before the name is the same signed or unsigned');
+    const sh = documentHtml(signedRec, 'http://localhost');
+    assert.ok(sh.includes('(ผู้ช่วยศาสตราจารย์ ดร.สิริศักดิ์ อาจวิชัย)') && !sh.includes('(tonpalm03@cpru.ac.th)'), 'preview prints the drafted signatory');
+    assert.ok(isSamePerson('ผู้ช่วยศาสตราจารย์ ดร.สิริศักดิ์  อาจวิชัย', 'ผศ.ดร.สิริศักดิ์ อาจวิชัย') && !isSamePerson('ผศ.ดร.สิริศักดิ์ อาจวิชัย', 'tonpalm03@cpru.ac.th'), 'name matching ignores academic titles');
+  }
   assert.ok(/Extension="png"/i.test(signedZip.file('[Content_Types].xml').asText()), 'png content type registered');
   console.log(' PASS: All five categories export from templates; circulars repeat per recipient; e-signature embedded.');
 

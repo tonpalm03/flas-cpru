@@ -33,7 +33,8 @@ import {
   exportAdminPdf, 
   exportAdminWord,
   getDisplayDocNumber,
-  formatDocDigits
+  formatDocDigits,
+  isSamePerson
 } from '@/lib/adminDocument';
 import {
   getWorkflowConfig,
@@ -328,9 +329,14 @@ export default function AdminRegistryTable({
   async function handleSign(r: AdminDocRegistryRecord) {
     if (!currentUser || busy) return;
     
-    let confirmText = `ยืนยันลงนามอิเล็กทรอนิกส์ (e-Signature) ในเอกสาร ${r.docNumber || r.subject} ในนาม "${currentUser.name}" (${currentUser.position || 'ผู้ลงนาม'}) ใช่หรือไม่?`;
+    // ลงนาม = ประทับรูปลายเซ็นเหนือชื่อผู้ลงนามที่ระบุในเอกสาร ชื่อและตำแหน่งในเอกสารไม่เปลี่ยน
+    const printedName = r.signatoryName || '';
+    let confirmText = `ยืนยันประทับลายเซ็นอิเล็กทรอนิกส์ (e-Signature) ในเอกสาร ${r.docNumber || r.subject} เหนือชื่อ "${printedName || currentUser.name}" ใช่หรือไม่?`;
+    if (printedName && !isSamePerson(printedName, currentUser.name)) {
+      confirmText = `คำเตือน: ลายเซ็นของท่าน (${currentUser.name}) จะถูกประทับเหนือชื่อ "${printedName}" ซึ่งไม่ใช่ชื่อของท่าน\n\nต้องการดำเนินการต่อหรือไม่?`;
+    }
     if (!currentUser.signatureUrl) {
-      confirmText += `\n\nหมายเหตุ: ท่านยังไม่ได้อัปโหลดรูปลายเซ็นโปร่งใสไว้ในระบบ (ตั้งค่าได้ที่หน้า "ตั้งค่า > ข้อมูลส่วนตัว") ระบบจะประทับชื่อและวันที่ดิจิทัลให้`;
+      confirmText += `\n\nหมายเหตุ: ท่านยังไม่ได้อัปโหลดรูปลายเซ็นโปร่งใสไว้ในระบบ (ตั้งค่าได้ที่หน้า "ตั้งค่า > ข้อมูลส่วนตัว") ระบบจะบันทึกการลงนามโดยไม่มีรูปลายเซ็น`;
     }
 
     if (!confirm(confirmText)) return;
@@ -343,8 +349,9 @@ export default function AdminRegistryTable({
         signatureUrl: currentUser.signatureUrl || r.signatureUrl,
         signedAt: bangkokDate(),
         signedById: currentUser.id,
+        // ผู้กดลงนามเก็บไว้เป็นประวัติ (ไม่พิมพ์ลงเอกสาร)
         signedByName: currentUser.name,
-        signedByPosition: currentUser.position || r.signatoryPosition || ''
+        signedByPosition: currentUser.position || ''
       };
 
       await saveAdminRecord(updatedRecord, currentUser, crypto.randomUUID(), r);

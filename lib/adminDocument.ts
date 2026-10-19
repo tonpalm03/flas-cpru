@@ -1,7 +1,7 @@
 import type { AdminDocCategory, AdminDocRegistryRecord } from './types';
-import { PAGE_BREAK_XML, blocksToWordXml, loadWordTemplate, renderWordTemplate, xmlImagePara, xmlPara, xmlRun, xmlTab, type TemplateImage, type XmlParaOptions } from './wordTemplate';
+import { PAGE_BREAK_XML, blocksToWordXml, imagePixelSize, loadWordTemplate, renderWordTemplate, xmlFloatingImageRun, xmlPara, xmlRun, xmlTab, type TemplateImage, type XmlParaOptions } from './wordTemplate';
 import { INDENT_STEP_MM, INDENT_STEP_TWIPS, getBodyBlocks, newBlock, type RichBlock } from './richBody';
-import { cssMargin, getHeaderFillTwips, getPaper, getTemplateSpec, mmToTwips, wordMargin } from './adminTemplateSpec';
+import { SIGNATURE_BOX, cssMargin, fitSignatureMm, getHeaderFillTwips, getPaper, getTemplateSpec, mmToTwips, wordMargin } from './adminTemplateSpec';
 
 export function garudaPath(category: string, garudaImage?: string) {
   if (garudaImage) return garudaImage;
@@ -62,6 +62,44 @@ export function formatSignatoryName(name: string): string {
   const trimmed = (name || '').trim();
   if (!trimmed) return '';
   return trimmed.replace(/\s+/g, ' ');
+}
+
+/**
+ * ตำแหน่งรูปลายเซ็นลอยเหนือชื่อผู้ลงนาม (มม.): กึ่งกลางตรงกับชื่อ (ช่วงหลังเยื้องบล็อกลงนาม)
+ * ขอบล่างของรูปอยู่เหนือตัวอักษรของชื่อ SIGNATURE_BOX.gapAboveNameMm
+ * top วัดจากบนบรรทัดชื่อ (ติดลบ = เหนือบรรทัด) ตัวอักษรเริ่มต่ำกว่าบนบรรทัด NAME_GLYPH_TOP_MM
+ * ใน Word ตำแหน่ง "line" นับจากบนระยะเว้นก่อนย่อหน้า จึงต้องบวกระยะเว้นก่อนชื่อ (spaceBeforeMm)
+ */
+// วัดจาก Word และ Chrome: ขอบบนตัวอักษรของชื่อเทียบกับจุดอ้างอิงของแต่ละโปรแกรม
+const NAME_GLYPH_TOP_MM = { word: 0.15, html: -0.12 };
+// Word วางรูปตามบรรทัดโดยหักระยะเว้นหลังย่อหน้าก่อนหน้า ("ขอแสดงความนับถือ"/"สั่ง ณ วันที่" เว้นหลัง 3 พอยต์)
+const PREV_SPACE_AFTER_MM = 60 / 56.693;
+export function signaturePlacementMm(category: string, size: { width: number; height: number }, target: 'word' | 'html', spaceBeforeMm = 0) {
+  const spec = getTemplateSpec(category);
+  const textWidth = getPaper(category).mm.width - spec.margins.left - spec.margins.right;
+  const centre = spec.sign.indentMm + (textWidth - spec.sign.indentMm) / 2;
+  const prevAfter = target === 'word' && category !== 'memo' && category !== 'memo_circular' ? PREV_SPACE_AFTER_MM : 0;
+  return { left: centre - size.width / 2, top: spaceBeforeMm - prevAfter + NAME_GLYPH_TOP_MM[target] - SIGNATURE_BOX.gapAboveNameMm - size.height };
+}
+
+/** ชื่อเดียวกันหรือไม่ โดยไม่สนคำนำหน้า/ตำแหน่งวิชาการ (ผศ. = ผู้ช่วยศาสตราจารย์, ดร., นาย ฯลฯ) และช่องว่าง */
+export function isSamePerson(a: string, b: string): boolean {
+  const key = (n: string) => {
+    let s = (n || '').replace(/[\s.]/g, '');
+    const prefixes = ['ผู้ช่วยศาสตราจารย์', 'รองศาสตราจารย์', 'ศาสตราจารย์', 'ผศ', 'รศ', 'ดร', 'นางสาว', 'นาง', 'นาย', 'อาจารย์'];
+    for (let changed = true; changed; ) {
+      changed = false;
+      for (const p of prefixes) {
+        if (s.startsWith(p) && s.length > p.length + 2) {
+          s = s.slice(p.length);
+          changed = true;
+        }
+      }
+    }
+    return s;
+  };
+  const ka = key(a);
+  return ka !== '' && ka === key(b);
 }
 
 export function sanitizeFieldText(text: string, keyword?: string): string {
@@ -215,8 +253,8 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
   const digitType = getRecordDigitType(r);
   const displayDigits = (t: string) => formatDocDigits(t, digitType);
 
-  const formattedSignatory = formatSignatoryName(r.signedByName || r.signatoryName || '');
-  const signatoryPos = r.signedByPosition || r.signatoryPosition || '';
+  const formattedSignatory = formatSignatoryName(r.signatoryName || r.signedByName || '');
+  const signatoryPos = r.signatoryPosition || r.signedByPosition || '';
   const cleanSubject = sanitizeFieldText(r.subject, 'เรื่อง');
   const cleanReference = sanitizeFieldText(r.referenceDoc || '', 'อ้างถึง');
   const displayNum = getDisplayDocNumber(r);
@@ -274,7 +312,8 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
   const signGapMm = (isOrder ? orderLayout.signGapMm : letter ? letter.signGapMm : sign.gapMm ?? 36.25) + tune.signAdjMm;
   // กล่องลงนามจัดกึ่งกลางในช่วงหลังเยื้อง เหมือนย่อหน้า Word ที่เยื้องซ้ายแล้วจัดกึ่งกลาง
   const signBox = `margin-left: ${sign.indentMm}mm;`;
-  const closingBox = `margin-left: ${sign.closingIndentMm ?? sign.indentMm}mm;`; // ตราครุฑบันทึกข้อความอยู่สูงจากขอบกระดาษ 1 ซม. ตามต้นฉบับ
+  const closingBox = `margin-left: ${sign.closingIndentMm ?? sign.indentMm}mm;`;
+  const sigBox = signaturePlacementMm(r.category, { width: SIGNATURE_BOX.maxWidthMm, height: SIGNATURE_BOX.maxHeightMm }, 'html'); // ตราครุฑบันทึกข้อความอยู่สูงจากขอบกระดาษ 1 ซม. ตามต้นฉบับ
 
   return `<!doctype html>
 <html lang="th">
@@ -499,13 +538,13 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
       break-inside: avoid;
       page-break-inside: avoid;
     }
-    /* ขนาดเดียวกับรูปลายเซ็นในไฟล์ Word (140 x 48 px) */
+    /* กรอบลายเซ็นเท่ากับในไฟล์ Word: รูปย่อตามสัดส่วนให้พอดีกรอบ ชิดขอบล่างและกึ่งกลาง */
     .sig-img {
-      width: 37mm;
-      height: 12.7mm;
-      object-fit: fill;
-      margin: 0 auto;
-      display: block;
+      position: absolute;
+      width: ${SIGNATURE_BOX.maxWidthMm}mm;
+      height: ${SIGNATURE_BOX.maxHeightMm}mm;
+      object-fit: contain;
+      object-position: center bottom;
     }
     .footer-memo {
       position: absolute;
@@ -648,10 +687,9 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
 
     ${!isMemo && !isOrder ? `<div class="ext-closing" style="${closingBox} margin-top: ${((letter?.closingGapMm ?? 4.2) + (tune.closingAdjMm ?? 0)).toFixed(1)}mm;">ขอแสดงความนับถือ</div>` : ''}
 
-    <!-- ระยะเท่าย่อหน้า Word: มีรูปลายเซ็น = เว้น 12 พอยต์ + รูป 140x48 px + 6 พอยต์ ไม่มีรูป = ระยะก่อนชื่อตาม spec -->
-    <div class="signature-container" style="${signBox} margin-top: ${r.signatureUrl ? 4.2 : signGapMm.toFixed(1)}mm;">
-      ${r.signatureUrl ? `<img class="sig-img" src="${escape(absUrl(r.signatureUrl))}" alt="ลายเซ็น" />` : ''}
-      <p style="font-size: 16pt; font-weight: normal; margin: ${r.signatureUrl ? 1.2 : 0}mm 0 0; line-height: ${WORD_LH}; color: #000;">(${escape(displayDigits(formattedSignatory))})</p>
+    <!-- ระยะก่อนชื่อตามแม่แบบเสมอ รูปลายเซ็นลอยเหนือชื่อ (กรอบ 4 x 1.5 ซม. ย่อตามสัดส่วน ชิดล่างกึ่งกลาง) ไม่ดันข้อความ เหมือนไฟล์ Word -->
+    <div class="signature-container" style="${signBox} margin-top: ${signGapMm.toFixed(1)}mm;">
+      <p style="position: relative; font-size: 16pt; font-weight: normal; margin: 0; line-height: ${WORD_LH}; color: #000;">${r.signatureUrl ? `<img class="sig-img" style="left: ${(sigBox.left - sign.indentMm).toFixed(2)}mm; top: ${sigBox.top.toFixed(2)}mm;" src="${escape(absUrl(r.signatureUrl))}" alt="ลายเซ็น" />` : ''}(${escape(displayDigits(formattedSignatory))})</p>
       <p style="font-size: 16pt; font-weight: normal; margin: ${sign.positionGapMm ?? 0}mm 0 0; white-space: pre-line; line-height: ${WORD_LH}; color: #000;">${escape(displayDigits(signatoryPos))}</p>
     </div>
 
@@ -770,8 +808,8 @@ async function buildFromTemplate(r: AdminDocRegistryRecord): Promise<Blob | null
     const reference = sanitizeFieldText(r.referenceDoc || '', 'อ้างถึง');
     const subject = sanitizeFieldText(r.subject, 'เรื่อง');
     const docNumber = getDisplayDocNumber(r);
-    const signatory = formatSignatoryName(r.signedByName || r.signatoryName || '');
-    const position = r.signedByPosition || r.signatoryPosition || '';
+    const signatory = formatSignatoryName(r.signatoryName || r.signedByName || '');
+    const position = r.signatoryPosition || r.signedByPosition || '';
     const blocks = getBodyBlocks(r);
 
     const images: TemplateImage[] = [];
@@ -796,12 +834,14 @@ async function buildFromTemplate(r: AdminDocRegistryRecord): Promise<Blob | null
     const signIndent = mmToTwips(sign.indentMm);
     const closingIndent = mmToTwips(sign.closingIndentMm ?? sign.indentMm);
     const signGap = isOrder ? orderLayout.signGapMm : letter ? letter.signGapMm : sign.gapMm ?? 36.25;
+    // ลายเซ็นลอยเหนือชื่อ ไม่ดันข้อความ ระยะและตำแหน่งชื่อคงตามแม่แบบเสมอ
+    const sigSize = images.length ? fitSignatureMm(imagePixelSize(images[0].bytes)) : null;
+    const sigPos = sigSize ? signaturePlacementMm(r.category, sigSize, 'word', signGap) : null;
     const signatureXml = () =>
-      (images.length ? xmlImagePara('rIdSignature1', 140, 48, { align: 'center', left: signIndent, before: 240, after: 60, keepNext: true }) : '') +
-      xmlPara(xmlRun(`(${display(signatory)})`), {
+      xmlPara((sigSize && sigPos ? xmlFloatingImageRun('rIdSignature1', sigSize.width, sigSize.height, sigPos.left, sigPos.top) : '') + xmlRun(`(${display(signatory)})`), {
         align: 'center',
         left: signIndent,
-        before: images.length ? 60 : mmToTwips(signGap),
+        before: mmToTwips(signGap),
         keepNext: true
       }) +
       xmlPara(xmlRun(display(position)), { align: 'center', left: signIndent, before: mmToTwips(sign.positionGapMm ?? 0) });
@@ -954,8 +994,8 @@ export async function buildAdminWord(r: AdminDocRegistryRecord): Promise<Blob> {
   const font = 'TH SarabunPSK';
   const digitType = getRecordDigitType(r);
   const display = (text: string) => formatDocDigits(text, digitType);
-  const formattedSignatory = formatSignatoryName(r.signedByName || r.signatoryName || '');
-  const signatoryPos = r.signedByPosition || r.signatoryPosition || '';
+  const formattedSignatory = formatSignatoryName(r.signatoryName || r.signedByName || '');
+  const signatoryPos = r.signatoryPosition || r.signedByPosition || '';
   const cleanSubject = sanitizeFieldText(r.subject, 'เรื่อง');
   const cleanReference = sanitizeFieldText(r.referenceDoc || '', 'อ้างถึง');
   const displayNum = getDisplayDocNumber(r);
@@ -1028,28 +1068,31 @@ export async function buildAdminWord(r: AdminDocRegistryRecord): Promise<Blob> {
       spacing
     });
 
-  // Signature block
+  // Signature block: ลายเซ็นลอยเหนือชื่อ ระยะตามแม่แบบเสมอ (ชุดเดียวกับแม่แบบ Word)
+  const sigSize = signatureBytes ? fitSignatureMm(imagePixelSize(new Uint8Array(signatureBytes))) : null;
+  const sigSpaceBeforeMm = isOrder ? orderLayout.signGapMm : letterSpec ? letterSpec.signGapMm : signSpec.gapMm ?? 36.25;
+  const sigPos = sigSize ? signaturePlacementMm(r.category, sigSize, 'word', sigSpaceBeforeMm) : null;
   const signatureParagraphs = [
-    ...(signatureBytes ? [
-      new Paragraph({
-        alignment: AlignmentType.CENTER,
-        indent: { left: sigIndent },
-        children: [
-          new ImageRun({
-            type: 'png',
-            data: signatureBytes,
-            transformation: { width: 140, height: 48 }
-          })
-        ],
-        spacing: { before: 240, after: 60 },
-        keepNext: true
-      })
-    ] : []),
-    para('(' + formattedSignatory + ')', {
+    new Paragraph({
       alignment: AlignmentType.CENTER,
       indent: { left: sigIndent },
       keepNext: true,
-      spacing: { before: signatureBytes ? 60 : (isOrder ? mmToTwips(orderLayout.signGapMm) : letterSpec ? mmToTwips(letterSpec.signGapMm) : mmToTwips(signSpec.gapMm ?? 36.25)), after: 0, ...SINGLE }
+      spacing: { before: isOrder ? mmToTwips(orderLayout.signGapMm) : letterSpec ? mmToTwips(letterSpec.signGapMm) : mmToTwips(signSpec.gapMm ?? 36.25), after: 0, ...SINGLE },
+      children: [
+        ...(signatureBytes && sigSize && sigPos ? [new ImageRun({
+          type: 'png',
+          data: signatureBytes,
+          transformation: { width: Math.round(sigSize.width * 96 / 25.4), height: Math.round(sigSize.height * 96 / 25.4) },
+          floating: {
+            horizontalPosition: { relative: HorizontalPositionRelativeFrom.MARGIN, offset: Math.round(sigPos.left * 36000) },
+            verticalPosition: { relative: VerticalPositionRelativeFrom.LINE, offset: Math.round(sigPos.top * 36000) },
+            wrap: { type: TextWrappingType.NONE },
+            allowOverlap: true,
+            behindDocument: false
+          }
+        })] : []),
+        run('(' + formattedSignatory + ')')
+      ]
     }),
     para(signatoryPos.replace(/\s*ปฏิบัติราชการแทน\s*/, ' ปฏิบัติราชการแทน\n').replace(/\s*รักษาราชการแทน\s*/, ' รักษาราชการแทน\n'), {
       alignment: AlignmentType.CENTER,

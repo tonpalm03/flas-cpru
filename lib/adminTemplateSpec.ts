@@ -139,3 +139,17 @@ export function wordMargin(m: TemplateMarginsMm) {
     left: mmToTwips(m.left)
   };
 }
+
+/**
+ * รูปลายเซ็น e-Signature: ประทับเหนือชื่อผู้ลงนามแบบลอย ไม่ดันข้อความ ชื่อและระยะคงตามต้นแบบ
+ * ย่อ/ขยายตามสัดส่วนให้พอดีกรอบ กว้างไม่เกิน 4 ซม. สูงไม่เกิน 1.5 ซม. ขอบล่างเหนือตัวอักษรของชื่อ 1 มม.
+ */
+export const SIGNATURE_BOX = { maxWidthMm: 40, maxHeightMm: 15, gapAboveNameMm: 1 } as const;
+
+/** ขนาดรูปลายเซ็น (มม.) ตามสัดส่วนรูปจริง ไม่ทราบขนาดรูปใช้เต็มกรอบ */
+export function fitSignatureMm(px?: { width: number; height: number } | null): { width: number; height: number } {
+  const { maxWidthMm: W, maxHeightMm: H } = SIGNATURE_BOX;
+  if (!px || px.width <= 0 || px.height <= 0) return { width: W, height: H };
+  const scale = Math.min(W / px.width, H / px.height);
+  return { width: px.width * scale, height: px.height * scale };
+}

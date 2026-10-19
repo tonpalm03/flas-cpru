@@ -100,7 +100,49 @@ export function xmlImagePara(rId: string, widthPx: number, heightPx: number, o: 
   return xmlPara(drawing, o);
 }
 
-export const PAGE_BREAK_XML = '<w:p><w:r><w:br w:type="page"/></w:r></w:p>';
+/** ขนาดรูป (พิกเซล) จากส่วนหัวไฟล์ PNG หรือ JPEG ไม่รู้จักคืน null */
+export function imagePixelSize(bytes: Uint8Array): { width: number; height: number } | null {
+  if (bytes.length > 24 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) {
+    const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    return { width: dv.getUint32(16), height: dv.getUint32(20) };
+  }
+  if (bytes[0] === 0xff && bytes[1] === 0xd8) {
+    let i = 2;
+    while (i + 9 < bytes.length) {
+      if (bytes[i] !== 0xff) { i++; continue; }
+      const marker = bytes[i + 1];
+      const len = (bytes[i + 2] << 8) | bytes[i + 3];
+      if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) {
+        return { width: (bytes[i + 7] << 8) | bytes[i + 8], height: (bytes[i + 5] << 8) | bytes[i + 6] };
+      }
+      i += 2 + len;
+    }
+  }
+  return null;
+}
+
+/**
+ * รันรูปลอย (ไม่ดันข้อความ) วางตามระยะจากขอบเนื้อหาซ้าย (มม.) และจากบนบรรทัดที่ยึด (มม. ติดลบ = เหนือบรรทัด)
+ * ใช้ประทับลายเซ็นเหนือชื่อผู้ลงนามโดยไม่เปลี่ยนระยะของแม่แบบ
+ */
+export function xmlFloatingImageRun(rId: string, widthMm: number, heightMm: number, leftMm: number, topMm: number): string {
+  const emu = (mm: number) => Math.round(mm * 36000);
+  const cx = emu(widthMm);
+  const cy = emu(heightMm);
+  return (
+    `<w:r><w:drawing><wp:anchor xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" distT="0" distB="0" distL="0" distR="0" simplePos="0" relativeHeight="251659264" behindDoc="0" locked="0" layoutInCell="1" allowOverlap="1">` +
+    `<wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="margin"><wp:posOffset>${emu(leftMm)}</wp:posOffset></wp:positionH>` +
+    `<wp:positionV relativeFrom="line"><wp:posOffset>${emu(topMm)}</wp:posOffset></wp:positionV>` +
+    `<wp:extent cx="${cx}" cy="${cy}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:wrapNone/><wp:docPr id="9002" name="Signature"/><wp:cNvGraphicFramePr/>` +
+    `<a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">` +
+    `<pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="0" name="signature"/><pic:cNvPicPr/></pic:nvPicPr>` +
+    `<pic:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="${rId}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>` +
+    `<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic>` +
+    `</a:graphicData></a:graphic></wp:anchor></w:drawing></w:r>`
+  );
+}
+
+export const PAGE_BREAK_XML ='<w:p><w:r><w:br w:type="page"/></w:r></w:p>';
 
 /** แทนค่าในแม่แบบ: ค่าธรรมดาใช้ {{tag}} ค่า XML ใช้ {{@tag}} ลูปใช้ {{#list}}...{{/list}} */
 export async function renderWordTemplate(

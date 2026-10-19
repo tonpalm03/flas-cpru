@@ -18,7 +18,9 @@ const mod = require(path.join(root, 'lib', 'adminDocument.ts'));
 // DUMP_SIGNED=1: ใส่รูปลายเซ็นตัวอย่าง (PNG 1x1) ให้เอกสารเพื่อตรวจระยะบล็อกลงนามแบบมีรูป
 const SIGNED = process.env.DUMP_SIGNED === '1';
 const TEST_SIGNATURE = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
-const withSig = r => (SIGNED && String(r.id).startsWith('real-') ? { ...r, signatureUrl: TEST_SIGNATURE } : r);
+// DUMP_SIGNATURE=<ไฟล์ PNG>: ใช้รูปลายเซ็นจริงแทนรูปตัวอย่าง
+const SIGNATURE = process.env.DUMP_SIGNATURE ? 'data:image/png;base64,' + fs.readFileSync(process.env.DUMP_SIGNATURE).toString('base64') : TEST_SIGNATURE;
+const withSig = r => (SIGNED && String(r.id).startsWith('real-') ? { ...r, signatureUrl: SIGNATURE } : r);
 const original = mod.buildAdminWord;
 mod.buildAdminWord = async function (r) {
   const blob = await original(withSig(r));
