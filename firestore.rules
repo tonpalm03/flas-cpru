@@ -264,6 +264,42 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // 20.1 สิทธิ์การแก้ไขโมดูลธุรการ (จดหมายข่าว วาระการประชุม ตารางงาน)
+    // ทุกคนที่ล็อกอินอ่านได้ ผู้แก้ไขเป็นไปตามยศที่แอดมินกำหนดใน system_module_permissions
+    function moduleEditorRoles(moduleKey) {
+      return exists(/databases/$(database)/documents/system_module_permissions/$(moduleKey))
+        ? get(/databases/$(database)/documents/system_module_permissions/$(moduleKey)).data.editorRoles
+        : ['แอดมิน', 'ธุรการ'];
+    }
+
+    function canEditModule(moduleKey) {
+      return isAuthenticated() && (
+        isAdmin() ||
+        (isClerk() && ('ธุรการ' in moduleEditorRoles(moduleKey))) ||
+        (getUserData().keys().hasAny(['roles']) && getUserData().roles.hasAny(moduleEditorRoles(moduleKey)))
+      );
+    }
+
+    match /system_module_permissions/{moduleKey} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /admin_newsletters/{itemId} {
+      allow read: if isAuthenticated();
+      allow write: if canEditModule('newsletter');
+    }
+
+    match /admin_meetings/{itemId} {
+      allow read: if isAuthenticated();
+      allow write: if canEditModule('meetings');
+    }
+
+    match /admin_calendar_events/{itemId} {
+      allow read: if isAuthenticated();
+      allow write: if canEditModule('calendar');
+    }
+
     match /admin_doc_registry/{docId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated() && (

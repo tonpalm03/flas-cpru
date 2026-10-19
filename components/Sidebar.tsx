@@ -10,6 +10,7 @@ import {
   GraduationCap
 } from "lucide-react";
 import { useRole } from "./RoleContext";
+import { ADMIN_MODULES } from "@/lib/modulePermissionService";
 import { DynamicNavIcon } from "./DynamicNavIcon";
 import { getNavigationLayout, DEFAULT_NAVIGATION_SECTIONS } from "@/lib/navigationService";
 import { getAdminCategories } from "@/lib/adminCategoryService";
@@ -128,6 +129,15 @@ export default function Sidebar() {
             let subItemsToRender: Array<{ id?: string; title: string; href: string; badge?: string }> = [
               ...(section.subItems || [])
             ];
+
+            // เมนูโมดูลธุรการที่กำหนดในโค้ด: แสดงเสมอแม้ผังเมนูที่บันทึกไว้เดิมยังไม่มี
+            if (section.key === "admin") {
+              for (const mod of ADMIN_MODULES) {
+                if (!subItemsToRender.some((s) => s.href === mod.href)) {
+                  subItemsToRender.push({ id: `mod_${mod.key}`, title: mod.title, href: mod.href });
+                }
+              }
+            }
 
             if (section.key === "admin" && customCategories.length > 0) {
               const customCategoryLinks = customCategories.map((c) => ({

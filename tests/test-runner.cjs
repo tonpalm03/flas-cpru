@@ -690,7 +690,83 @@ async function runAllTests() {
   }
   console.log(' PASS: Rich body sanitized, round-trips, and renders in preview and Word.');
 
-  console.log('\n=== ALL 16 CORE TEST GROUPS PASSED WITH 100% ACCURACY! ===');
+  console.log('\n[TEST 17] Admin Modules: per-module edit permissions, calendar grid, meeting documents:');
+  const mp = require('../lib/modulePermissionService.ts');
+  const cal = require('../lib/calendarService.ts');
+  const meet = require('../lib/meetingService.ts');
+  const news = require('../lib/newsletterService.ts');
+  const store = require('../lib/adminModuleStore.ts');
+  const modDoc = require('../lib/moduleDocument.ts');
+
+  const mkUser = (id, roles, role) => ({ id, name: id, email: id + '@x', role: role || 'lecturer', roles, status: 'active' });
+  const clerk = mkUser('clerk', ['ธุรการ']);
+  const teacher = mkUser('teacher', ['อาจารย์']);
+  const adminU = mkUser('adm', [], 'admin');
+  const dean = mkUser('dean', ['คณบดี']);
+  const inactive = { ...clerk, status: 'suspended' };
+  const defaults = mp.DEFAULT_MODULE_PERMISSIONS.newsletter;
+  assert.equal(mp.canUserEditModule(clerk, defaults), true, 'clerk edits by default');
+  assert.equal(mp.canUserEditModule(teacher, defaults), false, 'teacher cannot edit by default');
+  assert.equal(mp.canUserEditModule(adminU, { ...defaults, editorRoles: [] }), true, 'admin always edits');
+  assert.equal(mp.canUserEditModule(dean, { ...defaults, editorRoles: ['คณบดี'] }), true, 'dean edits when role is granted');
+  assert.equal(mp.canUserEditModule(inactive, defaults), false, 'suspended user cannot edit');
+  assert.equal(mp.canUserEditModule(null, defaults), false, 'anonymous cannot edit');
+  assert.equal(mp.canUserViewModule(teacher), true, 'everyone active can view');
+  assert.deepEqual(mp.normalizeEditorRoles(['ธุรการ', 'ไม่ใช่ยศ']), ['แอดมิน', 'ธุรการ'], 'unknown roles dropped and admin always kept');
+
+  const grid = cal.monthGrid(2026, 1);
+  assert.equal(grid.length, 6, 'six weeks');
+  assert.ok(grid.every(w => w.length === 7), 'seven days per week');
+  assert.equal(grid[0][0].date, '2026-02-01', 'Feb 2026 starts on Sunday');
+  assert.equal(grid.flat().filter(d => d.inMonth).length, 28, 'Feb 2026 has 28 days in month');
+  const evs = [
+    { id: 'a', title: 'ประชุม', category: 'ประชุม', date: '2026-02-10', createdAt: 'x' },
+    { id: 'b', title: 'อบรม', category: 'อบรม/สัมมนา', date: '2026-02-09', endDate: '2026-02-11', createdAt: 'x' }
+  ];
+  assert.deepEqual(cal.eventsOnDate(evs, '2026-02-10').map(e => e.id).sort(), ['a', 'b'], 'multi-day events cover each day');
+  assert.equal(cal.eventsOnDate(evs, '2026-02-12').length, 0, 'no events after end date');
+  assert.ok(cal.validateCalendarEvent({ ...evs[0], endDate: '2026-02-01' }), 'end before start rejected');
+  assert.equal(cal.validateCalendarEvent(evs[1]), null, 'valid event accepted');
+
+  const m = {
+    ...meet.newMeeting({ id: 'u', name: 'n' }, '2026-09-15'),
+    meetingNo: '3/2569',
+    time: '09:00',
+    attendees: 'นาย ก\nนาย ข',
+    agendaItems: [
+      { id: '1', title: 'เรื่องแจ้งเพื่อทราบ', detailHtml: '<p>รายละเอียด</p>', resolutionHtml: '<p>รับทราบ</p>' },
+      { id: '2', title: 'เรื่องเพื่อพิจารณา', detailHtml: '', resolutionHtml: '' }
+    ]
+  };
+  assert.equal(meet.validateMeeting(m), null, 'meeting valid');
+  assert.ok(meet.validateMeeting({ ...m, agendaItems: [{ id: 'z', title: ' ', detailHtml: '', resolutionHtml: '' }] }), 'blank agenda title rejected');
+  const agendaHtml = modDoc.pageHtml('วาระ', meet.agendaParts(m), 'http://localhost');
+  assert.ok(agendaHtml.includes('ระเบียบวาระที่ ๑ เรื่องแจ้งเพื่อทราบ'), 'agenda numbered in Thai digits');
+  assert.equal(agendaHtml.includes('รับทราบ'), false, 'agenda excludes resolutions');
+  const minutesHtml = modDoc.pageHtml('รายงาน', meet.minutesParts(m), 'http://localhost');
+  assert.ok(minutesHtml.includes('มติที่ประชุม') && minutesHtml.includes('รับทราบ'), 'minutes include resolutions');
+  assert.ok(minutesHtml.includes('๑. นาย ก'), 'attendees listed');
+  const wordBlob = await modDoc.buildPartsWord(meet.minutesParts(m));
+  assert.ok(wordBlob.size > 1000, 'minutes Word export builds');
+
+  const n = { ...news.newNewsletter(), title: 'ข่าว', bodyHtml: '<p>เนื้อหา <strong>ข่าว</strong></p>', status: 'เผยแพร่แล้ว', publishedAt: '2026-09-15T00:00:00.000Z' };
+  const draft = { ...n, id: 'd', status: 'ฉบับร่าง' };
+  assert.equal(news.visibleNewsletters([n, draft], false).length, 1, 'viewers see published only');
+  assert.equal(news.visibleNewsletters([n, draft], true).length, 2, 'editors see drafts too');
+  assert.ok(news.validateNewsletter({ ...n, bodyHtml: '' }, true), 'publish requires body');
+  assert.equal(news.validateNewsletter({ ...n, bodyHtml: '' }, false), null, 'draft may be empty');
+  assert.ok(modDoc.pageHtml('ข่าว', news.newsletterParts(n), 'http://localhost').includes('<strong>ข่าว</strong>'), 'newsletter keeps bold');
+  assert.equal(modDoc.pageHtml('x', [{ kind: 'title', text: '<script>alert(1)</script>' }], 'http://localhost').includes('<script>alert'), false, 'titles are escaped');
+
+  const merged = store.mergeItems(
+    [{ id: '1', createdAt: '2026-01-01', updatedAt: '2026-01-02', t: 'local' }, { id: '2', createdAt: '2026-01-01', t: 'gone' }],
+    [{ id: '1', createdAt: '2026-01-01', updatedAt: '2026-01-05', t: 'cloud' }, { id: '3', createdAt: '2026-01-03', t: 'new' }],
+    new Set(['2'])
+  );
+  assert.deepEqual(merged.map(i => i.t).sort(), ['cloud', 'new'], 'merge keeps newest, adds cloud-only, drops deleted');
+  console.log(' PASS: Module permissions, calendar, meetings, newsletters and store merge verified.');
+
+  console.log('\n=== ALL 17 CORE TEST GROUPS PASSED WITH 100% ACCURACY! ===');
 }
 
 runAllTests().catch(err => {
