@@ -721,18 +721,20 @@ async function buildFromTemplate(r: AdminDocRegistryRecord): Promise<Blob | null
         : labelLine(i === 0 ? 'สิ่งที่ส่งมาด้วย' : '', numText, 1417);
     });
 
-    // บล็อกลงนาม: ระยะห่างตามต้นฉบับของแต่ละประเภท มีรูปลายเซ็นจะเว้นเท่ารูป
-    const signIndent = isMemo || isOrder ? 2835 : 2268;
-    const signGap = isOrder ? orderLayout.signGapMm : letter ? letter.signGapMm : 0;
+    // บล็อกลงนาม: ตำแหน่งและระยะห่างตามต้นฉบับของแต่ละประเภท (spec.sign) มีรูปลายเซ็นจะเว้นเท่ารูป
+    const sign = getTemplateSpec(r.category).sign;
+    const signIndent = mmToTwips(sign.indentMm);
+    const closingIndent = mmToTwips(sign.closingIndentMm ?? sign.indentMm);
+    const signGap = isOrder ? orderLayout.signGapMm : letter ? letter.signGapMm : sign.gapMm ?? 36.25;
     const signatureXml = () =>
       (images.length ? xmlImagePara('rIdSignature1', 140, 48, { align: 'center', left: signIndent, before: 240, after: 60, keepNext: true }) : '') +
       xmlPara(xmlRun(`(${display(signatory)})`), {
         align: 'center',
         left: signIndent,
-        before: images.length ? 60 : isMemo ? 2055 : Math.round(signGap * 56.693),
+        before: images.length ? 60 : mmToTwips(signGap),
         keepNext: true
       }) +
-      xmlPara(xmlRun(display(position)), { align: 'center', left: signIndent });
+      xmlPara(xmlRun(display(position)), { align: 'center', left: signIndent, before: mmToTwips(sign.positionGapMm ?? 0) });
     const coordinatorXml = (gapMm?: number) =>
       r.coordinatorInfo ? xmlPara(xmlRun(display(r.coordinatorInfo)), { before: gapMm ? Math.round(gapMm * 56.693) : 240 }) : '';
 
@@ -804,7 +806,7 @@ async function buildFromTemplate(r: AdminDocRegistryRecord): Promise<Blob | null
         ...(reference ? [labelLine('อ้างถึง', reference, 720)] : []),
         ...attachments,
         blocksToWordXml(blocks, display),
-        xmlPara(xmlRun('ขอแสดงความนับถือ'), { align: 'center', left: signIndent, before: letter ? Math.round(letter.closingGapMm * 56.693) : 240, after: 60, keepNext: true }),
+        xmlPara(xmlRun('ขอแสดงความนับถือ'), { align: 'center', left: closingIndent, before: letter ? Math.round(letter.closingGapMm * 56.693) : 240, after: 60, keepNext: true }),
         signatureXml(),
         coordinatorXml(letter?.coordinatorGapMm)
       ];
@@ -887,10 +889,12 @@ export async function buildAdminWord(r: AdminDocRegistryRecord): Promise<Blob> {
   const displayNum = getDisplayDocNumber(r);
   const isMemo = r.category.startsWith('memo');
   const isOrder = r.category === 'order';
-  // กึ่งกลางบล็อกลงนามตามต้นฉบับ: หนังสือภายนอก ~10 ซม. จากขอบซ้าย, บันทึกข้อความ/คำสั่ง ~10.5 ซม.
+  // บล็อกลงนามตามต้นฉบับของแต่ละประเภท (spec.sign) ชุดเดียวกับแม่แบบ Word
   const letterSpec = getTemplateSpec(r.category).letter;
   const orderLayout = getTemplateSpec('order').orderLayout!;
-  const sigIndent = isMemo || isOrder ? 2835 : 2268;
+  const signSpec = getTemplateSpec(r.category).sign;
+  const sigIndent = mmToTwips(signSpec.indentMm);
+  const closingIndent = mmToTwips(signSpec.closingIndentMm ?? signSpec.indentMm);
   const formattedOrderNum = displayNum;
   const pageWidth = getPaper(r.category).twips.width;
   const pageHeight = getPaper(r.category).twips.height;
@@ -973,13 +977,13 @@ export async function buildAdminWord(r: AdminDocRegistryRecord): Promise<Blob> {
       alignment: AlignmentType.CENTER,
       indent: { left: sigIndent },
       keepNext: true,
-      spacing: { before: signatureBytes ? 60 : (isOrder ? mmToTwips(orderLayout.signGapMm) : isMemo ? 2055 : letterSpec ? mmToTwips(letterSpec.signGapMm) : 1000), after: 0, ...SINGLE }
+      spacing: { before: signatureBytes ? 60 : (isOrder ? mmToTwips(orderLayout.signGapMm) : letterSpec ? mmToTwips(letterSpec.signGapMm) : mmToTwips(signSpec.gapMm ?? 36.25)), after: 0, ...SINGLE }
     }),
     para(signatoryPos.replace(/\s*ปฏิบัติราชการแทน\s*/, ' ปฏิบัติราชการแทน\n').replace(/\s*รักษาราชการแทน\s*/, ' รักษาราชการแทน\n'), {
       alignment: AlignmentType.CENTER,
       indent: { left: sigIndent },
       keepLines: true,
-      spacing: { ...SINGLE, after: 0 }
+      spacing: { ...SINGLE, before: mmToTwips(signSpec.positionGapMm ?? 0), after: 0 }
     })
   ];
 
@@ -1311,7 +1315,7 @@ export async function buildAdminWord(r: AdminDocRegistryRecord): Promise<Blob> {
         return extField(i === 0 ? 'สิ่งที่ส่งมาด้วย' : '', numText, 1417);
       }),
       ...getBodyBlocks(r).map(b => body(b)),
-      para('ขอแสดงความนับถือ', { alignment: AlignmentType.CENTER, indent: { left: sigIndent }, keepNext: true, spacing: { before: letterSpec ? mmToTwips(letterSpec.closingGapMm) : 240, after: 60, ...SINGLE } }),
+      para('ขอแสดงความนับถือ', { alignment: AlignmentType.CENTER, indent: { left: closingIndent }, keepNext: true, spacing: { before: letterSpec ? mmToTwips(letterSpec.closingGapMm) : 240, after: 60, ...SINGLE } }),
       ...signatureParagraphs,
       ...(r.coordinatorInfo ? [new Paragraph({
         children: r.coordinatorInfo.split('\n').flatMap((line, idx) => [

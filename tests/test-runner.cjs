@@ -814,6 +814,8 @@ async function runAllTests() {
     assert.ok(x.includes('ด้วยคณะ ทดสอบ') && x.includes('ผู้ช่วยศาสตราจารย์ ดร.สิริศักดิ์ อาจวิชัย'), cat + ': body and signatory placed');
     const paperRe = cat === 'memo' ? /w:w="12240"[^>]*w:h="15840"/ : /w:w="11906"[^>]*w:h="16838"/;
     assert.ok(paperRe.test(x), cat + ': page size follows the original (memo Letter, others A4)');
+    const { getTemplateSpec: specOf, mmToTwips: toTw } = require('../lib/adminTemplateSpec.ts');
+    assert.ok(x.includes(`w:left="${toTw(specOf(cat).sign.indentMm)}"`), cat + ': signature block indent comes from spec.sign (measured in Word)');
   }
   const orderZip = new PizZip(Buffer.from(await (await buildAdminWord(orderRec)).arrayBuffer()));
   const orderXml = orderZip.file('word/document.xml').asText();

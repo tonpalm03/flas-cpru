@@ -19,10 +19,24 @@ export interface AdminTemplateSpec {
   margins: TemplateMarginsMm;
   /** ขอบบนเฉพาะหน้าแรก (มม.) ใช้เมื่อหัวเอกสารอยู่สูงกว่าขอบบนของหน้าถัดไป ต้นฉบับบันทึกข้อความวางครุฑสูงกว่าขอบ */
   firstPageTop?: number;
+  /** บล็อกลงนาม (ตำแหน่งแนวนอน และระยะแนวตั้งของบันทึกข้อความ) วัดจากต้นฉบับที่เปิดใน Microsoft Word */
+  sign: SignSpec;
   /** หนังสือภายนอก: ตราครุฑลอยและระยะแนวตั้งของท้ายหนังสือตามต้นฉบับ (วัดจากไฟล์ .docx) */
   letter?: LetterSpec;
   /** คำสั่ง: ตราครุฑลอยกึ่งกลาง ระยะเยื้องและระยะท้ายคำสั่งตามต้นฉบับ (วัดจากไฟล์ .docx) */
   orderLayout?: OrderLayoutSpec;
+}
+
+export interface SignSpec {
+  /** เยื้องซ้ายของย่อหน้าชื่อและตำแหน่งผู้ลงนาม (มม. จากขอบเนื้อหา) ข้อความจัดกึ่งกลางในช่วงที่เหลือ
+   *  ต้นฉบับวางด้วยการเคาะวรรค จึงเลือกเยื้องให้กึ่งกลางชื่อตรงกับต้นฉบับ */
+  indentMm: number;
+  /** เยื้องของ "ขอแสดงความนับถือ" ถ้าต่างจากชื่อ (หนังสือภายนอก) */
+  closingIndentMm?: number;
+  /** บันทึกข้อความ: ระยะเว้นก่อนชื่อผู้ลงนาม (มม.) ประเภทอื่นใช้ letter/orderLayout.signGapMm */
+  gapMm?: number;
+  /** ระยะเว้นเพิ่มก่อนบรรทัดตำแหน่ง (มม.) */
+  positionGapMm?: number;
 }
 
 export interface OrderLayoutSpec {
@@ -73,27 +87,37 @@ const SIDE = { right: 20, left: 30 };
 const SPECS: Record<string, AdminTemplateSpec> = {
   // ต้นฉบับบันทึกข้อความตั้งกระดาษ Letter (12240 x 15840 twips)
   // เส้นประหัวเรื่องในต้นฉบับจบที่ 19.51 ซม. จากขอบกระดาษ (วัดจาก PDF ที่ Word พิมพ์) = 9360 twips จากขอบเนื้อหา
-  memo: { paper: 'letter', headerFillTwips: 9360, margins: { top: 25, bottom: 22.5, ...SIDE }, firstPageTop: 16.5 },
-  memo_circular: { margins: { top: 20, bottom: 20, ...SIDE }, firstPageTop: 16 },
+  memo: {
+    paper: 'letter', headerFillTwips: 9360, margins: { top: 25, bottom: 22.5, ...SIDE }, firstPageTop: 16.5,
+    // กึ่งกลางชื่อ 14.05 ซม. จากขอบกระดาษ เว้นจาก "จึงเรียน" 4.22 ซม. ชื่อถึงตำแหน่ง 0.75 ซม.
+    sign: { indentMm: 55.2, gapMm: 35.76, positionGapMm: 1.1 }
+  },
+  // กึ่งกลางชื่อ 14.05 ซม. จากขอบกระดาษ เว้นจาก "จึงเรียน" 4.47 ซม.
+  memo_circular: { margins: { top: 20, bottom: 20, ...SIDE }, firstPageTop: 16, sign: { indentMm: 61, gapMm: 38.24 } },
   order: {
     margins: { top: 17.5, bottom: 20, ...SIDE },
+    // กึ่งกลางชื่อ 13.95 ซม. จากขอบกระดาษ
+    sign: { indentMm: 59 },
     orderLayout: {
       garuda: { widthMm: 29.1, heightMm: 30, topOffsetMm: -0.9 },
       headerBlockMm: 34.9,
       headingIndentMm: 25.4,
       dateIndentMm: 38.1,
-      signGapMm: 37.6
+      signGapMm: 32
     }
   },
   // ต้นฉบับตั้งขอบล่างไว้ 0.5 ซม. ซึ่งเป็นความผิดพลาดของไฟล์ ใช้ 2.0 ซม. แทน
   external: {
     margins: { top: 17.5, bottom: 20, ...SIDE },
-    letter: { garuda: { widthMm: 30.4, heightMm: 30, leftMm: 62.3 }, closingGapMm: 15.9, signGapMm: 23.5, coordinatorGapMm: 30, headerTextTopMm: 26.2 }
+    sign: { indentMm: 40 },
+    letter: { garuda: { widthMm: 30.4, heightMm: 30, leftMm: 62.3 }, closingGapMm: 15.9, signGapMm: 21.5, coordinatorGapMm: 25.6, headerTextTopMm: 26.2 }
   },
   // ต้นฉบับตั้งขอบบน 2.54 ซม. แต่ตราครุฑลอยเหนือขอบ ตำแหน่งจริงเท่ากับหนังสือภายนอกคือ 1.75 ซม.
   external_circular: {
     margins: { top: 17.5, bottom: 17.5, ...SIDE },
-    letter: { garuda: { widthMm: 31, heightMm: 29.4, leftMm: 57.7 }, closingGapMm: 12.1, signGapMm: 30.1, coordinatorGapMm: 19.5, headerTextTopMm: 23.4 }
+    // ต้นฉบับวาง "ขอแสดงความนับถือ" เยื้องซ้ายกว่าชื่อเล็กน้อย
+    sign: { indentMm: 38.2, closingIndentMm: 35.6 },
+    letter: { garuda: { widthMm: 31, heightMm: 29.4, leftMm: 57.7 }, closingGapMm: 10.8, signGapMm: 25.6, coordinatorGapMm: 18.2, headerTextTopMm: 23.4 }
   }
 };
 
