@@ -4,14 +4,14 @@
   ต้นฉบับ_dir ต้องมีไฟล์ real-memo-01.docx, real-order-02.docx, real-ext-circ-03.docx,
   real-ext-04.docx, real-memo-05.docx  (ชื่อตรงกับที่ dump-word.cjs สร้าง)
 ต้องมี LibreOffice และฟอนต์ TH SarabunPSK ติดตั้งในเครื่อง และ pip install pymupdf
-นอกจาก Word ยังพิมพ์ HTML Preview (ไฟล์ .html ใน ours_dir) เป็น PDF ด้วย Chrome แล้วเทียบแบบเดียวกัน
-ออก exit code 1 ถ้าขอบซ้าย/ขวา หรือตำแหน่งบรรทัดแรกของเนื้อหาหน้าแรกต่างจากต้นฉบับเกิน TOL_MM
+ออก exit code 1 ถ้าขอบซ้าย/ขวาของเนื้อหาหน้าแรกต่างจากต้นฉบับเกิน TOL_MM
+LibreOffice จัดหน้าต่างจาก Microsoft Word จึงใช้ตรวจหยาบเท่านั้น การเทียบ Preview/PDF ใช้ compare_html_word.py
+ซึ่งเทียบกับไฟล์ที่ Microsoft Word ส่งออกจริง
 """
 import glob, os, re, shutil, subprocess, sys, zipfile
 import fitz
 
 TOL_MM = 6.0
-CHROME = os.environ.get('CHROME', r'C:\Program Files\Google\Chrome\Application\chrome.exe')
 SOFFICE = os.environ.get('SOFFICE', r'C:\Program Files\LibreOffice\program\soffice.exe')
 NAMES = ['memo-01', 'order-02', 'ext-circ-03', 'ext-04', 'memo-05']
 
@@ -40,21 +40,6 @@ def text_extent_mm(page):
     return min(b[0] for b in blocks) * mm, (page.rect.width - max(b[2] for b in blocks)) * mm
 
 
-def html_to_pdf(ours_dir, out_dir):
-    os.makedirs(os.path.join(out_dir, 'pdf_html'), exist_ok=True)
-    for n in NAMES:
-        src = os.path.abspath(os.path.join(ours_dir, f'real-{n}.html'))
-        dst = os.path.abspath(os.path.join(out_dir, 'pdf_html', f'real-{n}.pdf'))
-        subprocess.run([CHROME, '--headless', '--disable-gpu', '--no-pdf-header-footer',
-                        f'--print-to-pdf={dst}', 'file:///' + src.replace(os.sep, '/')],
-                       check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-
-def first_text_top_mm(page):
-    blocks = [b for b in page.get_text('blocks') if b[4].strip()]
-    return min(b[1] for b in blocks) * 25.4 / 72
-
-
 def main(orig_dir, ours_dir, out_dir):
     tmp = os.path.join(out_dir, '_orig_psk')
     os.makedirs(tmp, exist_ok=True)
@@ -67,7 +52,6 @@ def main(orig_dir, ours_dir, out_dir):
     for f in glob.glob(os.path.join(ours_dir, '*.docx')):
         swap_font(f, os.path.join(ours_tmp, os.path.basename(f)))
     to_pdf(sorted(glob.glob(os.path.join(ours_tmp, '*.docx'))), os.path.join(out_dir, 'pdf_ours'))
-    html_to_pdf(ours_dir, out_dir)
     failed = False
     for n in NAMES:
         a = fitz.open(os.path.join(out_dir, 'pdf_orig', f'real-{n}.pdf'))[0]
@@ -77,16 +61,6 @@ def main(orig_dir, ours_dir, out_dir):
         ok = abs(al - bl) <= TOL_MM and abs(ar - br) <= TOL_MM
         failed |= not ok
         print(f"{'PASS' if ok else 'FAIL'} {n}: left orig {al:.1f} ours {bl:.1f} mm | right orig {ar:.1f} ours {br:.1f} mm")
-        h = fitz.open(os.path.join(out_dir, 'pdf_html', f'real-{n}.pdf'))[0]
-        hl, hr = text_extent_mm(h)
-        top_a, top_h = first_text_top_mm(a), first_text_top_mm(h)
-        hok = abs(al - hl) <= TOL_MM and abs(ar - hr) <= TOL_MM and abs(top_a - top_h) <= TOL_MM
-        failed |= not hok
-        print(f"{'PASS' if hok else 'FAIL'} {n} [html]: left {hl:.1f}/{al:.1f} right {hr:.1f}/{ar:.1f} first-text-top {top_h:.1f}/{top_a:.1f} mm")
-        top_b = first_text_top_mm(b)
-        wok = abs(bl - hl) <= TOL_MM and abs(br - hr) <= TOL_MM and abs(top_b - top_h) <= TOL_MM
-        failed |= not wok
-        print(f"{'PASS' if wok else 'FAIL'} {n} [html vs word]: left {hl:.1f}/{bl:.1f} right {hr:.1f}/{br:.1f} first-text-top {top_h:.1f}/{top_b:.1f} mm")
         pa, pb = a.get_pixmap(dpi=80), b.get_pixmap(dpi=80)
         out = fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, pa.width + pb.width + 10, max(pa.height, pb.height)), False)
         out.clear_with(200)

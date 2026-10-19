@@ -175,6 +175,38 @@ export function getDisplayDocNumber(r: Partial<AdminDocRegistryRecord>): string 
 /**
  * HTML Preview and PDF printing template generator
  */
+/**
+ * ค่าปรับ Preview/PDF (Chrome) ให้ตรงกับไฟล์ Word ที่เปิดใน Microsoft Word (มม.)
+ * วัดโดยพิมพ์ HTML เป็น PDF แล้วเทียบตำแหน่งทุกบรรทัดกับ PDF ที่ Word ส่งออกจากเอกสารเดียวกัน
+ */
+interface PreviewTune {
+  /** บันทึกข้อความ: ความสูงแถบ "บันทึกข้อความ" และการขยับคำว่า "บันทึกข้อความ" ขึ้น/ลง */
+  memoHeadMm?: number;
+  memoTitleNudgeMm?: number;
+  /** ขนาดคำว่า "บันทึกข้อความ" ตามต้นฉบับ (บันทึกข้อความ 28 พอยต์, (ว) 29 พอยต์) */
+  memoTitlePt?: number;
+  /** หนังสือภายนอก: ขยับทั้งหัวหนังสือ (ครุฑ + ที่/ที่อยู่) และตำแหน่งบรรทัดแรกของที่/ที่อยู่จากขอบบนครุฑ */
+  extHeaderShiftMm?: number;
+  extHeaderTextTopMm?: number;
+  extDateGapMm?: number;
+  /** คำสั่ง: ตำแหน่งครุฑและความสูงบล็อกครุฑ */
+  orderGarudaTopMm?: number;
+  orderHeaderBlockMm?: number;
+  /** ระยะก่อนเนื้อหาย่อหน้าแรก */
+  bodyGapMm: number;
+  /** ปรับระยะก่อน "ขอแสดงความนับถือ" ชื่อผู้ลงนาม และผู้ประสานงาน เทียบกับค่าใน spec */
+  closingAdjMm?: number;
+  signAdjMm: number;
+  coordinatorAdjMm?: number;
+}
+const PREVIEW_TUNE: Record<string, PreviewTune> = {
+  memo: { memoHeadMm: 9.7, memoTitleNudgeMm: -0.15, memoTitlePt: 28, bodyGapMm: 4, signAdjMm: 0 },
+  memo_circular: { memoHeadMm: 10.7, memoTitleNudgeMm: -0.45, memoTitlePt: 29, bodyGapMm: 4, signAdjMm: 0 },
+  external: { extHeaderShiftMm: -3.5, extHeaderTextTopMm: 22.9, extDateGapMm: 1.6, bodyGapMm: 2.2, closingAdjMm: 0, signAdjMm: 0, coordinatorAdjMm: 0 },
+  external_circular: { extHeaderShiftMm: 0, extHeaderTextTopMm: 21.9, extDateGapMm: 1.7, bodyGapMm: 1.8, closingAdjMm: 0, signAdjMm: 0, coordinatorAdjMm: 0 },
+  order: { orderGarudaTopMm: -1.7, orderHeaderBlockMm: 29.0, bodyGapMm: -1.0, signAdjMm: 0 }
+};
+
 export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrint = false) {
   const isMemo = r.category.startsWith('memo');
   const isOrder = r.category === 'order';
@@ -214,8 +246,9 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
       if (run.underline) t = `<u>${t}</u>`;
       return t;
     }).join('') || '&nbsp;';
+  // บันทึกข้อความ: ย่อหน้า "จึงเรียน..." เว้นก่อน 12 พอยต์ (ประเภทอื่น 6 พอยต์) เหมือนไฟล์ Word
   const bodyParaHtml = (b: RichBlock) =>
-    `<div class="body-para" style="text-align: ${b.align};${b.firstLine ? '' : ' text-indent: 0;'}${b.indent ? ` margin-left: ${b.indent * INDENT_STEP_MM}mm;` : ''}">${richRunsHtml(b)}</div>`;
+    `<div class="body-para" style="${isMemo && b.text.startsWith('จึงเรียน') ? 'margin-top: 4.2mm; ' : ''}text-align: ${b.align};${b.firstLine ? '' : ' text-indent: 0;'}${b.indent ? ` margin-left: ${b.indent * INDENT_STEP_MM}mm;` : ''}">${richRunsHtml(b)}</div>`;
   const spec = getTemplateSpec(r.category);
   const letter = spec.letter;
   // รหัสท้ายหน้า CPRU-66-001 + เลขหน้า: ต้นฉบับมีเฉพาะบันทึกข้อความ (บันทึกข้อความ (ว) ไม่มีส่วนท้าย) เลขหน้าเป็นเลขอารบิกเสมอ
@@ -223,7 +256,16 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
   const orderLayout = getTemplateSpec('order').orderLayout!;
   const pageMargin = cssMargin(spec.margins);
   const firstTopMm = spec.firstPageTop;
-  const MEMO_GARUDA_TOP_MM = 10; // ตราครุฑบันทึกข้อความอยู่สูงจากขอบกระดาษ 1 ซม. ตามต้นฉบับ
+  // ระยะบรรทัดเดี่ยวของ Word กับ TH SarabunIT๙ (hhea 850+250+30 ต่อ 1000) วัดจริงได้ 6.4 มม. ต่อบรรทัด 16 พอยต์
+  const WORD_LH = 1.134;
+  const MEMO_GARUDA_TOP_MM = 10;
+  const tune = PREVIEW_TUNE[r.category] || PREVIEW_TUNE.memo;
+  const sign = spec.sign;
+  // ระยะก่อนชื่อผู้ลงนาม (ไม่มีรูปลายเซ็น) ค่าเดียวกับ Word
+  const signGapMm = (isOrder ? orderLayout.signGapMm : letter ? letter.signGapMm : sign.gapMm ?? 36.25) + tune.signAdjMm;
+  // กล่องลงนามจัดกึ่งกลางในช่วงหลังเยื้อง เหมือนย่อหน้า Word ที่เยื้องซ้ายแล้วจัดกึ่งกลาง
+  const signBox = `margin-left: ${sign.indentMm}mm;`;
+  const closingBox = `margin-left: ${sign.closingIndentMm ?? sign.indentMm}mm;`; // ตราครุฑบันทึกข้อความอยู่สูงจากขอบกระดาษ 1 ซม. ตามต้นฉบับ
 
   return `<!doctype html>
 <html lang="th">
@@ -231,15 +273,16 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
   <meta charset="utf-8">
   <title>${escape(displayDigits(displayNum))} ${escape(cleanSubject)}</title>
   <style>
+    /* ฟอนต์เดียวกับไฟล์ Word ต้นฉบับ (TH SarabunIT๙) เพื่อให้ความกว้างตัวอักษรและการตัดบรรทัดตรงกับ Word */
     @font-face {
-      font-family: 'THSarabunPSK';
-      src: local('TH SarabunPSK'), local('THSarabunPSK'), url('${escape(origin)}/templates/admin/fonts/THSarabunPSK-Regular.ttf') format('truetype');
+      font-family: 'THSarabunIT9';
+      src: local('TH SarabunIT๙'), url('${escape(origin)}/templates/admin/fonts/THSarabunIT9-Regular.ttf') format('truetype');
       font-weight: normal;
       font-style: normal;
     }
     @font-face {
-      font-family: 'THSarabunPSK';
-      src: local('TH SarabunPSK Bold'), local('THSarabunPSK-Bold'), local('TH SarabunPSK'), url('${escape(origin)}/templates/admin/fonts/THSarabunPSK-Bold.ttf') format('truetype');
+      font-family: 'THSarabunIT9';
+      src: local('TH SarabunIT๙ Bold'), url('${escape(origin)}/templates/admin/fonts/THSarabunIT9-Bold.ttf') format('truetype');
       font-weight: bold;
       font-style: normal;
     }
@@ -248,8 +291,8 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
       /* ระยะขอบตามต้นฉบับของประเภทเอกสาร ใช้กับทุกหน้า ไม่ใช่เฉพาะหน้าแรก */
       margin: ${pageMargin};
       ${hasFooterCode ? `
-      @bottom-left { content: 'CPRU-66-001'; font-family: 'THSarabunPSK', 'Sarabun', sans-serif; font-size: 15pt; vertical-align: bottom; padding-bottom: 15mm; }
-      @bottom-right { content: counter(page); font-family: 'THSarabunPSK', 'Sarabun', sans-serif; font-size: 15pt; vertical-align: bottom; padding-bottom: 15mm; }
+      @bottom-left { content: 'CPRU-66-001'; font-family: Calibri, Carlito, sans-serif; font-size: 11pt; vertical-align: top; margin-top: -0.9mm; line-height: 1; }
+      @bottom-right { content: counter(page); font-family: Calibri, Carlito, sans-serif; font-size: 11pt; vertical-align: top; margin-top: -0.9mm; line-height: 1; }
       ` : ''}
     }
     article { page: doc; }
@@ -264,9 +307,9 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
       margin: 0;
       color: #000;
       background: #f1f5f9;
-      font-family: 'THSarabunPSK', 'Sarabun', sans-serif;
+      font-family: 'THSarabunIT9', 'THSarabunPSK', 'Sarabun', sans-serif;
       font-size: 16pt;
-      line-height: 1.25;
+      line-height: ${WORD_LH};
       -webkit-font-smoothing: antialiased;
     }
     .print-bar {
@@ -335,7 +378,7 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
       top: 27mm;
       width: 60mm;
       font-size: 16pt;
-      line-height: 1.25;
+      line-height: ${WORD_LH};
     }
     .ext-header-center {
       position: absolute;
@@ -353,23 +396,23 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
       object-fit: contain;
     }
     .ext-header-right {
-      margin-left: 101mm;
+      margin-left: 101.7mm;
       padding-top: 27mm;
       min-height: 30mm;
       font-size: 16pt;
-      line-height: 1.25;
+      line-height: ${WORD_LH};
       white-space: pre-line;
       text-align: left;
     }
     .ext-date {
       margin: 4mm 0 2.5mm 75mm;
       font-size: 16pt;
-      line-height: 1.25;
+      line-height: ${WORD_LH};
     }
     .ext-row {
       display: flex;
-      margin: 3.1mm 0 0;
-      line-height: 1.25;
+      margin: 2.1mm 0 0;
+      line-height: ${WORD_LH};
       font-size: 16pt;
     }
     .ext-label {
@@ -379,27 +422,24 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
       flex-shrink: 0;
     }
     .ext-closing {
-      margin-left: 40mm;
-      width: 120mm;
       text-align: center;
-      margin-top: 8mm;
-      margin-bottom: 2mm;
+      margin-bottom: 0;
       font-size: 16pt;
-      line-height: 1.25;
+      line-height: ${WORD_LH};
     }
     .memohead {
       position: relative;
-      height: 12mm;
+      height: ${tune.memoHeadMm ?? 12}mm;
       text-align: center;
-      font-size: 29pt;
+      font-size: ${tune.memoTitlePt ?? 29}pt;
       font-weight: bold;
-      line-height: 12mm;
+      line-height: ${tune.memoHeadMm ?? 12}mm;
       margin-bottom: 0;
     }
     .memo-row {
       display: flex;
       padding: 0;
-      line-height: 1.4;
+      line-height: ${WORD_LH};
       align-items: baseline;
     }
     .memo-row b {
@@ -431,32 +471,31 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
     }
     .val-text {
       font-size: 16pt;
-      line-height: 1.25;
+      line-height: ${WORD_LH};
       white-space: pre-wrap;
     }
-    .split-memo { display: flex; justify-content: space-between; gap: 4mm; }
-    .split-memo > div:first-child { width: 52%; }
-    .split-memo > div:last-child { width: 48%; }
+    /* "วันที่" อยู่ที่แท็บ 3960 twips (6.99 ซม. จากขอบเนื้อหา) เหมือนต้นฉบับ */
+    .split-memo { display: flex; }
+    .split-memo > div:first-child { width: 69.9mm; flex: none; }
+    .split-memo > div:last-child { flex: 1; min-width: 0; }
     .body-para {
       text-indent: 25mm;
       text-align: justify;
       text-justify: inter-character;
       margin: 2.1mm 0;
-      line-height: 1.33;
+      line-height: ${WORD_LH};
     }
     .signature-container {
-      margin-top: 17mm;
-      margin-left: 60mm;
-      width: 100mm;
       text-align: center;
       break-inside: avoid;
       page-break-inside: avoid;
     }
+    /* ขนาดเดียวกับรูปลายเซ็นในไฟล์ Word (140 x 48 px) */
     .sig-img {
-      max-height: 18mm;
-      max-width: 50mm;
-      object-fit: contain;
-      margin: 0 auto 2mm auto;
+      width: 37mm;
+      height: 12.7mm;
+      object-fit: fill;
+      margin: 0 auto;
       display: block;
     }
     .footer-memo {
@@ -466,7 +505,8 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
       right: 20mm;
       display: flex;
       justify-content: space-between;
-      font-size: 15pt;
+      font-family: Calibri, Carlito, sans-serif;
+      font-size: 11pt;
       color: #000;
     }
     @media print {
@@ -497,7 +537,7 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
     ${isMemo ? `
       <div class="memohead">
         <img class="garuda-memo" src="${garudaPath(r.category)}" alt="ครุฑ" />
-        บันทึกข้อความ
+        <span style="position: relative; top: ${tune.memoTitleNudgeMm ?? 0}mm;">บันทึกข้อความ</span>
       </div>
 
       <div class="memo-row">
@@ -536,24 +576,24 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
         </div>
       </div>
     ` : isOrder ? `
-      <img class="garuda-center" style="width: ${orderLayout.garuda.widthMm}mm; height: ${orderLayout.garuda.heightMm}mm; margin: ${orderLayout.garuda.topOffsetMm}mm auto ${(orderLayout.headerBlockMm - orderLayout.garuda.heightMm - orderLayout.garuda.topOffsetMm).toFixed(1)}mm;" src="${garudaPath(r.category)}" alt="ครุฑ" />
-      <div style="text-align: center; font-weight: bold; font-size: 16pt; line-height: 1.35; margin-bottom: 3mm;">
+      <img class="garuda-center" style="width: ${orderLayout.garuda.widthMm}mm; height: ${orderLayout.garuda.heightMm}mm; margin: ${tune.orderGarudaTopMm ?? orderLayout.garuda.topOffsetMm}mm auto ${((tune.orderHeaderBlockMm ?? orderLayout.headerBlockMm) - orderLayout.garuda.heightMm - (tune.orderGarudaTopMm ?? orderLayout.garuda.topOffsetMm)).toFixed(1)}mm;" src="${garudaPath(r.category)}" alt="ครุฑ" />
+      <div style="text-align: center; font-weight: bold; font-size: 16pt; line-height: ${WORD_LH}; margin-bottom: 3mm;">
         <div>คำสั่ง${escape(displayDigits((r.from || '').trim().replace(/^คำสั่ง\s*/, '')))}</div>
         <div>${escape(displayDigits(formattedOrderNum))}</div>
-        <div style="padding-left: 25mm; text-indent: -25mm;">เรื่อง  ${escape(displayDigits(cleanSubject))}</div>
+        <div style="padding-left: 25mm; text-indent: -25mm; white-space: pre-wrap;">เรื่อง  ${escape(displayDigits(cleanSubject))}</div>
         <div style="font-size: 16pt;">........................................................</div>
       </div>
     ` : `
-      <div class="ext-header">
-        <div class="ext-header-left"${letter ? ` style="top: ${letter.headerTextTopMm}mm;"` : ''}>
+      <div class="ext-header" style="margin-top: ${tune.extHeaderShiftMm ?? 0}mm;">
+        <div class="ext-header-left" style="top: ${tune.extHeaderTextTopMm ?? letter?.headerTextTopMm ?? 27}mm;">
           ${escape(displayDigits(displayNum))}
         </div>
         <div class="ext-header-center" ${letter ? `style="left: ${letter.garuda.leftMm}mm; transform: none; width: ${letter.garuda.widthMm}mm;"` : ''}>
           <img class="garuda-ext" ${letter ? `style="width: ${letter.garuda.widthMm}mm; height: ${letter.garuda.heightMm}mm;"` : ''} src="${garudaPath(r.category)}" alt="ครุฑ" />
         </div>
-        <div class="ext-header-right"${letter ? ` style="padding-top: ${letter.headerTextTopMm}mm;"` : ''}>${escape(displayDigits(r.officeAddress || r.from))}</div>
+        <div class="ext-header-right" style="padding-top: ${tune.extHeaderTextTopMm ?? letter?.headerTextTopMm ?? 27}mm;">${escape(displayDigits(r.officeAddress || r.from))}</div>
       </div>
-      <div class="ext-date">
+      <div class="ext-date" style="margin-top: ${tune.extDateGapMm ?? 4}mm;">
         ${escape(thaiGovDate(r.date, digitType, 'external'))}
       </div>
       <div class="ext-row"><b class="ext-label">เรื่อง</b><span>${escape(displayDigits(cleanSubject))}</span></div>
@@ -579,54 +619,51 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
       </div>
     ` : ''}
 
-    <div style="margin-top: ${isMemo ? 4 : isOrder ? 1.6 : r.category === 'external_circular' ? 2.8 : 2.2}mm;">
+    <div style="margin-top: ${tune.bodyGapMm}mm;">
       ${bodyItems.map(({ text: p, block }) => {
         if (isOrder) {
           const mem = parseCommitteeRow(p);
           if (mem.isMember) {
-            return `<div style="display: flex; padding-left: 32.5mm; margin: 0; line-height: 1.35;">
+            return `<div style="display: flex; padding-left: 32.5mm; margin: 0; line-height: ${WORD_LH};">
               <span style="width: 81.5mm; flex-shrink: 0;">${escape(displayDigits(mem.name))}</span>
               <span>${escape(displayDigits(mem.role))}</span>
             </div>`;
           }
           if (/^[๐-๙0-9]+(?:\.[๐-๙0-9]+)*[\.\s]\s*คณะกรรมการ/.test(p)) {
-            return `<div style="padding-left: ${orderLayout.headingIndentMm}mm; font-weight: bold; margin: 2mm 0 2mm; line-height: 1.35;">${escape(displayDigits(p))}</div>`;
+            return `<div style="padding-left: ${orderLayout.headingIndentMm}mm; font-weight: bold; margin: 2mm 0 2mm; line-height: ${WORD_LH};">${escape(displayDigits(p))}</div>`;
           }
           if (p === 'หน้าที่' || p.startsWith('หน้าที่')) {
             // ตัวหนาเฉพาะคำว่า "หน้าที่" ข้อความต่อท้ายเป็นตัวปกติ ตามต้นฉบับ
             const dutyRest = p.startsWith('หน้าที่') ? p.slice('หน้าที่'.length) : '';
-            return `<div style="padding-left: ${orderLayout.headingIndentMm}mm; margin: 2mm 0 2mm; line-height: 1.35;"><strong>${escape(displayDigits('หน้าที่'))}</strong>${escape(displayDigits(dutyRest))}</div>`;
+            return `<div style="padding-left: ${orderLayout.headingIndentMm}mm; margin: 2mm 0 2mm; line-height: ${WORD_LH};"><strong>${escape(displayDigits('หน้าที่'))}</strong>${escape(displayDigits(dutyRest))}</div>`;
           }
           if (/^[๐-๙0-9]+(?:\.[๐-๙0-9]+)*[\.\s]/.test(p) && !mem.isMember) {
-            return `<div style="padding-left: 32.5mm; margin: 0; line-height: 1.35;">${escape(displayDigits(p))}</div>`;
+            return `<div style="padding-left: 32.5mm; margin: 0; line-height: ${WORD_LH};">${escape(displayDigits(p))}</div>`;
           }
           if (p.startsWith('สั่ง ณ วันที่')) {
-            return `<div style="padding-left: ${orderLayout.dateIndentMm}mm; margin: 3.2mm 0 1mm; line-height: 1.35;">${escape(displayDigits(p))}</div>`;
+            return `<div style="padding-left: ${orderLayout.dateIndentMm}mm; margin: 3.2mm 0 1mm; line-height: ${WORD_LH};">${escape(displayDigits(p))}</div>`;
           }
         }
         return bodyParaHtml(block);
       }).join('')}
       ${isOrder && !bodyItems.some(i => i.text.startsWith('สั่ง ณ วันที่')) ? `
-        <div style="padding-left: ${orderLayout.dateIndentMm}mm; margin: 3.2mm 0 1mm; line-height: 1.35;">
+        <div style="padding-left: ${orderLayout.dateIndentMm}mm; margin: 3.2mm 0 1mm; line-height: ${WORD_LH};">
           ${escape(displayDigits(thaiGovDate(r.date, digitType, 'order')))}
         </div>
       ` : ''}
     </div>
 
-    ${!isMemo && !isOrder ? `<div class="ext-closing"${letter ? ` style="margin-top: ${(letter.closingGapMm + 0.2).toFixed(1)}mm;"` : ''}>ขอแสดงความนับถือ</div>` : ''}
+    ${!isMemo && !isOrder ? `<div class="ext-closing" style="${closingBox} margin-top: ${((letter?.closingGapMm ?? 4.2) + (tune.closingAdjMm ?? 0)).toFixed(1)}mm;">ขอแสดงความนับถือ</div>` : ''}
 
-    <div class="signature-container" ${!isMemo && !isOrder ? `style="margin-left: 40mm; width: 120mm; margin-top: ${letter ? (letter.signGapMm - 15).toFixed(1) : 9}mm;"` : isMemo ? 'style="margin-top: 20.5mm;"' : isOrder ? `style="margin-top: ${(orderLayout.signGapMm - 15.4).toFixed(1)}mm;"` : ''}>
-      ${r.signatureUrl ? `
-        <img class="sig-img" src="${r.signatureUrl}" alt="ลายเซ็น" />
-      ` : '<div style="height: 14mm;"></div>'}
-      <p style="font-size: 16pt; font-weight: normal; margin: 1.5mm 0; color: #000;">(${escape(displayDigits(formattedSignatory))})</p>
-      <p style="font-size: 16pt; font-weight: normal; margin: 0; white-space: pre-line; line-height: 1.25; color: #000;">${escape(displayDigits(signatoryPos))}</p>
+    <!-- ระยะเท่าย่อหน้า Word: มีรูปลายเซ็น = เว้น 12 พอยต์ + รูป 140x48 px + 6 พอยต์ ไม่มีรูป = ระยะก่อนชื่อตาม spec -->
+    <div class="signature-container" style="${signBox} margin-top: ${r.signatureUrl ? 4.2 : signGapMm.toFixed(1)}mm;">
+      ${r.signatureUrl ? `<img class="sig-img" src="${r.signatureUrl}" alt="ลายเซ็น" />` : ''}
+      <p style="font-size: 16pt; font-weight: normal; margin: ${r.signatureUrl ? 1.2 : 0}mm 0 0; line-height: ${WORD_LH}; color: #000;">(${escape(displayDigits(formattedSignatory))})</p>
+      <p style="font-size: 16pt; font-weight: normal; margin: ${sign.positionGapMm ?? 0}mm 0 0; white-space: pre-line; line-height: ${WORD_LH}; color: #000;">${escape(displayDigits(signatoryPos))}</p>
     </div>
 
     ${r.coordinatorInfo ? `
-      <div style="margin-top: ${letter ? (letter.coordinatorGapMm - 7.3).toFixed(1) : 8}mm; font-size: ${letter ? 16 : 14}pt; line-height: ${letter ? 1.33 : 1.25}; white-space: pre-line;">
-        ${escape(displayDigits(r.coordinatorInfo))}
-      </div>
+      <div style="margin-top: ${(letter ? letter.coordinatorGapMm + (tune.coordinatorAdjMm ?? 0) : 4.2).toFixed(1)}mm; font-size: 16pt; line-height: ${WORD_LH}; white-space: pre-line;">${escape(displayDigits(r.coordinatorInfo))}</div>
     ` : ''}
 
     ${hasFooterCode ? `

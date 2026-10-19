@@ -15,9 +15,13 @@ process.env.NEXT_PUBLIC_FIREBASE_API_KEY = 'demo-key';
 process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID = 'demo-faculty-erp';
 
 const mod = require(path.join(root, 'lib', 'adminDocument.ts'));
+// DUMP_SIGNED=1: ใส่รูปลายเซ็นตัวอย่าง (PNG 1x1) ให้เอกสารเพื่อตรวจระยะบล็อกลงนามแบบมีรูป
+const SIGNED = process.env.DUMP_SIGNED === '1';
+const TEST_SIGNATURE = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+const withSig = r => (SIGNED && String(r.id).startsWith('real-') ? { ...r, signatureUrl: TEST_SIGNATURE } : r);
 const original = mod.buildAdminWord;
 mod.buildAdminWord = async function (r) {
-  const blob = await original(r);
+  const blob = await original(withSig(r));
   if (String(r.id).startsWith('real-')) {
     fs.writeFileSync(path.join(outDir, r.id + '.docx'), Buffer.from(await blob.arrayBuffer()));
   }
@@ -28,7 +32,7 @@ const publicUrl = 'file:///' + path.join(root, 'public').split(path.sep).join('/
 mod.documentHtml = function (r, origin, autoPrint) {
   const html = originalHtml(r, origin, autoPrint);
   if (String(r.id).startsWith('real-')) {
-    fs.writeFileSync(path.join(outDir, r.id + '.html'), originalHtml(r, publicUrl, false).split('src="/templates').join('src="' + publicUrl + '/templates'));
+    fs.writeFileSync(path.join(outDir, r.id + '.html'), originalHtml(withSig(r), publicUrl, false).split('src="/templates').join('src="' + publicUrl + '/templates'));
   }
   return html;
 };
