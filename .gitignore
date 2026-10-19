@@ -29,3 +29,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local scratch and emulator logs
+/tmp/
+firestore-debug.log
+*-debug.log
