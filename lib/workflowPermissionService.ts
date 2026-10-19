@@ -438,8 +438,12 @@ export function canUserSign(
   const currentAction = record.action || 'รอตรวจ';
   if (currentAction !== 'รอลงนาม') return false;
 
-  // Creator cannot sign own doc unless explicitly allowed
-  if (record.createdById === user.id && !config?.allowCreatorSelfSign) {
+  // ผู้ร่างลงนามเอกสารของตนเองไม่ได้ ยกเว้นเปิดสวิตช์ allowCreatorSelfSign หรือถูกระบุชื่อเป็นผู้ลงนามโดยตรง
+  const namedSigner =
+    (config?.signers?.userIds?.includes(user.id) ?? false) ||
+    (record.assignedSignerIds?.includes(user.id) ?? false) ||
+    (record.signerSteps?.some(s => s.assignedUserId === user.id) ?? false);
+  if (record.createdById === user.id && !config?.allowCreatorSelfSign && !namedSigner) {
     const roles = getUserRoles(user);
     if (!roles.includes('คณบดี') && !roles.includes('รองคณบดี') && !roles.includes('ผู้บริหาร') && user.role !== 'dean') {
       return false;

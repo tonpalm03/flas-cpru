@@ -594,6 +594,22 @@ export default function WorkflowsSettingsPage() {
                 </div>
               </div>
             )}
+
+            {/* ผู้ร่างลงนามเอกสารของตนเอง: ค่าเริ่มต้นปิด ผู้ที่ถูกติ๊กชื่อเฉพาะรายลงนามเอกสารของตนเองได้เสมอ */}
+            <label className="flex items-start gap-2 pt-3 border-t border-slate-100 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={config.allowCreatorSelfSign ?? false}
+                onChange={(e) => setConfig({ ...config, allowCreatorSelfSign: e.target.checked })}
+                className="mt-0.5 rounded text-emerald-900"
+              />
+              <span>
+                <span className="text-xs font-semibold text-slate-800 block">อนุญาตให้ผู้ร่างลงนามเอกสารของตนเอง</span>
+                <span className="text-[11px] text-slate-500">
+                  ปิดไว้: ผู้ร่างลงนามเอกสารที่ตนสร้างไม่ได้ ยกเว้นคณบดี/รองคณบดี/ผู้บริหาร และผู้ที่ถูกระบุชื่อเฉพาะรายด้านบน
+                </span>
+              </span>
+            </label>
           </div>
         </div>
       )}

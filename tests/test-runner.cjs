@@ -187,6 +187,14 @@ async function runAllTests() {
   assert.equal(canUserSign(userDean, signingDoc, customWorkflow), true, 'Dean can sign');
   console.log(' PASS: Adding helper reviewer does not grant number issuing or signing rights.');
 
+  // ผู้ร่างลงนามเอกสารของตนเอง: ปิดไว้เป็นค่าเริ่มต้น ยกเว้นถูกติ๊กชื่อเฉพาะราย หรือเปิดสวิตช์
+  const ownSigningDoc = { ...signingDoc, createdById: userAdmin.id, createdByName: userAdmin.name };
+  assert.equal(canUserSign(userAdmin, ownSigningDoc, customWorkflow), false, 'Admin cannot sign a document they drafted by default');
+  assert.equal(canUserSign(userAdmin, ownSigningDoc, { ...customWorkflow, signers: { ...customWorkflow.signers, userIds: [userAdmin.id] } }), true, 'Named signer can sign their own document');
+  assert.equal(canUserSign(userAdmin, ownSigningDoc, { ...customWorkflow, allowCreatorSelfSign: true }), true, 'Self-sign switch allows the drafter to sign');
+  assert.equal(canUserSign(userLecturer, signingDoc, { ...customWorkflow, allowCreatorSelfSign: true }), false, 'Self-sign switch does not make a non-signer a signer');
+  console.log(' PASS: Drafters sign their own documents only when named as signer or the switch is on.');
+
   // Test 4: Locking during Signing and Word download lock
   console.log('\n[TEST 4] Word download locked during รอลงนาม:');
   assert.equal(canUserDownloadWord(userLecturer, signingDoc, customWorkflow), false, 'Word locked during signing');
