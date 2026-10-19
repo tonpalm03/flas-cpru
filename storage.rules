@@ -1,0 +1,77 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isActiveUser() {
+      return isAuthenticated() && firestore.exists(/databases/(default)/documents/users/$(request.auth.uid)) &&
+        (!('status' in firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data) || firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.status == 'active');
+    }
+
+    function canManageAdminDocuments() {
+      let user = firestore.get(/databases/(default)/documents/users/$(request.auth.uid));
+      return isActiveUser() &&
+        (user.data.role == 'admin' || ('permissions' in user.data && 'admin_documents' in user.data.permissions));
+    }
+
+    match /admin_registry_attachments/{userId}/{fileId} {
+      allow read: if isActiveUser();
+      allow create: if canManageAdminDocuments() && request.auth.uid == userId && isValidFileSize() &&
+        request.resource.contentType in ['application/pdf','application/vnd.openxmlformats-officedocument.wordprocessingml.document','image/png','image/jpeg'];
+      allow delete: if canManageAdminDocuments();
+      allow update: if false;
+    }
+
+    function isValidFileSize() {
+      return request.resource.size <= 25 * 1024 * 1024; // 25 MB max limit
+    }
+
+    function isValidMimeType() {
+      return request.resource.contentType.matches('application/pdf') ||
+             request.resource.contentType.matches('image/.*') ||
+             request.resource.contentType.matches('application/vnd.openxmlformats-officedocument.wordprocessingml.document') ||
+             request.resource.contentType.matches('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') ||
+             request.resource.contentType.matches('application/msword') ||
+             request.resource.contentType.matches('application/vnd.ms-excel') ||
+             request.resource.contentType.matches('application/octet-stream');
+    }
+
+    match /inbound_attachments/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && isValidFileSize() && isValidMimeType();
+    }
+
+    match /outbound_attachments/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && isValidFileSize() && isValidMimeType();
+    }
+
+    match /orders_attachments/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && isValidFileSize() && isValidMimeType();
+    }
+
+    match /memo_attachments/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && isValidFileSize() && isValidMimeType();
+    }
+
+    match /checklists/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && isValidFileSize() && isValidMimeType();
+    }
+
+    match /avatars/{userId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && (request.auth.uid == userId) && isValidFileSize();
+    }
+
+    // Default authenticated path with validation
+    match /{folder}/{allPaths=**} {
+      allow read: if folder != 'admin_registry_attachments' && isAuthenticated();
+      allow write: if folder != 'admin_registry_attachments' && isAuthenticated() && isValidFileSize() && isValidMimeType();
+    }
+  }
+}
