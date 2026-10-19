@@ -47,6 +47,8 @@ def rpr_of(r):
 
 
 def tag_run(rpr, tag):
+    # ต้นฉบับ ว 721 ระบายวันที่สีแดงไว้เตือนตอนร่าง ฉบับที่ออกจริง (ว 718) เป็นสีดำ ค่าที่ระบบเติมจึงไม่ใช้สีของรันตัวอย่าง
+    rpr = re.sub(r'<w:color [^>]*/>', '', rpr)
     return f'<w:r>{rpr}<w:t xml:space="preserve">{{{{{tag}}}}}</w:t></w:r>'
 
 
@@ -80,6 +82,7 @@ def small(rpr):
 
 
 def tab_run(rpr, tiny=True):
+    rpr = re.sub(r'<w:color [^>]*/>', '', rpr)  # เส้นประเป็นสีดำเสมอ ดู tag_run
     return f'<w:r>{small(rpr) if tiny else rpr}<w:tab/></w:r>'
 
 
@@ -124,8 +127,8 @@ def tag_para(tag):
 
 
 def memo_body(sect_break):
-    run = lambda t: f'<w:r><w:rPr>{FONT}<w:sz w:val="32"/><w:szCs w:val="32"/></w:rPr><w:t xml:space="preserve">{t}</w:t></w:r>'
-    tab = f'<w:r><w:rPr>{FONT}<w:sz w:val="32"/><w:szCs w:val="32"/></w:rPr><w:tab/></w:r>'
+    run = lambda t: f'<w:r><w:rPr>{FONT}<w:sz w:val="32"/><w:szCs w:val="32"/><w:cs/></w:rPr><w:t xml:space="preserve">{t}</w:t></w:r>'
+    tab = f'<w:r><w:rPr>{FONT}<w:sz w:val="32"/><w:szCs w:val="32"/><w:cs/></w:rPr><w:tab/></w:r>'
     to = para('<w:tabs><w:tab w:val="left" w:pos="720"/></w:tabs><w:spacing w:before="120" w:after="120" w:line="240" w:lineRule="auto"/>',
               run('เรียน') + tab + run('{{to}}'))
     return (tag_para('#letters') + to + ''.join(tag_para('@' + t) for t in ('extra', 'body', 'signature', 'coordinator'))

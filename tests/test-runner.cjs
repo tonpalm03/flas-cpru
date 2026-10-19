@@ -779,6 +779,8 @@ async function runAllTests() {
     const { getHeaderFillTwips } = require('../lib/adminTemplateSpec.ts');
     const memoHeader = Object.keys(memoZip.files).filter(n => /^word\/header\d*\.xml$/.test(n)).map(n => memoZip.file(n).asText()).join('');
     assert.ok(memoHeader.includes(`w:pos="${getHeaderFillTwips('memo')}"`), 'memo header fill lines end where the original does (spec headerFillTwips)');
+    assert.equal(/<w:color /.test(memoHeader), false, 'header values and fill lines carry no draft colour from the sample');
+    assert.ok(/ย่อหน้าหนึ่ง/.test(memoDoc) && /<w:cs\/><\/w:rPr><w:t xml:space="preserve">[^<]*ย่อหน้าหนึ่ง/.test(memoDoc), 'Thai body runs are marked complex script (<w:cs/>) like the original');
   }
   assert.ok(memoZip.file('word/footer1.xml').asText().includes('CPRU-66-001'), 'footer code comes from the original file');
   const noTemplateBlob = await buildAdminWord({ ...memoRecord, category: 'order', bodyHtml: undefined });

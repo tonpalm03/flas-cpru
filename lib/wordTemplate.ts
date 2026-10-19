@@ -22,16 +22,18 @@ export interface XmlRunOptions {
 /** รัน (ข้อความ) พร้อมรูปแบบ ขึ้นบรรทัดใหม่ด้วย \n */
 export function xmlRun(text: string, o: XmlRunOptions = {}): string {
   const size = o.size ?? 32;
+  // ลำดับแท็กตาม schema (sz, szCs, u, cs) และใส่ <w:cs/> เหมือนต้นฉบับ
+  // ไม่มี <w:cs/> Word จะจัดกระจายแบบไทยโดยถ่างระหว่างอักขระ ทำให้สระ/วรรณยุกต์หลุดจากพยัญชนะ
   const rpr =
     `<w:rPr>${RFONTS}${o.bold ? '<w:b/><w:bCs/>' : ''}${o.italic ? '<w:i/><w:iCs/>' : ''}` +
-    `${o.underline ? '<w:u w:val="single"/>' : ''}<w:sz w:val="${size}"/><w:szCs w:val="${size}"/></w:rPr>`;
+    `<w:sz w:val="${size}"/><w:szCs w:val="${size}"/>${o.underline ? '<w:u w:val="single"/>' : ''}<w:cs/></w:rPr>`;
   return text
     .split('\n')
     .map((line, i) => `${i ? `<w:r>${rpr}<w:br/></w:r>` : ''}${line ? `<w:r>${rpr}<w:t xml:space="preserve">${escapeXml(line)}</w:t></w:r>` : ''}`)
     .join('');
 }
 
-export const xmlTab = (size = 32) => `<w:r><w:rPr>${RFONTS}<w:sz w:val="${size}"/><w:szCs w:val="${size}"/></w:rPr><w:tab/></w:r>`;
+export const xmlTab = (size = 32) => `<w:r><w:rPr>${RFONTS}<w:sz w:val="${size}"/><w:szCs w:val="${size}"/><w:cs/></w:rPr><w:tab/></w:r>`;
 
 export interface XmlParaOptions {
   align?: 'left' | 'center' | 'right' | 'distribute';
