@@ -145,6 +145,37 @@ export function orderItems(blocks: RichBlock[]): { text: string; block: RichBloc
   return out;
 }
 
+/**
+ * รูปแบบย่อหน้าเนื้อหาคำสั่งตามไฟล์ต้นฉบับ (twips) ใช้ร่วมกันทั้ง Word, ตัวสร้างสำรอง และ Preview/PDF
+ * - ย่อหน้าแรก ("ด้วย..."): ต้นฉบับเคาะ 16 วรรค (19.5 มม.) และใช้ระยะบรรทัดเริ่มต้นของ Word (1.08 เว้นหลัง 8 พอยต์)
+ * - ย่อหน้าอื่นก่อนรายชื่อ ("ดังนั้น..."): เยื้อง 2.5 ซม. เว้นก่อน 6 พอยต์
+ * - ย่อหน้าหลังรายชื่อ ("ให้คณะกรรมการ..."): เยื้อง 2.5 ซม. เว้นก่อน 12 พอยต์ หลัง 8 พอยต์
+ * - "หน้าที่ ..." และข้อหน้าที่ "๑. ...": เยื้องเฉพาะบรรทัดแรก (แท็บ) บรรทัดถัดไปชิดขอบซ้าย เว้นก่อน/หลัง 6 พอยต์
+ */
+export type OrderParaKind = 'intro' | 'prose' | 'closing' | 'heading' | 'member' | 'duty' | 'dutyItem' | 'date';
+export interface OrderParaStyle { kind: OrderParaKind; firstLine: number; left: number; before: number; after: number; line: number }
+const ORDER_INTRO_FIRST_LINE = 1106; // 16 วรรคของ TH SarabunIT๙ 16 พอยต์
+export function orderParaStyles(texts: string[], headingIndent: number, dateIndent: number): OrderParaStyle[] {
+  let seenList = false;
+  let prose = 0;
+  return texts.map(text => {
+    const s = (kind: OrderParaKind, o: Partial<OrderParaStyle>): OrderParaStyle =>
+      ({ kind, firstLine: 0, left: 0, before: 0, after: 0, line: 240, ...o });
+    if (parseCommitteeRow(text).isMember) return s('member', { left: 1843 });
+    if (/^[๐-๙0-9]+(?:\.[๐-๙0-9]+)*[\.\s]\s*คณะกรรมการ/.test(text)) {
+      seenList = true;
+      return s('heading', { left: headingIndent, before: 120, after: 120 });
+    }
+    if (text.startsWith('หน้าที่')) return s('duty', { firstLine: 1418, before: 120, after: 120 });
+    if (/^[๐-๙0-9]+(?:\.[๐-๙0-9]+)*[\.\s]/.test(text)) return s('dutyItem', { firstLine: 1843, before: 120, after: 120 });
+    if (text.startsWith('สั่ง ณ วันที่')) return s('date', { left: dateIndent, before: 120, after: 60 });
+    if (seenList) return s('closing', { firstLine: 1418, before: 240, after: 160 });
+    return prose++ === 0
+      ? s('intro', { firstLine: ORDER_INTRO_FIRST_LINE, before: 120, after: 160, line: 259 })
+      : s('prose', { firstLine: 1418, before: 120 });
+  });
+}
+
 export function parseCommitteeRow(text: string) {
   const match = text.match(/^([๐-๙0-9]+(?:\.[๐-๙0-9]+)*[\.\s]\s*.+?)\s{2,}(.+)$/) ||
                 text.match(/^([๐-๙0-9]+(?:\.[๐-๙0-9]+)*[\.\s]\s*.+?)\s*(ประธานกรรมการ|รองประธานกรรมการ|กรรมการและ(?:ผู้ช่วย)?เลขานุการ|ผู้ช่วยเลขานุการ|กรรมการ|ที่ปรึกษา)$/);
@@ -276,6 +307,9 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
 
   const bodyBlocks = getBodyBlocks(r);
   const bodyItems = isOrder ? orderItems(bodyBlocks) : bodyBlocks.map(b => ({ text: b.text, block: b }));
+  const orderStyles = isOrder
+    ? orderParaStyles(bodyItems.map(i => i.text), mmToTwips(getTemplateSpec('order').orderLayout!.headingIndentMm), mmToTwips(getTemplateSpec('order').orderLayout!.dateIndentMm))
+    : [];
   const richRunsHtml = (b: RichBlock) =>
     b.runs.map(run => {
       let t = escape(displayDigits(run.text)).replace(/\n/g, '<br>');
@@ -297,6 +331,9 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
   // ระยะบรรทัดเดี่ยวของ Word กับ TH SarabunIT๙ (hhea 850+250+30 ต่อ 1000) วัดจริงได้ 6.4 มม. ต่อบรรทัด 16 พอยต์
   const WORD_LH = 1.134;
   const MEMO_GARUDA_TOP_MM = 10;
+  // คำสั่งหน้า 2 ขึ้นไป: ตำแหน่งเนื้อหาบรรทัดแรกและเลขหน้าวัดจากไฟล์ Word (หัวกระดาษห่างขอบ 1.27 ซม.)
+  const ORDER_NEXT_PAGE_TOP_MM = 24.6;
+  const ORDER_PAGE_NO_TOP_MM = 12.7;
   // ตำแหน่งเส้นใต้: ระยะจากขอบล่างกล่องข้อความ 16 พอยต์ (วัดเทียบ Word)
   const MH_U_BOTTOM_MM = 1.05;
   // แท็บเติมจุดจบที่ตำแหน่งแท็บของต้นฉบับ (บันทึกข้อความ 9360 twips ไม่ชิดขอบขวา)
@@ -346,6 +383,13 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
     article { page: doc; }
     @page doc { size: ${getPaper(r.category).cssSize}; margin: ${pageMargin}; }
     ${firstTopMm !== undefined ? `@page doc:first { margin-top: ${MEMO_GARUDA_TOP_MM}mm; }` : ''}
+    ${isOrder ? `
+    /* คำสั่ง: หน้า 2 เป็นต้นไปมีเลขหน้าเลขไทยมุมขวาบน (หัวกระดาษของไฟล์ Word) ซึ่งดันเนื้อหาลงเหมือนใน Word */
+    @page doc {
+      margin-top: ${ORDER_NEXT_PAGE_TOP_MM}mm;
+      @top-right { content: counter(page, thai); font-family: 'THSarabunIT9', 'THSarabunPSK', sans-serif; font-size: 16pt; vertical-align: top; padding-top: ${ORDER_PAGE_NO_TOP_MM}mm; }
+    }
+    @page doc:first { margin-top: ${spec.margins.top}mm; @top-right { content: none; } }` : ''}
     html {
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
@@ -652,34 +696,32 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
     ` : ''}
 
     <div style="margin-top: ${tune.bodyGapMm}mm;">
-      ${bodyItems.map(({ text: p, block }) => {
+      ${bodyItems.map(({ text: p, block }, k) => {
         if (isOrder) {
-          const mem = parseCommitteeRow(p);
-          if (mem.isMember) {
-            return `<div style="display: flex; padding-left: 32.5mm; margin: 0; line-height: ${WORD_LH};">
+          // ระยะและการเยื้องชุดเดียวกับไฟล์ Word (orderParaStyles) margin ของ HTML ยุบรวมแบบเดียวกับ Word
+          const st = orderStyles[k];
+          const tw = (v: number) => (v / 56.693).toFixed(2);
+          const box = `margin: ${tw(st.before)}mm 0 ${tw(st.after)}mm; padding-left: ${tw(st.left)}mm; text-indent: ${tw(st.firstLine)}mm; line-height: ${(WORD_LH * st.line / 240).toFixed(4)};`;
+          if (st.kind === 'member') {
+            const mem = parseCommitteeRow(p);
+            return `<div style="display: flex; ${box}">
               <span style="width: 81.5mm; flex-shrink: 0;">${escape(displayDigits(mem.name))}</span>
               <span>${escape(displayDigits(mem.role))}</span>
             </div>`;
           }
-          if (/^[๐-๙0-9]+(?:\.[๐-๙0-9]+)*[\.\s]\s*คณะกรรมการ/.test(p)) {
-            return `<div style="padding-left: ${orderLayout.headingIndentMm}mm; font-weight: bold; margin: 2mm 0 2mm; line-height: ${WORD_LH};">${escape(displayDigits(p))}</div>`;
-          }
-          if (p === 'หน้าที่' || p.startsWith('หน้าที่')) {
+          if (st.kind === 'heading') return `<div style="${box} font-weight: bold;">${escape(displayDigits(p))}</div>`;
+          if (st.kind === 'duty') {
             // ตัวหนาเฉพาะคำว่า "หน้าที่" ข้อความต่อท้ายเป็นตัวปกติ ตามต้นฉบับ
-            const dutyRest = p.startsWith('หน้าที่') ? p.slice('หน้าที่'.length) : '';
-            return `<div style="padding-left: ${orderLayout.headingIndentMm}mm; margin: 2mm 0 2mm; line-height: ${WORD_LH};"><strong>${escape(displayDigits('หน้าที่'))}</strong>${escape(displayDigits(dutyRest))}</div>`;
+            return `<div style="${box} text-align: justify; text-justify: inter-character;"><strong>${escape(displayDigits('หน้าที่'))}</strong>${escape(displayDigits(p.slice('หน้าที่'.length)))}</div>`;
           }
-          if (/^[๐-๙0-9]+(?:\.[๐-๙0-9]+)*[\.\s]/.test(p) && !mem.isMember) {
-            return `<div style="padding-left: 32.5mm; margin: 0; line-height: ${WORD_LH};">${escape(displayDigits(p))}</div>`;
-          }
-          if (p.startsWith('สั่ง ณ วันที่')) {
-            return `<div style="padding-left: ${orderLayout.dateIndentMm}mm; margin: 3.2mm 0 1mm; line-height: ${WORD_LH};">${escape(displayDigits(p))}</div>`;
-          }
+          if (st.kind === 'dutyItem') return `<div style="${box} text-align: justify; text-justify: inter-character;">${escape(displayDigits(p))}</div>`;
+          if (st.kind === 'date') return `<div style="${box}">${escape(displayDigits(p))}</div>`;
+          return `<div class="body-para" style="${box}${block.firstLine ? '' : ' text-indent: 0;'} text-align: ${block.align};">${richRunsHtml(block)}</div>`;
         }
         return bodyParaHtml(block);
       }).join('')}
       ${isOrder && !bodyItems.some(i => i.text.startsWith('สั่ง ณ วันที่')) ? `
-        <div style="padding-left: ${orderLayout.dateIndentMm}mm; margin: 3.2mm 0 1mm; line-height: ${WORD_LH};">
+        <div style="padding-left: ${orderLayout.dateIndentMm}mm; margin: 2.12mm 0 1.06mm; line-height: ${WORD_LH};">
           ${escape(displayDigits(thaiGovDate(r.date, digitType, 'order')))}
         </div>
       ` : ''}
@@ -884,25 +926,29 @@ async function buildFromTemplate(r: AdminDocRegistryRecord): Promise<Blob | null
             i === 0 ? centered('เรื่อง  ' + display(line), { left: 1418, hanging: 1418 }) : centered(display(line))),
           centered('........................................................', { after: 120 })
         ];
-        for (const { text, block } of items) {
-          const mem = parseCommitteeRow(text);
-          if (mem.isMember) {
-            parts.push(xmlPara(xmlRun(display(mem.name)) + xmlTab() + xmlRun(display(mem.role)), { left: 1843, tabs: [6460] }));
-          } else if (/^[๐-๙0-9]+(?:\.[๐-๙0-9]+)*[\.\s]\s*คณะกรรมการ/.test(text)) {
-            parts.push(xmlPara(xmlRun(display(text), { bold: true }), { left: headingIndent, before: 120, after: 120, keepNext: true }));
-          } else if (text === 'หน้าที่' || text.startsWith('หน้าที่')) {
+        const styles = orderParaStyles(items.map(i => i.text), headingIndent, dateIndent);
+        items.forEach(({ text, block }, k) => {
+          const st = styles[k];
+          const pos = { firstLine: st.firstLine, left: st.left, before: st.before, after: st.after, line: st.line };
+          if (st.kind === 'member') {
+            const mem = parseCommitteeRow(text);
+            parts.push(xmlPara(xmlRun(display(mem.name)) + xmlTab() + xmlRun(display(mem.role)), { ...pos, tabs: [6460] }));
+          } else if (st.kind === 'heading') {
+            parts.push(xmlPara(xmlRun(display(text), { bold: true }), { ...pos, keepNext: true }));
+          } else if (st.kind === 'duty') {
             const rest = text.slice('หน้าที่'.length);
-            parts.push(xmlPara(xmlRun('หน้าที่', { bold: true }) + (rest.trim() ? xmlRun(display(rest)) : ''), { left: headingIndent, before: 120, after: 120 }));
-          } else if (/^[๐-๙0-9]+(?:\.[๐-๙0-9]+)*[\.\s]/.test(text)) {
-            parts.push(xmlPara(xmlRun(display(text)), { left: 1843, after: 30 }));
-          } else if (text.startsWith('สั่ง ณ วันที่')) {
-            parts.push(xmlPara(xmlRun(display(text)), { left: dateIndent, before: 180, after: 60, keepNext: true }));
+            parts.push(xmlPara(xmlRun('หน้าที่', { bold: true }) + (rest.trim() ? xmlRun(display(rest)) : ''), { ...pos, align: 'distribute', keepNext: !rest.trim() }));
+          } else if (st.kind === 'dutyItem') {
+            parts.push(xmlPara(xmlRun(display(text)), { ...pos, align: 'distribute' }));
+          } else if (st.kind === 'date') {
+            parts.push(xmlPara(xmlRun(display(text)), { ...pos, keepNext: true }));
           } else {
-            parts.push(blocksToWordXml([block], display));
+            // ย่อหน้าข้อความ: คงรูปแบบที่ผู้ร่างตั้ง (ตัวหนา/จัดแนว/ปิดเยื้องบรรทัดแรก) ระยะตามต้นฉบับ
+            parts.push(blocksToWordXml([block], display, () => st.before, b => ({ firstLine: b.firstLine ? st.firstLine : 0, after: st.after, line: st.line })));
           }
-        }
+        });
         if (!items.some(i => i.text.startsWith('สั่ง ณ วันที่'))) {
-          parts.push(xmlPara(xmlRun(display(thaiGovDate(r.date, digitType, 'order'))), { left: dateIndent, before: 180, after: 60, keepNext: true }));
+          parts.push(xmlPara(xmlRun(display(thaiGovDate(r.date, digitType, 'order'))), { left: dateIndent, before: 120, after: 60, keepNext: true }));
         }
         parts.push(signatureXml(), coordinatorXml());
         return { content: parts.join(''), pageBreak };
@@ -1239,51 +1285,43 @@ export async function buildAdminWord(r: AdminDocRegistryRecord): Promise<Blob> {
   if (isOrder) {
     const orderHeadingIndent = mmToTwips(orderLayout.headingIndentMm);
     const orderDateIndent = mmToTwips(orderLayout.dateIndentMm);
-    const orderBody = orderItems(getBodyBlocks(r)).map(({ text: block, block: rich }) => {
-      const mem = parseCommitteeRow(block);
-      if (mem.isMember) {
+    // รูปแบบย่อหน้าชุดเดียวกับแม่แบบ Word และ Preview (orderParaStyles)
+    const orderList = orderItems(getBodyBlocks(r));
+    const orderStyleList = orderParaStyles(orderList.map(i => i.text), orderHeadingIndent, orderDateIndent);
+    const orderBody = orderList.map(({ text: block, block: rich }, k) => {
+      const st = orderStyleList[k];
+      const spacing = { before: st.before, after: st.after, line: st.line, lineRule: LineRuleType.AUTO };
+      const indent = { firstLine: st.firstLine, left: st.left };
+      if (st.kind === 'member') {
+        const mem = parseCommitteeRow(block);
         return new Paragraph({
           children: [run(mem.name), new TextRun({ text: '\t', font, size: 32, language: { value: 'th-TH' } }), run(mem.role)],
-          indent: { left: 1843 },
+          indent,
           tabStops: [{ type: TabStopType.LEFT, position: 6460 }],
-          spacing: { ...SINGLE, after: 0 },
+          spacing,
           keepLines: true
         });
       }
-      if (/^[๐-๙0-9]+(?:\.[๐-๙0-9]+)*[\.\s]\s*คณะกรรมการ/.test(block)) {
-        return new Paragraph({
-          children: [run(block, true)],
-          indent: { left: orderHeadingIndent },
-          spacing: { before: 120, after: 120, ...SINGLE },
-          keepNext: true
-        });
-      }
-      if (block === 'หน้าที่' || block.startsWith('หน้าที่')) {
+      if (st.kind === 'heading') return new Paragraph({ children: [run(block, true)], indent, spacing, keepNext: true });
+      if (st.kind === 'duty') {
         // ตัวหนาเฉพาะคำว่า "หน้าที่" ข้อความต่อท้ายเป็นตัวปกติ ตามต้นฉบับ
         const rest = block.slice('หน้าที่'.length);
         return new Paragraph({
           children: [run('หน้าที่', true), ...(rest.trim() ? [run(rest)] : [])],
-          indent: { left: orderHeadingIndent },
-          spacing: { before: 120, after: 120, ...SINGLE },
+          alignment: AlignmentType.THAI_DISTRIBUTE,
+          indent,
+          spacing,
           keepNext: !rest.trim()
         });
       }
-      if (/^[๐-๙0-9]+(?:\.[๐-๙0-9]+)*[\.\s]/.test(block) && !mem.isMember) {
-        return new Paragraph({
-          children: [run(block)],
-          indent: { left: 1843 },
-          spacing: { ...SINGLE, after: 30 }
-        });
-      }
-      if (block.startsWith('สั่ง ณ วันที่')) {
-        return new Paragraph({
-          children: [run(block)],
-          indent: { left: orderDateIndent },
-          spacing: { before: 180, after: 60, ...SINGLE },
-          keepNext: true
-        });
-      }
-      return body(rich);
+      if (st.kind === 'dutyItem') return new Paragraph({ children: [run(block)], alignment: AlignmentType.THAI_DISTRIBUTE, indent, spacing });
+      if (st.kind === 'date') return new Paragraph({ children: [run(block)], indent, spacing, keepNext: true });
+      return new Paragraph({
+        children: blockRuns(rich),
+        alignment: alignMap[rich.align],
+        indent: { firstLine: rich.firstLine ? st.firstLine : 0, left: rich.indent * INDENT_STEP_TWIPS },
+        spacing
+      });
     });
 
     const hasDateInBody = orderItems(getBodyBlocks(r)).some(i => i.text.startsWith('สั่ง ณ วันที่'));
@@ -1324,7 +1362,7 @@ export async function buildAdminWord(r: AdminDocRegistryRecord): Promise<Blob> {
         })),
         new Paragraph({ children: [run('........................................................', true)], alignment: AlignmentType.CENTER, spacing: { ...SINGLE, after: 120 }, keepNext: true }),
         ...orderBody,
-        ...(!hasDateInBody ? [new Paragraph({ children: [run(thaiGovDate(r.date, digitType, 'order'))], indent: { left: orderDateIndent }, spacing: { before: 180, after: 60, ...SINGLE }, keepNext: true })] : []),
+        ...(!hasDateInBody ? [new Paragraph({ children: [run(thaiGovDate(r.date, digitType, 'order'))], indent: { left: orderDateIndent }, spacing: { before: 120, after: 60, ...SINGLE }, keepNext: true })] : []),
         ...signatureParagraphs,
         ...(r.coordinatorInfo ? [para(r.coordinatorInfo)] : [])
       ]

@@ -190,7 +190,26 @@ def leading_template(src, dst, first_text, pgmar_bottom=True):
     head = doc[:doc.index('<w:body>') + len('<w:body>')]
     new = head + tag_para('#letters') + leading + tag_para('@content') + tag_para('@pageBreak') + tag_para('/letters') + sect + '</w:body></w:document>'
     files['word/document.xml'] = new.encode('utf8')
+    page_number_field(files)
     write(dst, files, infos)
+
+
+def page_number_field(files):
+    """ต้นฉบับพิมพ์เลขหน้า "๒" ตายตัวที่หัวกระดาษ (หน้า 2 เป็นต้นไป) เปลี่ยนเป็นฟิลด์เลขหน้าเลขไทย เพื่อให้หน้า 3, 4 ถูกต้อง"""
+    for name in [n for n in files if re.match(r'word/header\d*\.xml', n)]:
+        x = files[name].decode('utf8')
+        if '<w:instrText' in x:
+            continue  # มีฟิลด์เลขหน้าอยู่แล้ว (หนังสือภายนอก)
+        m = re.search(r'<w:r>(<w:rPr>(?:(?!</w:rPr>).)*</w:rPr>)?<w:t>[๐-๙]+</w:t></w:r>', x, re.S)
+        if not m:
+            continue
+        rpr = m.group(1) or ''
+        field = (f'<w:r>{rpr}<w:fldChar w:fldCharType="begin"/></w:r>'
+                 f'<w:r>{rpr}<w:instrText xml:space="preserve"> PAGE \\* ThaiArabic </w:instrText></w:r>'
+                 f'<w:r>{rpr}<w:fldChar w:fldCharType="separate"/></w:r>'
+                 f'<w:r>{rpr}<w:t>๒</w:t></w:r>'
+                 f'<w:r>{rpr}<w:fldChar w:fldCharType="end"/></w:r>')
+        files[name] = (x[:m.start()] + field + x[m.end():]).encode('utf8')
 
 
 def write(dst, files, infos):

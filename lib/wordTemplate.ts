@@ -44,6 +44,8 @@ export interface XmlParaOptions {
   after?: number;
   tabs?: number[];
   keepNext?: boolean;
+  /** ระยะบรรทัด (240 = บรรทัดเดี่ยว, 259 = ค่าเริ่มต้นของ Word 1.08) */
+  line?: number;
 }
 
 export function xmlPara(inner: string, o: XmlParaOptions = {}): string {
@@ -55,13 +57,18 @@ export function xmlPara(inner: string, o: XmlParaOptions = {}): string {
   const tabs = o.tabs?.length ? `<w:tabs>${o.tabs.map(t => `<w:tab w:val="left" w:pos="${t}"/>`).join('')}</w:tabs>` : '';
   return (
     `<w:p><w:pPr>${o.keepNext ? '<w:keepNext/>' : ''}${tabs}` +
-    `<w:spacing w:before="${o.before ?? 0}" w:after="${o.after ?? 0}" w:line="240" w:lineRule="auto"/>${ind}` +
+    `<w:spacing w:before="${o.before ?? 0}" w:after="${o.after ?? 0}" w:line="${o.line ?? 240}" w:lineRule="auto"/>${ind}` +
     `${jc ? `<w:jc w:val="${jc}"/>` : ''}</w:pPr>${inner}</w:p>`
   );
 }
 
 /** เนื้อหา Rich Text เป็นย่อหน้า WordprocessingML ตามต้นฉบับ (เยื้องบรรทัดแรก 2.5 ซม. ชิดสองขอบแบบไทย) */
-export function blocksToWordXml(blocks: RichBlock[], display: (t: string) => string, beforeFor?: (b: RichBlock) => number): string {
+export function blocksToWordXml(
+  blocks: RichBlock[],
+  display: (t: string) => string,
+  beforeFor?: (b: RichBlock) => number,
+  extra?: (b: RichBlock) => XmlParaOptions
+): string {
   const alignOf = { left: 'left', center: 'center', right: 'right', justify: 'distribute' } as const;
   return blocks
     .map(b =>
@@ -71,7 +78,8 @@ export function blocksToWordXml(blocks: RichBlock[], display: (t: string) => str
           align: alignOf[b.align],
           firstLine: b.firstLine ? 1417 : 0,
           left: b.indent * INDENT_STEP_TWIPS,
-          before: beforeFor ? beforeFor(b) : 120
+          before: beforeFor ? beforeFor(b) : 120,
+          ...(extra ? extra(b) : {})
         }
       )
     )

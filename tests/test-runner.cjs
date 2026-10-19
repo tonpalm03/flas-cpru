@@ -835,6 +835,15 @@ async function runAllTests() {
   assert.equal(/\{\{|\}\}/.test(orderXml), false, 'order: no unreplaced tags');
   assert.ok(orderXml.includes('ประธานกรรมการ') && orderXml.includes('หน้าที่') && orderXml.includes('คำสั่งคณะศิลปศาสตร์'), 'order: committee row, duty label and title placed');
   assert.ok(orderXml.includes('<wp:anchor'), 'order: floating garuda comes from the original file');
+  {
+    // รูปแบบย่อหน้าคำสั่งตามต้นฉบับ: ย่อหน้าแรกเยื้อง 16 วรรค ระยะบรรทัด 1.08, ข้อหน้าที่เยื้องเฉพาะบรรทัดแรก, ย่อหน้าหลังรายชื่อเว้นก่อน 12 พอยต์
+    const { orderParaStyles } = require('../lib/adminDocument.ts');
+    const st = orderParaStyles(['ด้วยคณะ...', 'ดังนั้น ...', '๑. คณะกรรมการอำนวยการ', '๑. นาย ก  ประธานกรรมการ', 'หน้าที่ ให้คำปรึกษา', '๑. ดำเนินงานโครงการ', 'ให้คณะกรรมการ...', 'สั่ง ณ วันที่ ๑'], 1440, 2160);
+    assert.deepEqual(st.map(x => x.kind), ['intro', 'prose', 'heading', 'member', 'duty', 'dutyItem', 'closing', 'date'], 'order paragraphs classified like the original');
+    assert.equal(st[0].firstLine, 1106); assert.equal(st[0].line, 259); assert.equal(st[0].after, 160);
+    assert.equal(st[5].firstLine, 1843); assert.equal(st[5].left, 0, 'duty item wraps back to the margin');
+    assert.equal(st[6].before, 240); assert.equal(st[7].before, 120);
+  }
   // ชื่อเรื่องที่ผู้ร่างขึ้นบรรทัดใหม่เอง: บรรทัดถัดไปเป็นย่อหน้ากึ่งกลางเต็มบรรทัดเหมือนต้นฉบับ ทั้ง Word และ Preview
   const brokenTitle = { ...orderRec, subject: 'แต่งตั้งคณะกรรมการ และสตาร์ทอัพ\nท่องเที่ยวเพื่อพัฒนา' };
   const brokenXml = new PizZip(Buffer.from(await (await buildAdminWord(brokenTitle)).arrayBuffer())).file('word/document.xml').asText();
