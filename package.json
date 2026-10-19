@@ -9,6 +9,11 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@tiptap/extension-paragraph": "^3.32.0",
+    "@tiptap/extension-text-align": "^3.32.0",
+    "@tiptap/pm": "^3.32.0",
+    "@tiptap/react": "^3.32.0",
+    "@tiptap/starter-kit": "^3.32.0",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "docx": "^9.1.1",

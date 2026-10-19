@@ -11,6 +11,35 @@ export type UserRole =
   | "staff_plan"         // เจ้าหน้าที่งานแผนและยุทธศาสตร์
   | "gov_officer";       // เจ้าหน้าที่สายสนับสนุนทั่วไป
 
+export type StandardRole =
+  | "แอดมิน"
+  | "คณบดี"
+  | "รองคณบดี"
+  | "ผู้บริหาร"
+  | "ธุรการ"
+  | "การเงิน"
+  | "พัสดุ"
+  | "แผนงาน"
+  | "บุคคล"
+  | "ประธานสาขา"
+  | "อาจารย์"
+  | "เจ้าหน้าที่";
+
+export const ALL_STANDARD_ROLES: StandardRole[] = [
+  "แอดมิน",
+  "คณบดี",
+  "รองคณบดี",
+  "ผู้บริหาร",
+  "ธุรการ",
+  "การเงิน",
+  "พัสดุ",
+  "แผนงาน",
+  "บุคคล",
+  "ประธานสาขา",
+  "อาจารย์",
+  "เจ้าหน้าที่"
+];
+
 export type UserAccountStatus = "pending_approval" | "active" | "suspended" | "archived";
 
 export interface UserProfile {
@@ -18,6 +47,7 @@ export interface UserProfile {
   employeeId?: string;
   name: string;
   role: UserRole;
+  roles?: StandardRole[];       // Multi-Role array (Discord-like tags)
   roleTitle: string;
   department: string;
   position?: string;
@@ -26,6 +56,8 @@ export interface UserProfile {
   officeRoom?: string;
   bio?: string;
   status: UserAccountStatus;
+  signatureUrl?: string;        // Digital e-Signature URL (PNG transparent)
+  signatureName?: string;       // Custom display name for signature block
   permissions?: string[];
   avatarUrl?: string;
   avatarVersion?: number;
@@ -951,4 +983,175 @@ export interface AttendancePeriodLock {
   reopenReason?: string;
   reopenedAt?: string;
 }
+
+// 9. ระบบสารบรรณและแม่แบบเอกสารอิเล็กทรอนิกส์ (Admin Document Registry & Templates)
+export type AdminDocCategory = 'order' | 'external' | 'external_circular' | 'memo_circular' | 'memo' | string;
+
+export interface AdminDocRegistryPreset {
+  from: string;
+  to: string;
+  subject: string;
+  action: string;
+  remarks?: string;
+  referenceDoc?: string;
+  attachmentsText?: string;
+  bodyText: string;
+  signatoryName: string;
+  signatoryPosition: string;
+  coordinatorInfo?: string;
+  officeAddress?: string;
+  recipients: string[];
+}
+
+export interface SignatoryPreset {
+  id: string;
+  label: string;
+  name: string;
+  position: string;
+  orderIndex?: number;
+  isActive?: boolean;
+  updatedAt?: string;
+  updatedBy?: string;
+}
+
+export interface AdminDocCategoryConfig {
+  id: string; // e.g. 'memo', 'memo_circular', 'external', 'external_circular', 'order', or custom slug
+  title: string;
+  subtitle?: string;
+  layoutType: 'memo' | 'external' | 'order' | 'custom';
+  garudaPosition: 'left' | 'center' | 'none';
+  garudaImage?: string;
+  garudaSize?: number;
+  prefix: string;
+  numberingPattern: string;
+  defaultDigitType: 'thai' | 'arabic';
+  paperSize: 'a4' | 'letter';
+  headerLineStyle?: 'dot_leader' | 'dotted' | 'solid' | 'underline' | 'none';
+  lineVisibility?: {
+    govOrg?: boolean;
+    docNumber?: boolean;
+    docDate?: boolean;
+    subject?: boolean;
+  };
+  preset: AdminDocRegistryPreset;
+  orderIndex: number;
+  isBuiltIn?: boolean;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+  updatedBy?: string;
+}
+
+export type AdminDocAction = 'ฉบับร่าง' | 'รอตรวจ' | 'รอลงนาม' | 'ลงนามแล้ว';
+
+export interface SequentialSignerStep {
+  step: number;
+  title: string;
+  requiredRole?: string;
+  assignedUserId?: string;
+  assignedUserName?: string;
+  status: 'pending' | 'signed';
+  signedAt?: string;
+  signedByName?: string;
+  signedByPosition?: string;
+  signatureUrl?: string;
+}
+
+export interface DocumentAuditEntry {
+  id: string;
+  action: string;
+  timestamp: string;
+  actorId: string;
+  actorName: string;
+  details?: string;
+}
+
+export interface DocumentWorkflowConfig {
+  id: string; // e.g. 'memo', 'external', 'order', or custom category ID
+  category: string;
+  title: string;
+  reviewers: { roles: string[]; userIds?: string[] };
+  numberers: { roles: string[]; userIds?: string[] };
+  signSubmitters: { roles: string[]; userIds?: string[] };
+  signers: {
+    mode: 'single' | 'sequential';
+    roles: string[];
+    userIds?: string[];
+    sequentialSteps?: Array<{ step: number; title: string; role?: string; userId?: string; userName?: string }>;
+  };
+  viewers: { roles: string[]; userIds?: string[] };
+  downloaders: { roles: string[]; userIds?: string[] };
+  allowCreatorSelfReview?: boolean;
+  allowCreatorSelfSign?: boolean;
+  updatedAt?: string;
+  updatedBy?: string;
+}
+
+export interface AdminDocRegistryRecord {
+  id: string;
+  category: AdminDocCategory;
+  year: number;
+  sequenceNumber: number;
+  docNumber: string;
+  date: string;
+  from: string;
+  to: string;
+  subject: string;
+  action: AdminDocAction | string;
+  remarks?: string;
+  filePath?: string;
+  fileUrl?: string;
+  fileName?: string;
+  fileSize?: number;
+  originalFileName?: string;
+  uploadedAt?: string;
+  createdBy?: string;
+  createdById?: string;
+  createdByName?: string;
+  createdByEmail?: string;
+  createdAt: string;
+  updatedAt?: string;
+  numeralFormat?: 'thai' | 'arabic';
+  digitType?: 'thai' | 'arabic';
+  paperSize?: 'a4' | 'letter';
+  headerLineStyle?: 'dot_leader' | 'dotted' | 'solid' | 'underline' | 'none';
+  lineVisibility?: {
+    govOrg?: boolean;
+    docNumber?: boolean;
+    docDate?: boolean;
+    subject?: boolean;
+  };
+  content?: string;
+  referenceDoc?: string;
+  attachmentsList?: string[];
+  bodyParagraphs?: string[];
+  /** เนื้อหาแบบ Rich Text (HTML ชุดเล็ก p/br/strong/em/u) ถ้ามีจะใช้เรนเดอร์แทน bodyParagraphs */
+  bodyHtml?: string;
+  signatoryName?: string;
+  signatoryPosition?: string;
+  signatureUrl?: string;
+  signedAt?: string;
+  signedById?: string;
+  signedByName?: string;
+  signedByPosition?: string;
+  coordinatorInfo?: string;
+  officeAddress?: string;
+  recipients?: string[];
+  templateVersion?: string;
+  revision?: number;
+  // Workflow & granular tracking
+  isNumberIssued?: boolean;
+  numberIssuedAt?: string;
+  numberIssuedBy?: string;
+  numberIssuedById?: string;
+  currentSignerStep?: number;
+  signerSteps?: SequentialSignerStep[];
+  assignedReviewerIds?: string[];
+  assignedSignerIds?: string[];
+  syncStatus?: 'local' | 'syncing' | 'synced' | 'error';
+  syncError?: string;
+  tombstone?: boolean;
+  history?: DocumentAuditEntry[];
+}
+
 

@@ -1,8 +1,10 @@
 import type { AdminDocCategory, AdminDocRegistryRecord } from './types';
+import { INDENT_STEP_MM, INDENT_STEP_TWIPS, getBodyBlocks, newBlock, type RichBlock } from './richBody';
+import { A4_MM, A4_TWIPS, cssMargin, getTemplateSpec, mmToTwips, wordMargin } from './adminTemplateSpec';
 
 export function garudaPath(category: string, garudaImage?: string) {
   if (garudaImage) return garudaImage;
-  if (category.startsWith('memo')) return '/templates/admin/garuda-memo.jpg';
+  if (category.startsWith('memo')) return '/templates/admin/garuda-memo.png';
   if (category === 'order') return '/templates/admin/garuda-order.png';
   return '/templates/admin/garuda-external.png';
 }
@@ -78,7 +80,7 @@ export function orderBlocks(paragraphs: string[]) {
   for (const raw of paragraphs.join("\n").split("\n")) {
     const line = raw.trim().replace(/[ \t]{2,}/g, " ");
     if (!line) continue;
-    if (!blocks.length || /^(?:[๐-๙0-9]+\.|หน้าที่|ดังนั้น|ให้คณะกรรมการ|ทั้งนี้|สั่ง ณ)/.test(line)) {
+    if (!blocks.length || /^(?:[๐-๙0-9]+(?:\.[๐-๙0-9]+)*[\.\s]|หน้าที่|ดังนั้น|ให้คณะกรรมการ|ทั้งนี้|สั่ง ณ)/.test(line)) {
       blocks.push(line);
     } else {
       blocks[blocks.length - 1] += " " + line;
@@ -87,9 +89,26 @@ export function orderBlocks(paragraphs: string[]) {
   return blocks;
 }
 
+/**
+ * แบ่งเนื้อหาคำสั่งเป็นรายการพร้อมข้อความล้วนสำหรับจัดประเภท (หัวข้อ/รายชื่อกรรมการ/หน้าที่)
+ * ใช้ร่วมกันทั้ง Preview และ Word เพื่อให้ผลตรงกัน
+ */
+export function orderItems(blocks: RichBlock[]): { text: string; block: RichBlock }[] {
+  const out: { text: string; block: RichBlock }[] = [];
+  for (const b of blocks) {
+    const ls = orderBlocks([b.text]);
+    if (ls.length === 1 && ls[0] === b.text.trim().replace(/[ \t]{2,}/g, ' ')) {
+      out.push({ text: ls[0], block: b });
+    } else {
+      for (const l of ls) out.push({ text: l, block: newBlock(l, { align: b.align, firstLine: b.firstLine, indent: b.indent }) });
+    }
+  }
+  return out;
+}
+
 export function parseCommitteeRow(text: string) {
-  const match = text.match(/^([๐-๙0-9]+\.\s*.+?)\s{2,}(.+)$/) ||
-                text.match(/^([๐-๙0-9]+\.\s*.+?)\s+(ประธานกรรมการ|รองประธานกรรมการ|กรรมการและ(?:ผู้ช่วย)?เลขานุการ|กรรมการ|ที่ปรึกษา)$/);
+  const match = text.match(/^([๐-๙0-9]+(?:\.[๐-๙0-9]+)*[\.\s]\s*.+?)\s{2,}(.+)$/) ||
+                text.match(/^([๐-๙0-9]+(?:\.[๐-๙0-9]+)*[\.\s]\s*.+?)\s*(ประธานกรรมการ|รองประธานกรรมการ|กรรมการและ(?:ผู้ช่วย)?เลขานุการ|ผู้ช่วยเลขานุการ|กรรมการ|ที่ปรึกษา)$/);
   if (match) {
     return { isMember: true, name: match[1].trim(), role: match[2].trim() };
   }
@@ -97,21 +116,59 @@ export function parseCommitteeRow(text: string) {
 }
 
 export function parseAttachmentRow(text: string) {
-  const match = text.match(/^([๐-๙0-9]+\.\s*.+?)\s+(จำนวน\s+[๐-๙0-9]+\s*ฉบับ|\d+\s*ฉบับ)$/);
-  if (match) {
-    return { item: match[1].trim(), qty: match[2].trim() };
+  const numMatch = text.match(/^([๐-๙0-9]+(?:\.[๐-๙0-9]+)*[\.\s]\s*)(.*)$/);
+  const core = numMatch ? numMatch[2].trim() : text.trim();
+  const qtyMatch = core.match(/^(.*?)\s{2,}(.*?)$/) ||
+                   core.match(/^(.*?)\s+(จำนวน\s+[๐-๙0-9]+\s*ฉบับ|\d+\s*ฉบับ|[๐-๙0-9]+\s*ชุด|จำนวน\s+[๐-๙0-9]+\s*ชุด)$/);
+  if (qtyMatch) {
+    return { item: qtyMatch[1].trim(), qty: qtyMatch[2].trim() };
   }
-  return { item: text, qty: '' };
+  return { item: core, qty: '' };
+}
+
+export function getCategoryDocPrefix(category = 'memo'): string {
+  if (category === 'memo_circular') return 'อว 0646.02/ว ';
+  if (category === 'memo') return 'อว 0646.02/';
+  if (category === 'external_circular') return 'ที่ อว 0646.02/ว ';
+  if (category === 'external') return 'ที่ อว 0646.02/';
+  if (category === 'order') return 'ที่ ';
+  return 'อว 0646.02/';
 }
 
 /**
- * Display formatted document number or pending placeholder
+ * Display formatted document number with permanent category prefix.
+ * Trailing sequence number is appended when available.
  */
 export function getDisplayDocNumber(r: Partial<AdminDocRegistryRecord>): string {
-  if (r.docNumber && r.docNumber.trim()) {
-    return r.docNumber.trim();
+  const category = r.category || 'memo';
+  const prefix = getCategoryDocPrefix(category);
+  const raw = (r.docNumber || '').trim();
+
+  // If order category
+  if (category === 'order') {
+    if (raw && !raw.startsWith('(')) {
+      return raw.startsWith('ที่') ? raw : `ที่ ${raw}`;
+    }
+    const yearStr = r.year ? String(r.year) : (r.date ? String(Number(r.date.slice(0, 4)) + 543) : '๒๕๖๙');
+    return `ที่      /${yearStr}`;
   }
-  return '(รอออกเลขหนังสือ)';
+
+  // If empty or placeholder like (รอออกเลข...)
+  if (!raw || raw.startsWith('(')) {
+    return prefix;
+  }
+
+  // If raw already contains slash or faculty code
+  if (raw.includes('/') || raw.includes('อว')) {
+    let clean = raw;
+    if (category.startsWith('memo') && clean.startsWith('ที่')) {
+      clean = clean.replace(/^ที่\s*/, '');
+    }
+    return clean;
+  }
+
+  // If raw is just sequence number e.g. "1741" or "๑๗๔๑"
+  return `${prefix}${raw}`;
 }
 
 /**
@@ -121,7 +178,7 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
   const isMemo = r.category.startsWith('memo');
   const isOrder = r.category === 'order';
   const recipients = r.recipients?.filter(x => x.trim()) || [];
-  const targets = r.category === 'external_circular' && recipients.length ? recipients : [r.to || ''];
+  const targets = (r.category === 'external_circular' || r.category === 'memo_circular') && recipients.length ? recipients : [r.to || ''];
   const digitType = getRecordDigitType(r);
   const displayDigits = (t: string) => formatDocDigits(t, digitType);
 
@@ -130,9 +187,7 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
   const cleanSubject = sanitizeFieldText(r.subject, 'เรื่อง');
   const cleanReference = sanitizeFieldText(r.referenceDoc || '', 'อ้างถึง');
   const displayNum = getDisplayDocNumber(r);
-  const formattedOrderNum = isOrder
-    ? displayNum.replace(/^ที่\s*/, 'ที่  ').replace(/([๐-๙0-9]+)\s*\/\s*([๐-๙0-9]+)/, '$1  /$2')
-    : displayNum;
+  const formattedOrderNum = displayNum;
 
   const lineStyle = r.headerLineStyle || 'dot_leader';
   const lineVis = {
@@ -144,12 +199,26 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
 
   const getLineClass = (visible: boolean) => {
     if (!visible || lineStyle === 'none') return '';
-    if (lineStyle === 'dotted') return 'border-dotted';
     if (lineStyle === 'solid') return 'border-solid';
-    return '';
+    return 'border-dotted';
   };
 
-  const isLetter = r.paperSize === 'letter';
+  const bodyBlocks = getBodyBlocks(r);
+  const bodyItems = isOrder ? orderItems(bodyBlocks) : bodyBlocks.map(b => ({ text: b.text, block: b }));
+  const richRunsHtml = (b: RichBlock) =>
+    b.runs.map(run => {
+      let t = escape(displayDigits(run.text)).replace(/\n/g, '<br>');
+      if (run.bold) t = `<strong>${t}</strong>`;
+      if (run.italic) t = `<em>${t}</em>`;
+      if (run.underline) t = `<u>${t}</u>`;
+      return t;
+    }).join('') || '&nbsp;';
+  const bodyParaHtml = (b: RichBlock) =>
+    `<div class="body-para" style="text-align: ${b.align};${b.firstLine ? '' : ' text-indent: 0;'}${b.indent ? ` margin-left: ${b.indent * INDENT_STEP_MM}mm;` : ''}">${richRunsHtml(b)}</div>`;
+  const spec = getTemplateSpec(r.category);
+  const pageMargin = cssMargin(spec.margins);
+  const firstTopMm = spec.firstPageTop;
+  const MEMO_GARUDA_TOP_MM = 10; // ตราครุฑบันทึกข้อความอยู่สูงจากขอบกระดาษ 1 ซม. ตามต้นฉบับ
 
   return `<!doctype html>
 <html lang="th">
@@ -159,19 +228,31 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
   <style>
     @font-face {
       font-family: 'THSarabunPSK';
-      src: url('${escape(origin)}/templates/admin/fonts/THSarabunPSK-Regular.ttf') format('truetype');
+      src: local('TH SarabunPSK'), local('THSarabunPSK'), url('${escape(origin)}/templates/admin/fonts/THSarabunPSK-Regular.ttf') format('truetype');
       font-weight: normal;
       font-style: normal;
     }
     @font-face {
       font-family: 'THSarabunPSK';
-      src: url('${escape(origin)}/templates/admin/fonts/THSarabunPSK-Bold.ttf') format('truetype');
+      src: local('TH SarabunPSK Bold'), local('THSarabunPSK-Bold'), local('TH SarabunPSK'), url('${escape(origin)}/templates/admin/fonts/THSarabunPSK-Bold.ttf') format('truetype');
       font-weight: bold;
       font-style: normal;
     }
     @page {
-      size: ${isLetter ? 'letter portrait' : 'A4 portrait'};
-      margin: 25mm 20mm 20mm 30mm;
+      size: A4 portrait;
+      /* ระยะขอบตามต้นฉบับของประเภทเอกสาร ใช้กับทุกหน้า ไม่ใช่เฉพาะหน้าแรก */
+      margin: ${pageMargin};
+      ${isMemo ? `
+      @bottom-left { content: 'CPRU-66-001'; font-family: 'THSarabunPSK', 'Sarabun', sans-serif; font-size: 12pt; vertical-align: bottom; }
+      @bottom-right { content: counter(page${digitType === 'thai' ? ', thai' : ''}); font-family: 'THSarabunPSK', 'Sarabun', sans-serif; font-size: 12pt; vertical-align: bottom; }
+      ` : ''}
+    }
+    article { page: doc; }
+    @page doc { size: A4 portrait; margin: ${pageMargin}; }
+    ${firstTopMm !== undefined ? `@page doc:first { margin-top: ${MEMO_GARUDA_TOP_MM}mm; }` : ''}
+    html {
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
     }
     * { box-sizing: border-box; }
     body {
@@ -204,11 +285,19 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
       font-family: inherit;
     }
     .print-btn:hover { background: #1e40af; }
+    .print-hint {
+      display: inline-block;
+      margin-left: 16px;
+      color: #94a3b8;
+      font-size: 12px;
+      font-family: 'Sarabun', sans-serif;
+      vertical-align: middle;
+    }
     article {
       background: white;
-      width: ${isLetter ? '216mm' : '210mm'};
-      min-height: ${isLetter ? '279mm' : '297mm'};
-      padding: 25mm 20mm 20mm 30mm;
+      width: ${A4_MM.width}mm;
+      min-height: ${A4_MM.height}mm;
+      padding: ${firstTopMm !== undefined ? `${firstTopMm}mm ${spec.margins.right}mm ${spec.margins.bottom}mm ${spec.margins.left}mm` : pageMargin};
       margin: 20px auto;
       box-shadow: 0 4px 16px rgba(0,0,0,0.08);
       position: relative;
@@ -218,43 +307,125 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
     .garuda-memo {
       position: absolute;
       left: 0;
-      top: 0;
+      top: -${(firstTopMm ?? MEMO_GARUDA_TOP_MM) - MEMO_GARUDA_TOP_MM}mm;
+      width: 14.25mm;
       height: 15mm;
-      width: auto;
+      object-fit: contain;
     }
     .garuda-center {
       display: block;
+      width: 28.5mm;
       height: 30mm;
-      width: auto;
       margin: 0 auto 3mm;
+      object-fit: contain;
+    }
+    .ext-header {
+      position: relative;
+      margin-bottom: 0;
+    }
+    .ext-header-left {
+      position: absolute;
+      left: 0;
+      top: 27mm;
+      width: 60mm;
+      font-size: 16pt;
+      line-height: 1.25;
+    }
+    .ext-header-center {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      top: 0;
+      text-align: center;
+      width: 32mm;
+    }
+    .garuda-ext {
+      width: 28.5mm;
+      height: 30mm;
+      display: block;
+      margin: 0 auto;
+      object-fit: contain;
+    }
+    .ext-header-right {
+      margin-left: 101mm;
+      padding-top: 27mm;
+      min-height: 30mm;
+      font-size: 16pt;
+      line-height: 1.25;
+      white-space: pre-line;
+      text-align: left;
+    }
+    .ext-date {
+      margin: 3mm 0 3mm 75mm;
+      font-size: 16pt;
+      line-height: 1.25;
+    }
+    .ext-row {
+      display: flex;
+      margin: 3.1mm 0 0;
+      line-height: 1.25;
+      font-size: 16pt;
+    }
+    .ext-label {
+      width: 12.5mm;
+      font-size: 16pt;
+      font-weight: normal;
+      flex-shrink: 0;
+    }
+    .ext-closing {
+      margin-left: 40mm;
+      width: 120mm;
+      text-align: center;
+      margin-top: 8mm;
+      margin-bottom: 2mm;
+      font-size: 16pt;
+      line-height: 1.25;
     }
     .memohead {
       position: relative;
-      height: 18mm;
+      height: 12mm;
       text-align: center;
       font-size: 29pt;
       font-weight: bold;
-      line-height: 35pt;
-      margin-bottom: 2mm;
+      line-height: 12mm;
+      margin-bottom: 0;
     }
     .memo-row {
       display: flex;
-      padding: 0.5mm 0;
-      line-height: 1.35;
-      min-height: 7mm;
+      padding: 0;
+      line-height: 1.4;
       align-items: baseline;
     }
-    .memo-row.border-dotted { border-bottom: 1px dotted #333; }
-    .memo-row.border-solid { border-bottom: 1px solid #333; }
-    .memo-row b { font-size: 20pt; margin-right: 2mm; white-space: nowrap; flex-shrink: 0; }
-    .memo-row .val-text { font-size: 16pt; }
-    .leader-dots {
+    .memo-row b {
+      font-size: 20pt;
+      margin-right: 2.5mm;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .memo-label-regular {
+      font-size: 16pt;
+      font-weight: normal;
+      margin-right: 2.5mm;
+      white-space: nowrap;
+      flex-shrink: 0;
+      color: #000;
+    }
+    .memo-val-line {
       flex: 1;
-      margin-left: 2mm;
-      border-bottom: 1.5px dotted #333;
-      min-width: 4mm;
-      height: 0;
-      align-self: baseline;
+      display: flex;
+      align-items: baseline;
+      min-width: 0;
+    }
+    .memo-val-line.border-dotted {
+      border-bottom: 1px dotted #555;
+    }
+    .memo-val-line.border-solid {
+      border-bottom: 1px solid #333;
+    }
+    .val-text {
+      font-size: 16pt;
+      line-height: 1.25;
+      white-space: pre-wrap;
     }
     .split-memo { display: flex; justify-content: space-between; gap: 4mm; }
     .split-memo > div:first-child { width: 52%; }
@@ -262,15 +433,15 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
     .body-para {
       text-indent: 25mm;
       text-align: justify;
-      text-justify: inter-cluster;
+      text-justify: inter-character;
       margin: 3mm 0;
       line-height: 1.35;
     }
     .signature-container {
-      margin-top: 10mm;
-      margin-left: auto;
+      margin-top: 17mm;
+      margin-left: 60mm;
+      width: 100mm;
       text-align: center;
-      width: 80mm;
       break-inside: avoid;
       page-break-inside: avoid;
     }
@@ -288,13 +459,21 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
       right: 20mm;
       display: flex;
       justify-content: space-between;
-      font-size: 11pt;
-      color: #64748b;
+      font-size: 12pt;
+      color: #000;
     }
     @media print {
       body { background: white; }
       .print-bar { display: none; }
-      article { margin: 0; box-shadow: none; width: 100%; min-height: 100vh; padding: 0; }
+      article {
+        margin: 0;
+        box-shadow: none;
+        width: auto;
+        min-height: 0;
+        /* ระยะขอบมาตรฐานมาจาก @page แล้ว ห้ามใส่ padding ซ้ำ ไม่เช่นนั้นหน้าแรกจะขอบหนาเกินและเนื้อหาเลื่อน */
+        padding: ${firstTopMm !== undefined ? `${firstTopMm - MEMO_GARUDA_TOP_MM}mm 0 0 0` : '0'};
+      }
+      .footer-memo { display: none; }
     }
   </style>
 </head>
@@ -302,6 +481,7 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
   ${!autoPrint ? `
   <div class="print-bar">
     <button class="print-btn" onclick="window.print();">พิมพ์เอกสาร / บันทึกเป็น PDF</button>
+    <span class="print-hint">หากต้องการซ่อนวันที่/URL ที่ขอบกระดาษ: ในหน้าต่างพิมพ์ ให้ยกเลิก "ส่วนหัวและส่วนท้าย" (Headers and Footers)</span>
   </div>
   ` : ''}
 
@@ -313,116 +493,137 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
         บันทึกข้อความ
       </div>
 
-      <div class="memo-row ${getLineClass(lineVis.govOrg)}">
+      <div class="memo-row">
         <b>ส่วนราชการ</b>
-        <span class="val-text">${escape(displayDigits(r.from))}</span>
-        ${lineVis.govOrg && lineStyle === 'dot_leader' ? '<span class="leader-dots"></span>' : ''}
+        <div class="memo-val-line ${getLineClass(lineVis.govOrg)}">
+          <span class="val-text">${escape(displayDigits(r.from))}</span>
+        </div>
       </div>
 
       <div class="split-memo">
-        <div class="memo-row ${getLineClass(lineVis.docNumber)}">
+        <div class="memo-row">
           <b>ที่</b>
-          <span class="val-text">${escape(displayDigits(displayNum))}</span>
-          ${lineVis.docNumber && lineStyle === 'dot_leader' ? '<span class="leader-dots"></span>' : ''}
+          <div class="memo-val-line ${getLineClass(lineVis.docNumber)}">
+            <span class="val-text">${escape(displayDigits(displayNum))}</span>
+          </div>
         </div>
-        <div class="memo-row ${getLineClass(lineVis.docDate)}">
+        <div class="memo-row">
           <b>วันที่</b>
-          <span class="val-text">${escape(thaiGovDate(r.date, digitType, 'memo'))}</span>
-          ${lineVis.docDate && lineStyle === 'dot_leader' ? '<span class="leader-dots"></span>' : ''}
+          <div class="memo-val-line ${getLineClass(lineVis.docDate)}">
+            <span class="val-text">${escape(thaiGovDate(r.date, digitType, 'memo'))}</span>
+          </div>
         </div>
-      </div>
-
-      <div class="memo-row ${getLineClass(lineVis.subject)}">
-        <b>เรื่อง</b>
-        <span class="val-text" style="font-weight: bold;">${escape(displayDigits(cleanSubject))}</span>
-        ${lineVis.subject && lineStyle === 'dot_leader' ? '<span class="leader-dots"></span>' : ''}
       </div>
 
       <div class="memo-row">
-        <b>เรียน</b>
-        <span class="val-text">${escape(displayDigits(targetTo || r.to))}</span>
+        <b>เรื่อง</b>
+        <div class="memo-val-line ${getLineClass(lineVis.subject)}">
+          <span class="val-text">${escape(displayDigits(cleanSubject))}</span>
+        </div>
+      </div>
+
+      <div class="memo-row" style="margin-top: 0;">
+        <span class="memo-label-regular">เรียน</span>
+        <div class="memo-val-line">
+          <span class="val-text">${escape(displayDigits(targetTo || r.to))}</span>
+        </div>
       </div>
     ` : isOrder ? `
       <img class="garuda-center" src="${garudaPath(r.category)}" alt="ครุฑ" />
-      <div style="text-align: center; font-weight: bold; font-size: 18pt; line-height: 1.35; margin-bottom: 3mm;">
-        <div>คำสั่ง${escape(displayDigits(r.from.startsWith('คำสั่ง') ? r.from.slice(6) : r.from))}</div>
-        <div style="margin: 1mm 0;">${escape(displayDigits(formattedOrderNum))}</div>
-        <div>เรื่อง  ${escape(displayDigits(cleanSubject))}</div>
-        <div style="border-bottom: 1.5px dashed #000; width: 60%; margin: 4mm auto 5mm auto;"></div>
+      <div style="text-align: center; font-weight: bold; font-size: 16pt; line-height: 1.35; margin-bottom: 3mm;">
+        <div>คำสั่ง${escape(displayDigits((r.from || '').trim().replace(/^คำสั่ง\s*/, '')))}</div>
+        <div>${escape(displayDigits(formattedOrderNum))}</div>
+        <div style="padding-left: 25mm; text-indent: -25mm;">เรื่อง  ${escape(displayDigits(cleanSubject))}</div>
+        <div style="font-size: 16pt;">........................................................</div>
       </div>
     ` : `
-      <img class="garuda-center" src="${garudaPath(r.category)}" alt="ครุฑ" />
-      <div style="display: flex; justify-content: space-between; font-size: 16pt; margin-bottom: 2mm;">
-        <div>${escape(displayDigits(displayNum))}</div>
-        <div style="text-align: left; white-space: pre-line; line-height: 1.25; font-size: 15pt;">
-          ${escape(displayDigits(r.officeAddress || r.from))}
+      <div class="ext-header">
+        <div class="ext-header-left">
+          ${escape(displayDigits(displayNum))}
         </div>
+        <div class="ext-header-center">
+          <img class="garuda-ext" src="${garudaPath(r.category)}" alt="ครุฑ" />
+        </div>
+        <div class="ext-header-right">${escape(displayDigits(r.officeAddress || r.from))}</div>
       </div>
-      <div style="text-align: center; margin: 3mm 0; font-size: 16pt;">
+      <div class="ext-date">
         ${escape(thaiGovDate(r.date, digitType, 'external'))}
       </div>
-      <div style="display: flex; margin: 1mm 0;"><b style="width: 20mm;">เรื่อง</b><span>${escape(displayDigits(cleanSubject))}</span></div>
-      <div style="display: flex; margin: 1mm 0;"><b style="width: 20mm;">เรียน</b><span>${escape(displayDigits(targetTo || r.to))}</span></div>
+      <div class="ext-row"><b class="ext-label">เรื่อง</b><span>${escape(displayDigits(cleanSubject))}</span></div>
+      <div class="ext-row"><b class="ext-label">เรียน</b><span>${escape(displayDigits(targetTo || r.to))}</span></div>
     `}
 
     ${cleanReference ? `
-      <div style="display: flex; margin: 1mm 0;"><b style="width: 20mm;">อ้างถึง</b><span>${escape(displayDigits(cleanReference))}</span></div>
+      <div class="ext-row"><b class="ext-label">อ้างถึง</b><span>${escape(displayDigits(cleanReference))}</span></div>
     ` : ''}
 
     ${(r.attachmentsList || []).length > 0 ? `
-      <div style="margin: 1.5mm 0;">
-        ${(r.attachmentsList || []).map((att, i) => `
-          <div style="display: flex;">
-            <b style="width: 28mm;">${i === 0 ? 'สิ่งที่ส่งมาด้วย' : ''}</b>
-            <span>${displayDigits(String(i + 1))}. ${escape(displayDigits(att))}</span>
-          </div>
-        `).join('')}
+      <div style="margin: 1.2mm 0;">
+        ${(r.attachmentsList || []).map((att, i) => {
+          const parsed = parseAttachmentRow(att);
+          return `<div class="ext-row" style="justify-content: space-between;${i > 0 ? ' margin-top: 0;' : ''}">
+            <div style="display: flex;">
+              <b class="ext-label" style="width: 25mm;">${i === 0 ? 'สิ่งที่ส่งมาด้วย' : ''}</b>
+              <span>${displayDigits(String(i + 1))}. ${escape(displayDigits(parsed.item))}</span>
+            </div>
+            ${parsed.qty ? `<span style="text-align: right; margin-right: 10mm;">${escape(displayDigits(parsed.qty))}</span>` : ''}
+          </div>`;
+        }).join('')}
       </div>
     ` : ''}
 
     <div style="margin-top: 4mm;">
-      ${(r.bodyParagraphs || []).map(p => {
+      ${bodyItems.map(({ text: p, block }) => {
         if (isOrder) {
           const mem = parseCommitteeRow(p);
           if (mem.isMember) {
-            return `<div style="display: flex; justify-content: space-between; padding-left: 35mm; padding-right: 5mm; margin: 0.5mm 0; line-height: 1.35;">
-              <span>${escape(displayDigits(mem.name))}</span>
+            return `<div style="display: flex; padding-left: 32.5mm; margin: 0; line-height: 1.35;">
+              <span style="width: 81.5mm; flex-shrink: 0;">${escape(displayDigits(mem.name))}</span>
               <span>${escape(displayDigits(mem.role))}</span>
             </div>`;
           }
-          if (/^[๐-๙0-9]+\.\s*คณะกรรมการ/.test(p)) {
-            return `<div style="padding-left: 25mm; font-weight: bold; margin: 3mm 0 1.5mm; line-height: 1.35;">${escape(displayDigits(p))}</div>`;
+          if (/^[๐-๙0-9]+(?:\.[๐-๙0-9]+)*[\.\s]\s*คณะกรรมการ/.test(p)) {
+            return `<div style="padding-left: 32.5mm; font-weight: bold; margin: 2mm 0 2mm; line-height: 1.35;">${escape(displayDigits(p))}</div>`;
           }
           if (p === 'หน้าที่' || p.startsWith('หน้าที่')) {
             const dutyText = p.startsWith('หน้าที่') ? p : 'หน้าที่';
-            return `<div style="padding-left: 25mm; font-weight: bold; margin: 2mm 0 1mm; line-height: 1.35;">${escape(displayDigits(dutyText))}</div>`;
+            return `<div style="padding-left: 32.5mm; font-weight: bold; margin: 2mm 0 2mm; line-height: 1.35;">${escape(displayDigits(dutyText))}</div>`;
+          }
+          if (/^[๐-๙0-9]+(?:\.[๐-๙0-9]+)*[\.\s]/.test(p) && !mem.isMember) {
+            return `<div style="padding-left: 32.5mm; margin: 0; line-height: 1.35;">${escape(displayDigits(p))}</div>`;
           }
           if (p.startsWith('สั่ง ณ วันที่')) {
-            return `<div style="padding-left: 45mm; margin: 5mm 0 3mm; line-height: 1.35;">${escape(displayDigits(p))}</div>`;
+            return `<div style="padding-left: 25.4mm; margin: 5mm 0 3mm; line-height: 1.35;">${escape(displayDigits(p))}</div>`;
           }
         }
-        return `<div class="body-para">${escape(displayDigits(p))}</div>`;
+        return bodyParaHtml(block);
       }).join('')}
+      ${isOrder && !bodyItems.some(i => i.text.startsWith('สั่ง ณ วันที่')) ? `
+        <div style="padding-left: 25.4mm; margin: 5mm 0 3mm; line-height: 1.35;">
+          ${escape(displayDigits(thaiGovDate(r.date, digitType, 'order')))}
+        </div>
+      ` : ''}
     </div>
 
-    <div class="signature-container">
-      ${!isMemo && !isOrder ? '<p style="margin-bottom: 6mm;">ขอแสดงความนับถือ</p>' : ''}
+    ${!isMemo && !isOrder ? '<div class="ext-closing">ขอแสดงความนับถือ</div>' : ''}
+
+    <div class="signature-container" ${!isMemo && !isOrder ? 'style="margin-left: 40mm; width: 120mm; margin-top: 9mm;"' : ''}>
       ${r.signatureUrl ? `
         <img class="sig-img" src="${r.signatureUrl}" alt="ลายเซ็น" />
       ` : '<div style="height: 14mm;"></div>'}
-      <p style="font-weight: bold; margin: 1mm 0;">(${escape(displayDigits(formattedSignatory))})</p>
-      <p style="font-size: 15pt; margin: 0; white-space: pre-line; line-height: 1.2;">${escape(displayDigits(signatoryPos))}</p>
+      <p style="font-size: 16pt; font-weight: normal; margin: 1.5mm 0; color: #000;">(${escape(displayDigits(formattedSignatory))})</p>
+      <p style="font-size: 16pt; font-weight: normal; margin: 0; white-space: pre-line; line-height: 1.25; color: #000;">${escape(displayDigits(signatoryPos))}</p>
     </div>
 
     ${r.coordinatorInfo ? `
-      <div style="margin-top: 10mm; font-size: 14pt; color: #334155; border-top: 1px solid #e2e8f0; padding-top: 2mm; white-space: pre-line;">
+      <div style="margin-top: 8mm; font-size: 14pt; line-height: 1.25; white-space: pre-line;">
         ${escape(displayDigits(r.coordinatorInfo))}
       </div>
     ` : ''}
 
     ${isMemo ? `
       <div class="footer-memo">
-        <span></span>
+        <span>CPRU-66-001</span>
         <span>${displayDigits(String(targetIdx + 1))}</span>
       </div>
     ` : ''}
@@ -433,13 +634,16 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
 }
 
 export function openDocument(r: AdminDocRegistryRecord, autoPrint = false) {
-  const preview = window.open('', '_blank');
+  const html = documentHtml(r, window.location.origin, autoPrint);
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const preview = window.open(url, '_blank');
   if (!preview) {
+    URL.revokeObjectURL(url);
     throw new Error('กรุณาอนุญาตหน้าต่างใหม่ (Pop-up) เพื่อดูและพิมพ์เอกสาร');
   }
-  preview.document.open();
-  preview.document.write(documentHtml(r, window.location.origin, autoPrint));
-  preview.document.close();
+  // คืน memory หลังจากหน้าต่างโหลดเสร็จ
+  preview.addEventListener('load', () => URL.revokeObjectURL(url), { once: true });
 }
 
 export function exportAdminPdf(r: AdminDocRegistryRecord) {
@@ -456,17 +660,29 @@ export async function buildAdminWord(r: AdminDocRegistryRecord): Promise<Blob> {
 
   const {
     Document, Paragraph, TextRun, ImageRun, Packer, AlignmentType, Table, TableRow, TableCell,
-    BorderStyle, WidthType, LineRuleType, VerticalAlign, TabStopType,
-    Footer, Header
+    BorderStyle, WidthType, LineRuleType, VerticalAlign, TabStopType, UnderlineType,
+    Footer, Header, PageNumber
   } = await import('docx');
 
   // Load garuda image
   let garudaBytes: ArrayBuffer | null = null;
   try {
-    const res = await fetch(garudaPath(r.category));
-    if (res.ok) garudaBytes = await res.arrayBuffer();
+    const rawPath = garudaPath(r.category);
+    if (typeof window !== 'undefined') {
+      const res = await fetch(rawPath);
+      if (res.ok) garudaBytes = await res.arrayBuffer();
+    } else {
+      // In Node.js testing/CLI environment
+      const fs = await import('fs');
+      const path = await import('path');
+      const localFile = path.join(process.cwd(), 'public', rawPath.replace(/^\//, ''));
+      if (fs.existsSync(localFile)) {
+        const buf = fs.readFileSync(localFile);
+        garudaBytes = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+      }
+    }
   } catch (err) {
-    console.warn('Garuda image load warning:', err);
+    // Graceful fallback if image is not accessible
   }
 
   // Load signature image if present
@@ -490,6 +706,9 @@ export async function buildAdminWord(r: AdminDocRegistryRecord): Promise<Blob> {
     }
   }
 
+  // ต้นฉบับใช้ระยะบรรทัดเดี่ยว (line=240 auto) ไม่ใช่ exact เพื่อให้ตัดบรรทัดและเว้นระยะเหมือน Word จริง
+  const docStyles = { default: { document: { run: { font: { ascii: 'TH SarabunPSK', hAnsi: 'TH SarabunPSK', cs: 'TH SarabunPSK', eastAsia: 'TH SarabunPSK' }, size: 32, sizeComplexScript: 32 } } } };
+  const SINGLE = { line: 240, lineRule: LineRuleType.AUTO } as const;
   const font = 'TH SarabunPSK';
   const digitType = getRecordDigitType(r);
   const display = (text: string) => formatDocDigits(text, digitType);
@@ -500,17 +719,16 @@ export async function buildAdminWord(r: AdminDocRegistryRecord): Promise<Blob> {
   const displayNum = getDisplayDocNumber(r);
   const isMemo = r.category.startsWith('memo');
   const isOrder = r.category === 'order';
-  const formattedOrderNum = isOrder
-    ? displayNum.replace(/^ที่\s*/, 'ที่  ').replace(/([๐-๙0-9]+)\s*\/\s*([๐-๙0-9]+)/, '$1  /$2')
-    : displayNum;
-  const isLetter = r.paperSize === 'letter';
-
-  const pageWidth = isLetter ? 12240 : 11906;
-  const pageHeight = isLetter ? 15840 : 16838;
+  // กึ่งกลางบล็อกลงนามตามต้นฉบับ: หนังสือภายนอก ~10 ซม. จากขอบซ้าย, บันทึกข้อความ/คำสั่ง ~10.5 ซม.
+  const sigIndent = isMemo || isOrder ? 2835 : 2268;
+  const formattedOrderNum = displayNum;
+  const pageWidth = A4_TWIPS.width;
+  const pageHeight = A4_TWIPS.height;
+  const pageMargins = wordMargin(getTemplateSpec(r.category).margins);
   const border = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' };
 
   const recipients = r.recipients?.filter(x => x.trim()) || [];
-  const targets = r.category === 'external_circular' && recipients.length ? recipients : [r.to || ''];
+  const targets = (r.category === 'external_circular' || r.category === 'memo_circular') && recipients.length ? recipients : [r.to || ''];
 
   const run = (text: string, bold = false, size = 32) =>
     new TextRun({
@@ -528,15 +746,40 @@ export async function buildAdminWord(r: AdminDocRegistryRecord): Promise<Blob> {
         ...(i ? [new TextRun({ break: 1, font, size: 32, language: { value: 'th-TH' } })] : []),
         run(line)
       ]),
-      spacing: { line: 360, lineRule: LineRuleType.EXACT, after: 60 },
+      spacing: { ...SINGLE, after: 0 },
       ...opts
     });
 
-  const body = (text: string) =>
-    para(text, {
-      alignment: AlignmentType.JUSTIFIED,
-      indent: { firstLine: 1417 }, // 2.5 cm
-      spacing: { line: 360, lineRule: LineRuleType.EXACT, before: 60, after: 60 }
+  const alignMap = {
+    left: AlignmentType.LEFT,
+    center: AlignmentType.CENTER,
+    right: AlignmentType.RIGHT,
+    justify: AlignmentType.JUSTIFIED
+  } as const;
+
+  const blockRuns = (b: RichBlock) => {
+    const runs = b.runs.flatMap(rr => rr.text.split('\n').flatMap((line, i) => [
+      ...(i ? [new TextRun({ break: 1, font, size: 32, language: { value: 'th-TH' } })] : []),
+      ...(line ? [new TextRun({
+        text: display(line),
+        font,
+        size: 32,
+        sizeComplexScript: 32,
+        bold: rr.bold,
+        italics: rr.italic,
+        underline: rr.underline ? { type: UnderlineType.SINGLE } : undefined,
+        language: { value: 'th-TH' }
+      })] : [])
+    ]));
+    return runs.length ? runs : [new TextRun({ text: '', font, size: 32 })];
+  };
+
+  const body = (b: RichBlock, spacing: Record<string, unknown> = { ...SINGLE, before: 120, after: 0 }) =>
+    new Paragraph({
+      children: blockRuns(b),
+      alignment: alignMap[b.align],
+      indent: { firstLine: b.firstLine ? 1417 : 0, left: b.indent * INDENT_STEP_TWIPS }, // 2.5 cm
+      spacing
     });
 
   // Signature block
@@ -544,7 +787,7 @@ export async function buildAdminWord(r: AdminDocRegistryRecord): Promise<Blob> {
     ...(signatureBytes ? [
       new Paragraph({
         alignment: AlignmentType.CENTER,
-        indent: { left: 4536 },
+        indent: { left: sigIndent },
         children: [
           new ImageRun({
             type: 'png',
@@ -558,15 +801,15 @@ export async function buildAdminWord(r: AdminDocRegistryRecord): Promise<Blob> {
     ] : []),
     para('(' + formattedSignatory + ')', {
       alignment: AlignmentType.CENTER,
-      indent: { left: 4536 },
+      indent: { left: sigIndent },
       keepNext: true,
-      spacing: { before: signatureBytes ? 60 : (isOrder ? 1400 : 1000), after: 0, line: 360, lineRule: LineRuleType.EXACT }
+      spacing: { before: signatureBytes ? 60 : (isOrder ? 1400 : 1000), after: 0, ...SINGLE }
     }),
-    para(signatoryPos.replace(/ ปฏิบัติราชการแทน /, ' ปฏิบัติราชการแทน\n').replace(/ รักษาราชการแทน /, ' รักษาราชการแทน\n'), {
+    para(signatoryPos.replace(/\s*ปฏิบัติราชการแทน\s*/, ' ปฏิบัติราชการแทน\n').replace(/\s*รักษาราชการแทน\s*/, ' รักษาราชการแทน\n'), {
       alignment: AlignmentType.CENTER,
-      indent: { left: 4536 },
+      indent: { left: sigIndent },
       keepLines: true,
-      spacing: { line: 360, lineRule: LineRuleType.EXACT, after: 0 }
+      spacing: { ...SINGLE, after: 0 }
     })
   ];
 
@@ -575,15 +818,23 @@ export async function buildAdminWord(r: AdminDocRegistryRecord): Promise<Blob> {
     const solid = { style: BorderStyle.SINGLE, size: 4, color: '000000' };
     const lineBorder = r.headerLineStyle === 'solid' ? solid : r.headerLineStyle === 'none' ? undefined : dotted;
 
-    const field = (label: string, value: string, applyBorder = false) =>
-      new Paragraph({
+    const field = (label: string, value: string, applyBorder = false, isHalfCell = false) => {
+      const underlineStyle = applyBorder && r.headerLineStyle !== 'none'
+        ? { type: r.headerLineStyle === 'solid' ? UnderlineType.SINGLE : UnderlineType.DOTTED }
+        : undefined;
+
+      return new Paragraph({
         children: [
           new TextRun({ text: label + '  ', font, size: 40, bold: true, sizeComplexScript: 40, language: { value: 'th-TH' } }),
-          new TextRun({ text: display(value), font, size: 32, sizeComplexScript: 32, language: { value: 'th-TH' } })
+          new TextRun({ text: display(value), font, size: 32, sizeComplexScript: 32, language: { value: 'th-TH' }, underline: underlineStyle }),
+          ...(underlineStyle ? [
+            new TextRun({ text: '\t', font, size: 32, underline: underlineStyle })
+          ] : [])
         ],
-        spacing: { line: 452, lineRule: LineRuleType.EXACT, after: 0 },
-        border: applyBorder && lineBorder ? { bottom: lineBorder } : undefined
+        tabStops: [{ type: TabStopType.RIGHT, position: isHalfCell ? 4500 : 9070 }],
+        spacing: { line: 452, lineRule: LineRuleType.EXACT, after: 0 }
       });
+    };
 
     const memoPair = (left: InstanceType<typeof Paragraph>, right: InstanceType<typeof Paragraph>, leftWidth = 54) =>
       new Table({
@@ -600,100 +851,151 @@ export async function buildAdminWord(r: AdminDocRegistryRecord): Promise<Blob> {
         ]
       });
 
-    const memoSections = targets.map((to, targetIdx) => ({
-      properties: {
-        page: {
-          size: { width: pageWidth, height: pageHeight },
-          margin: { top: 1417, left: 1701, right: 1134, bottom: 1134 } // 2.5cm top, 3.0cm left, 2.0cm right, 2.0cm bottom
-        }
-      },
-      footers: {
-        default: new Footer({
-          children: [
-            new Table({
-              width: { size: 100, type: WidthType.PERCENTAGE },
-              borders: { top: border, bottom: border, left: border, right: border, insideHorizontal: border, insideVertical: border },
-              margins: { top: 0, bottom: 0, left: 0, right: 0 },
-              rows: [
-                new TableRow({
-                  children: [
-                    new TableCell({ width: { size: 50, type: WidthType.PERCENTAGE }, children: [new Paragraph({ children: [] })] }),
-                    new TableCell({ width: { size: 50, type: WidthType.PERCENTAGE }, children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: display(String(targetIdx + 1)), font, size: 24, language: { value: 'th-TH' } })] })] })
-                  ]
-                })
+    const spec = getTemplateSpec(r.category);
+    const firstTop = spec.firstPageTop;
+    const memoFooter = () => new Footer({
+      children: [
+        new Table({
+          width: { size: 100, type: WidthType.PERCENTAGE },
+          borders: { top: border, bottom: border, left: border, right: border, insideHorizontal: border, insideVertical: border },
+          margins: { top: 0, bottom: 0, left: 0, right: 0 },
+          rows: [
+            new TableRow({
+              children: [
+                new TableCell({
+                  width: { size: 50, type: WidthType.PERCENTAGE },
+                  children: [new Paragraph({ children: [new TextRun({ text: 'CPRU-66-001', font, size: 24, language: { value: 'th-TH' } })] })]
+                }),
+                new TableCell({ width: { size: 50, type: WidthType.PERCENTAGE }, children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ children: [PageNumber.CURRENT], font, size: 24, language: { value: 'th-TH' } })] })] })
               ]
             })
           ]
         })
+      ]
+    });
+
+    const memoSections = targets.map((to, targetIdx) => ({
+      properties: {
+        titlePage: firstTop !== undefined,
+        page: {
+          size: { width: pageWidth, height: pageHeight },
+          margin: {
+            ...pageMargins,
+            ...(firstTop !== undefined ? { top: mmToTwips(firstTop), header: mmToTwips(4) } : {})
+          }
+        }
+      },
+      ...(firstTop !== undefined ? {
+        // หน้าแรกเริ่มหัวเอกสารสูงตามต้นฉบับ หน้าถัดไปดันเนื้อหาลงให้ได้ขอบบนมาตรฐานด้วยหัวกระดาษเปล่า
+        headers: {
+          first: new Header({ children: [new Paragraph({ spacing: { before: 0, after: 0, line: 20, lineRule: LineRuleType.EXACT }, children: [] })] }),
+          default: new Header({ children: [new Paragraph({ spacing: { before: 0, after: 0, line: mmToTwips(spec.margins.top - 4), lineRule: LineRuleType.EXACT }, children: [] })] })
+        }
+      } : {}),
+      footers: {
+        default: memoFooter(),
+        ...(firstTop !== undefined ? { first: memoFooter() } : {})
       },
       children: [
-        memoPair(
-          new Paragraph({
-            children: garudaBytes ? [new ImageRun({ type: 'jpg', data: garudaBytes, transformation: { width: 56, height: 48 } })] : [],
-            spacing: { after: 0 }
-          }),
-          new Paragraph({
-            children: [new TextRun({ text: 'บันทึกข้อความ', font, size: 58, bold: true, language: { value: 'th-TH' } })],
-            spacing: { line: 700, lineRule: LineRuleType.EXACT, after: 0 }
-          }),
-          38
-        ),
+        new Table({
+          width: { size: 100, type: WidthType.PERCENTAGE },
+          borders: { top: border, bottom: border, left: border, right: border, insideHorizontal: border, insideVertical: border },
+          margins: { top: 0, bottom: 0, left: 0, right: 0 },
+          rows: [
+            new TableRow({
+              children: [
+                new TableCell({
+                  width: { size: 20, type: WidthType.PERCENTAGE },
+                  verticalAlign: VerticalAlign.TOP,
+                  children: [
+                    new Paragraph({
+                      children: garudaBytes ? [new ImageRun({ type: 'png', data: garudaBytes, transformation: { width: 41, height: 43 } })] : [],
+                      spacing: { after: 0 }
+                    })
+                  ]
+                }),
+                new TableCell({
+                  width: { size: 60, type: WidthType.PERCENTAGE },
+                  verticalAlign: VerticalAlign.CENTER,
+                  children: [
+                    new Paragraph({
+                      alignment: AlignmentType.CENTER,
+                      children: [new TextRun({ text: 'บันทึกข้อความ', font, size: 58, bold: true, language: { value: 'th-TH' } })],
+                      spacing: { line: 700, lineRule: LineRuleType.EXACT, after: 0 }
+                    })
+                  ]
+                }),
+                new TableCell({
+                  width: { size: 20, type: WidthType.PERCENTAGE },
+                  children: [new Paragraph({ children: [] })]
+                })
+              ]
+            })
+          ]
+        }),
         field('ส่วนราชการ', r.from, r.lineVisibility?.govOrg ?? true),
         memoPair(
-          field('ที่', displayNum, r.lineVisibility?.docNumber ?? true),
-          field('วันที่', thaiGovDate(r.date, digitType, 'memo'), r.lineVisibility?.docDate ?? true)
+          field('ที่', displayNum, r.lineVisibility?.docNumber ?? true, true),
+          field('วันที่', thaiGovDate(r.date, digitType, 'memo'), r.lineVisibility?.docDate ?? true, true)
         ),
         field('เรื่อง', cleanSubject, r.lineVisibility?.subject ?? true),
-        para('เรียน  ' + to, { spacing: { before: 120, after: 120, line: 360, lineRule: LineRuleType.EXACT } }),
+        para('เรียน  ' + to, { spacing: { before: 120, after: 120, ...SINGLE } }),
         ...(!cleanReference ? [] : [para('อ้างถึง  ' + cleanReference)]),
         ...(r.attachmentsList || []).map((item, i) => para((i === 0 ? 'สิ่งที่ส่งมาด้วย  ' : '                  ') + (i + 1) + '. ' + item)),
-        ...(r.bodyParagraphs || []).map(p => para(p, { alignment: AlignmentType.JUSTIFIED, indent: { firstLine: 1417 }, spacing: { line: 360, lineRule: LineRuleType.EXACT, before: p.startsWith('จึงเรียน') ? 120 : 60, after: 60 } })),
+        ...getBodyBlocks(r).map(b => body(b, { ...SINGLE, before: b.text.startsWith('จึงเรียน') ? 240 : 120, after: 0 })),
         ...signatureParagraphs,
         ...(r.coordinatorInfo ? [para(r.coordinatorInfo, { spacing: { before: 240, after: 0 } })] : [])
       ]
     }));
 
-    return Packer.toBlob(new Document({ sections: memoSections }));
+    return Packer.toBlob(new Document({ styles: docStyles, sections: memoSections }));
   }
 
   if (isOrder) {
-    const orderBody = orderBlocks(r.bodyParagraphs || []).map(block => {
+    const orderBody = orderItems(getBodyBlocks(r)).map(({ text: block, block: rich }) => {
       const mem = parseCommitteeRow(block);
       if (mem.isMember) {
         return new Paragraph({
           children: [run(mem.name), new TextRun({ text: '\t', font, size: 32, language: { value: 'th-TH' } }), run(mem.role)],
-          indent: { left: 1984 },
-          tabStops: [{ type: TabStopType.LEFT, position: 6520 }],
-          spacing: { line: 360, lineRule: LineRuleType.EXACT, after: 0 },
+          indent: { left: 1843 },
+          tabStops: [{ type: TabStopType.LEFT, position: 6460 }],
+          spacing: { ...SINGLE, after: 0 },
           keepLines: true
         });
       }
-      if (/^[๐-๙0-9]+\.\s*คณะกรรมการ/.test(block) || block === 'หน้าที่' || block.startsWith('หน้าที่')) {
+      if (/^[๐-๙0-9]+(?:\.[๐-๙0-9]+)*[\.\s]\s*คณะกรรมการ/.test(block) || block === 'หน้าที่' || block.startsWith('หน้าที่')) {
         return new Paragraph({
           children: [run(block, true)],
-          indent: { left: 1417 },
-          spacing: { before: 120, after: 60, line: 360, lineRule: LineRuleType.EXACT },
+          indent: { left: 1843 },
+          spacing: { before: 120, after: 120, ...SINGLE },
           keepNext: true
+        });
+      }
+      if (/^[๐-๙0-9]+(?:\.[๐-๙0-9]+)*[\.\s]/.test(block) && !mem.isMember) {
+        return new Paragraph({
+          children: [run(block)],
+          indent: { left: 1843 },
+          spacing: { ...SINGLE, after: 30 }
         });
       }
       if (block.startsWith('สั่ง ณ วันที่')) {
         return new Paragraph({
           children: [run(block)],
-          indent: { left: 2835 },
-          spacing: { before: 180, after: 60, line: 360, lineRule: LineRuleType.EXACT },
+          indent: { left: 1440 },
+          spacing: { before: 180, after: 60, ...SINGLE },
           keepNext: true
         });
       }
-      return body(block);
+      return body(rich);
     });
 
-    const hasDateInBody = orderBlocks(r.bodyParagraphs || []).some(b => b.startsWith('สั่ง ณ วันที่'));
+    const hasDateInBody = orderItems(getBodyBlocks(r)).some(i => i.text.startsWith('สั่ง ณ วันที่'));
 
     const orderSections = [{
       properties: {
         page: {
           size: { width: pageWidth, height: pageHeight },
-          margin: { top: 1417, right: 1134, bottom: 1134, left: 1701 }
+          margin: pageMargins
         }
       },
       children: [
@@ -705,18 +1007,18 @@ export async function buildAdminWord(r: AdminDocRegistryRecord): Promise<Blob> {
             keepNext: true
           })
         ] : []),
-        new Paragraph({ children: [run('คำสั่ง' + (r.from.startsWith('คำสั่ง') ? r.from.slice(6) : r.from), true)], alignment: AlignmentType.CENTER, spacing: { line: 360, lineRule: LineRuleType.EXACT, after: 0 }, keepNext: true }),
-        new Paragraph({ children: [run(formattedOrderNum, true)], alignment: AlignmentType.CENTER, spacing: { line: 360, lineRule: LineRuleType.EXACT, after: 0 }, keepNext: true }),
-        new Paragraph({ children: [run('เรื่อง  ' + cleanSubject, true)], alignment: AlignmentType.CENTER, spacing: { line: 360, lineRule: LineRuleType.EXACT, after: 0 }, keepNext: true }),
-        new Paragraph({ children: [run('------------------------------------------------------------')], alignment: AlignmentType.CENTER, spacing: { line: 360, lineRule: LineRuleType.EXACT, after: 120 }, keepNext: true }),
+        new Paragraph({ children: [run('คำสั่ง' + (r.from || '').trim().replace(/^คำสั่ง\s*/, ''), true)], alignment: AlignmentType.CENTER, spacing: { ...SINGLE, after: 0 }, keepNext: true }),
+        new Paragraph({ children: [run(formattedOrderNum, true)], alignment: AlignmentType.CENTER, spacing: { ...SINGLE, after: 0 }, keepNext: true }),
+        new Paragraph({ children: [run('เรื่อง  ' + cleanSubject, true)], alignment: AlignmentType.CENTER, indent: { left: 1418, hanging: 1418 }, spacing: { ...SINGLE, after: 0 }, keepNext: true }),
+        new Paragraph({ children: [run('........................................................', true)], alignment: AlignmentType.CENTER, spacing: { ...SINGLE, after: 120 }, keepNext: true }),
         ...orderBody,
-        ...(!hasDateInBody ? [new Paragraph({ children: [run(thaiGovDate(r.date, digitType, 'order'))], indent: { left: 2835 }, spacing: { before: 180, after: 60, line: 360, lineRule: LineRuleType.EXACT }, keepNext: true })] : []),
+        ...(!hasDateInBody ? [new Paragraph({ children: [run(thaiGovDate(r.date, digitType, 'order'))], indent: { left: 1440 }, spacing: { before: 180, after: 60, ...SINGLE }, keepNext: true })] : []),
         ...signatureParagraphs,
         ...(r.coordinatorInfo ? [para(r.coordinatorInfo)] : [])
       ]
     }];
 
-    return Packer.toBlob(new Document({ sections: orderSections }));
+    return Packer.toBlob(new Document({ styles: docStyles, sections: orderSections }));
   }
 
   // External correspondence & Custom layouts
@@ -725,24 +1027,17 @@ export async function buildAdminWord(r: AdminDocRegistryRecord): Promise<Blob> {
       children: [run(label), new TextRun({ text: '\t', font, size: 32, language: { value: 'th-TH' } }), run(text)],
       indent: { left: indent, hanging: indent },
       tabStops: [{ type: TabStopType.LEFT, position: indent }],
-      spacing: { line: 360, lineRule: LineRuleType.EXACT, after: 60 }
+      spacing: { ...SINGLE, before: 120, after: 0 }
     });
 
   const extSections = targets.map(to => ({
     properties: {
       page: {
         size: { width: pageWidth, height: pageHeight },
-        margin: { top: 1417, right: 1134, bottom: 1134, left: 1701 }
+        margin: pageMargins
       }
     },
     children: [
-      ...(garudaBytes ? [
-        new Paragraph({
-          alignment: AlignmentType.CENTER,
-          children: [new ImageRun({ type: 'png', data: garudaBytes, transformation: { width: 107, height: 113 } })],
-          spacing: { line: 1, lineRule: LineRuleType.EXACT, after: 60 }
-        })
-      ] : []),
       new Table({
         width: { size: 100, type: WidthType.PERCENTAGE },
         margins: { top: 0, bottom: 0, left: 0, right: 0 },
@@ -750,25 +1045,86 @@ export async function buildAdminWord(r: AdminDocRegistryRecord): Promise<Blob> {
         rows: [
           new TableRow({
             children: [
-              new TableCell({ width: { size: 60, type: WidthType.PERCENTAGE }, children: [para(displayNum)] }),
-              new TableCell({ width: { size: 40, type: WidthType.PERCENTAGE }, children: [para(r.officeAddress || r.from, { spacing: { line: 360, lineRule: LineRuleType.EXACT, after: 0 } })] })
+              new TableCell({
+                width: { size: 35, type: WidthType.PERCENTAGE },
+                verticalAlign: VerticalAlign.TOP,
+                children: [
+                  new Paragraph({
+                    children: [run(displayNum)],
+                    spacing: { before: 1400, ...SINGLE, after: 0 }
+                  })
+                ]
+              }),
+              new TableCell({
+                width: { size: 30, type: WidthType.PERCENTAGE },
+                verticalAlign: VerticalAlign.TOP,
+                children: [
+                  ...(garudaBytes ? [
+                    new Paragraph({
+                      alignment: AlignmentType.CENTER,
+                      children: [new ImageRun({ type: 'png', data: garudaBytes, transformation: { width: 107, height: 113 } })],
+                      spacing: { ...SINGLE, after: 0 }
+                    })
+                  ] : [new Paragraph({ children: [] })])
+                ]
+              }),
+              new TableCell({
+                width: { size: 35, type: WidthType.PERCENTAGE },
+                verticalAlign: VerticalAlign.TOP,
+                children: [
+                  new Paragraph({
+                    children: (r.officeAddress || r.from).split('\n').flatMap((line, idx) => [
+                      ...(idx ? [new TextRun({ break: 1, font, size: 32, language: { value: 'th-TH' } })] : []),
+                      run(line)
+                    ]),
+                    spacing: { before: 1400, ...SINGLE, after: 0 }
+                  })
+                ]
+              })
             ]
           })
         ]
       }),
-      para(thaiGovDate(r.date, digitType, 'external'), { indent: { left: 4320 }, spacing: { before: 120, after: 120, line: 360, lineRule: LineRuleType.EXACT } }),
+      para(thaiGovDate(r.date, digitType, 'external'), { indent: { left: 4252 }, spacing: { before: 180, after: 120, ...SINGLE } }),
       extField('เรื่อง', cleanSubject),
       extField('เรียน', to),
       ...(cleanReference ? [extField('อ้างถึง', cleanReference)] : []),
-      ...(r.attachmentsList || []).map((item, i) => extField(i === 0 ? 'สิ่งที่ส่งมาด้วย' : '', (i + 1) + '. ' + item, 1417)),
-      ...(r.bodyParagraphs || []).map(body),
-      para('ขอแสดงความนับถือ', { alignment: AlignmentType.CENTER, indent: { left: 4536 }, keepNext: true, spacing: { before: 180, after: 0, line: 360, lineRule: LineRuleType.EXACT } }),
+      ...(r.attachmentsList || []).map((att, i) => {
+        const parsed = parseAttachmentRow(att);
+        const numText = display(String(i + 1)) + '. ' + parsed.item;
+        if (parsed.qty) {
+          return new Paragraph({
+            children: [
+              run(i === 0 ? 'สิ่งที่ส่งมาด้วย' : ''),
+              new TextRun({ text: '\t', font, size: 32, language: { value: 'th-TH' } }),
+              run(numText),
+              new TextRun({ text: '\t', font, size: 32, language: { value: 'th-TH' } }),
+              run(parsed.qty)
+            ],
+            indent: { left: 1417, hanging: 1417 },
+            tabStops: [
+              { type: TabStopType.LEFT, position: 1417 },
+              { type: TabStopType.LEFT, position: 7200 }
+            ],
+            spacing: { ...SINGLE, after: 0 }
+          });
+        }
+        return extField(i === 0 ? 'สิ่งที่ส่งมาด้วย' : '', numText, 1417);
+      }),
+      ...getBodyBlocks(r).map(b => body(b)),
+      para('ขอแสดงความนับถือ', { alignment: AlignmentType.CENTER, indent: { left: sigIndent }, keepNext: true, spacing: { before: 240, after: 60, ...SINGLE } }),
       ...signatureParagraphs,
-      ...(r.coordinatorInfo ? [para(r.coordinatorInfo, { spacing: { before: 240, after: 0, line: 360, lineRule: LineRuleType.EXACT } })] : [])
+      ...(r.coordinatorInfo ? [new Paragraph({
+        children: r.coordinatorInfo.split('\n').flatMap((line, idx) => [
+          ...(idx ? [new TextRun({ break: 1, font, size: 28, language: { value: 'th-TH' } })] : []),
+          new TextRun({ text: display(line), font, size: 28, language: { value: 'th-TH' } })
+        ]),
+        spacing: { before: 240, after: 0, line: 300, lineRule: LineRuleType.EXACT }
+      })] : [])
     ]
   }));
 
-  return Packer.toBlob(new Document({ sections: extSections }));
+  return Packer.toBlob(new Document({ styles: docStyles, sections: extSections }));
 }
 
 export async function exportAdminWord(r: AdminDocRegistryRecord) {
