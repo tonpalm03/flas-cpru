@@ -632,10 +632,10 @@ async function runAllTests() {
   const { getTemplateSpec, cssMargin } = require('../lib/adminTemplateSpec.ts');
   for (const cat of ['memo', 'memo_circular', 'order', 'external', 'external_circular']) {
     const html = documentHtml({ ...signingDoc, category: cat, paperSize: 'letter', bodyParagraphs: ['x'] }, 'http://localhost');
-    assert.ok(html.includes('size: A4 portrait'), cat + ' must be A4 even if record says letter');
+    assert.ok(html.includes(cat === 'memo' ? 'size: letter portrait' : 'size: A4 portrait'), cat + ' paper follows the original (memo Letter, others A4) regardless of record paperSize');
     assert.ok(html.includes('margin: ' + cssMargin(getTemplateSpec(cat).margins)), cat + ' @page margin must come from spec');
   }
-  console.log(' PASS: Template spec drives A4 size and margins for all 5 categories.');
+  console.log(' PASS: Template spec drives paper size and margins for all 5 categories.');
 
   console.log('\n[TEST 16] Rich Text Body: sanitize, round-trip, HTML preview and Word export:');
   const rich = require('../lib/richBody.ts');
@@ -774,7 +774,7 @@ async function runAllTests() {
   assert.ok(memoDoc.includes('วราวุฒิ') && memoDoc.includes('ย่อหน้าหนึ่ง') && memoDoc.includes('(ผู้ช่วยศาสตราจารย์ ดร.สิริศักดิ์ อาจวิชัย)'), 'recipient, body and single-spaced signatory placed');
   assert.ok(memoDoc.includes('<w:b/>') && memoDoc.includes('w:val="center"'), 'rich body formatting carried into WordprocessingML');
   assert.ok(memoDoc.includes('อ้างถึง') && memoDoc.includes('สิ่งที่ส่งมาด้วย') && memoDoc.includes('ผู้ประสานงาน ทดสอบ'), 'optional reference, attachments and coordinator are rendered');
-  assert.ok(/w:w="11906"[^>]*w:h="16838"/.test(memoDoc), 'template page size is A4');
+  assert.ok(/w:w="12240"[^>]*w:h="15840"/.test(memoDoc), 'memo template page size is Letter like the original');
   assert.ok(memoZip.file('word/footer1.xml').asText().includes('CPRU-66-001'), 'footer code comes from the original file');
   const noTemplateBlob = await buildAdminWord({ ...memoRecord, category: 'order', bodyHtml: undefined });
   assert.ok(noTemplateBlob.size > 1000, 'categories without a template still use the generated document');
@@ -805,7 +805,8 @@ async function runAllTests() {
     const x = z.file('word/document.xml').asText();
     assert.equal(/\{\{|\}\}/.test(x), false, cat + ': no unreplaced tags');
     assert.ok(x.includes('ด้วยคณะ ทดสอบ') && x.includes('ผู้ช่วยศาสตราจารย์ ดร.สิริศักดิ์ อาจวิชัย'), cat + ': body and signatory placed');
-    assert.ok(/w:w="11906"[^>]*w:h="16838"/.test(x), cat + ': A4 page');
+    const paperRe = cat === 'memo' ? /w:w="12240"[^>]*w:h="15840"/ : /w:w="11906"[^>]*w:h="16838"/;
+    assert.ok(paperRe.test(x), cat + ': page size follows the original (memo Letter, others A4)');
   }
   const orderZip = new PizZip(Buffer.from(await (await buildAdminWord(orderRec)).arrayBuffer()));
   const orderXml = orderZip.file('word/document.xml').asText();

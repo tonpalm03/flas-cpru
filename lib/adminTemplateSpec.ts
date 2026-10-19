@@ -1,6 +1,6 @@
 /**
  * แม่แบบเอกสารกลาง: ค่าเดียวที่ Preview, PDF และ Word ต้องอ่านร่วมกัน
- * ถอดจากไฟล์ .docx ต้นฉบับของแต่ละประเภท กระดาษ A4 ทั้งหมด
+ * ถอดจากไฟล์ .docx ต้นฉบับของแต่ละประเภท กระดาษ A4 ยกเว้นบันทึกข้อความที่ต้นฉบับตั้ง Letter
  */
 export interface TemplateMarginsMm {
   top: number;
@@ -9,7 +9,11 @@ export interface TemplateMarginsMm {
   left: number;
 }
 
+export type PaperKey = 'a4' | 'letter';
+
 export interface AdminTemplateSpec {
+  /** ขนาดกระดาษตามต้นฉบับ: บันทึกข้อความตั้ง Letter ที่เหลือ A4 (ค่าเริ่มต้น) */
+  paper?: PaperKey;
   margins: TemplateMarginsMm;
   /** ขอบบนเฉพาะหน้าแรก (มม.) ใช้เมื่อหัวเอกสารอยู่สูงกว่าขอบบนของหน้าถัดไป ต้นฉบับบันทึกข้อความวางครุฑสูงกว่าขอบ */
   firstPageTop?: number;
@@ -44,11 +48,22 @@ export interface LetterSpec {
 
 export const A4_MM = { width: 210, height: 297 } as const;
 export const A4_TWIPS = { width: 11906, height: 16838 } as const;
+export const LETTER_MM = { width: 216, height: 279 } as const;
+export const LETTER_TWIPS = { width: 12240, height: 15840 } as const;
+
+/** ขนาดกระดาษของประเภทเอกสาร (มม. และ twips) ใช้ร่วมกันโดย Preview, PDF และ Word */
+export function getPaper(category = 'memo') {
+  const letter = getTemplateSpec(category).paper === 'letter';
+  return letter
+    ? { key: 'letter' as const, label: 'Letter', cssSize: 'letter portrait', mm: LETTER_MM, twips: LETTER_TWIPS }
+    : { key: 'a4' as const, label: 'A4', cssSize: 'A4 portrait', mm: A4_MM, twips: A4_TWIPS };
+}
 
 const SIDE = { right: 20, left: 30 };
 
 const SPECS: Record<string, AdminTemplateSpec> = {
-  memo: { margins: { top: 25, bottom: 22.5, ...SIDE }, firstPageTop: 16.5 },
+  // ต้นฉบับบันทึกข้อความตั้งกระดาษ Letter (12240 x 15840 twips)
+  memo: { paper: 'letter', margins: { top: 25, bottom: 22.5, ...SIDE }, firstPageTop: 16.5 },
   memo_circular: { margins: { top: 20, bottom: 20, ...SIDE }, firstPageTop: 16 },
   order: {
     margins: { top: 17.5, bottom: 20, ...SIDE },

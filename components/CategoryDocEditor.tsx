@@ -11,6 +11,7 @@ import type {
 } from "@/lib/types";
 import { bangkokDate, registryNumber } from "@/lib/adminRegistryModel";
 import { documentHtml } from "@/lib/adminDocument";
+import { getPaper } from "@/lib/adminTemplateSpec";
 import { bodyHtmlToParagraphs, paragraphsToBodyHtml, sanitizeBodyHtml } from "@/lib/richBody";
 import RichBodyEditor from "@/components/RichBodyEditor";
 import { getSignatoryPresets, DEFAULT_SIGNATORY_PRESETS } from "@/lib/adminSignatoryService";
@@ -1189,7 +1190,7 @@ export default function CategoryDocEditor({
               <Eye className="w-4 h-4 text-blue-400" />
               <span className="text-xs font-bold tracking-tight">ตัวอย่างเอกสารจริง (Live Preview จากแม่แบบคงที่)</span>
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-700 text-slate-300">
-                {isExternal ? "A4" : "Letter"}
+                {getPaper(draftPreviewRecord.category).label}
               </span>
             </div>
 
@@ -1220,8 +1221,8 @@ export default function CategoryDocEditor({
             <div 
               className="bg-white shadow-2xl rounded-sm transition-all duration-150 origin-top"
               style={{
-                width: isExternal ? "210mm" : "216mm",
-                minHeight: isExternal ? "297mm" : "279mm",
+                width: `${getPaper(draftPreviewRecord.category).mm.width}mm`,
+                minHeight: `${getPaper(draftPreviewRecord.category).mm.height}mm`,
                 transform: `scale(${zoomScale / 100})`,
                 transformOrigin: "top center"
               }}
@@ -1234,7 +1235,7 @@ export default function CategoryDocEditor({
                 )}
                 className="w-full border-0 pointer-events-none"
                 style={{
-                  height: isExternal ? "297mm" : "279mm",
+                  height: `${getPaper(draftPreviewRecord.category).mm.height}mm`,
                   overflow: "hidden"
                 }}
               />

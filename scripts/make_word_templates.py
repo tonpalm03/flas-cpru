@@ -15,6 +15,7 @@ import zipfile
 
 ROOT, OUT = sys.argv[1], sys.argv[2]
 A4 = '<w:pgSz w:w="11906" w:h="16838"/>'
+LETTER = '<w:pgSz w:w="12240" w:h="15840"/>'  # บันทึกข้อความของคณะตั้งกระดาษ Letter ตามต้นฉบับ
 FONT = '<w:rFonts w:ascii="TH SarabunIT๙" w:hAnsi="TH SarabunIT๙" w:cs="TH SarabunIT๙"/>'
 BOTTOM = 1134  # ขอบล่างคง 2.0 ซม. ตามที่ตกลง
 
@@ -82,7 +83,7 @@ def tab_run(rpr, tiny=True):
     return f'<w:r>{small(rpr) if tiny else rpr}<w:tab/></w:r>'
 
 
-def build_header(h):
+def build_header(h, fill=9070):
     """ช่องว่างหลังป้ายหัวข้อ (ส่วนราชการ/ที่/วันที่/เรื่อง) ใช้รันของต้นฉบับตามเดิม เพื่อให้ระยะเว้นวรรคเท่าต้นฉบับ"""
     out = h
     done = 0
@@ -95,17 +96,17 @@ def build_header(h):
         if texts and texts[0] == 'ส่วนราชการ':
             a, _ = value_span(rs, 0)
             vr = rpr_of(rs[a].group(0))
-            new = rebuild(p, [rs[0].group(0), *gap(1, a), tag_run(vr, 'from'), tab_run(vr)], [9070])
+            new = rebuild(p, [rs[0].group(0), *gap(1, a), tag_run(vr, 'from'), tab_run(vr)], [fill])
         elif texts and texts[0] == 'ที่':
             d = next(i for i, t in enumerate(texts) if t == 'วันที่')
             na, _ = value_span(rs, 0)
             da, _ = value_span(rs, d)
             nr, dr = rpr_of(rs[na].group(0)), rpr_of(rs[da].group(0))
-            new = rebuild(p, [rs[0].group(0), *gap(1, na), tag_run(nr, 'docNumber'), tab_run(nr), rs[d].group(0), *gap(d + 1, da), tag_run(dr, 'date'), tab_run(dr)], [3960, 9070])
+            new = rebuild(p, [rs[0].group(0), *gap(1, na), tag_run(nr, 'docNumber'), tab_run(nr), rs[d].group(0), *gap(d + 1, da), tag_run(dr, 'date'), tab_run(dr)], [3960, fill])
         elif texts and texts[0] == 'เรื่อง':
             a, _ = value_span(rs, 0)
             vr = rpr_of(rs[a].group(0))
-            new = rebuild(p, [rs[0].group(0), *gap(1, a), tag_run(vr, 'subject'), tab_run(vr, tiny=False)], [720, 9070])
+            new = rebuild(p, [rs[0].group(0), *gap(1, a), tag_run(vr, 'subject'), tab_run(vr, tiny=False)], [720, fill])
         if new:
             out = out[:m.start()] + new + out[m.end():]
             done += 1
@@ -142,13 +143,13 @@ def add_part(zin_files, name, data, content_type, rel_type, rel_id):
     zin_files['[Content_Types].xml'] = ct.encode('utf8')
 
 
-def memo_template(src, dst):
+def memo_template(src, dst, paper=A4, fill=9070):
     zin = zipfile.ZipFile(src)
     files = {i.filename: zin.read(i.filename) for i in zin.infolist()}
     infos = {i.filename: i for i in zin.infolist()}
     doc = files['word/document.xml'].decode('utf8')
     sect = re.findall(r'<w:sectPr.*?</w:sectPr>', doc, re.S)[-1]
-    sect = re.sub(r'<w:pgSz[^>]*/>', A4, sect)
+    sect = re.sub(r'<w:pgSz[^>]*/>', paper, sect)
     hdr_ref = re.search(r'<w:headerReference w:type="default" r:id="(\w+)"/>', sect)
     ftr_ref = re.search(r'<w:footerReference w:type="default" r:id="(\w+)"/>', sect)
     # ส่วนหัวต้นฉบับ (ครุฑ+หัวเรื่อง) แสดงเฉพาะหน้าแรก หน้าถัดไปใช้ส่วนหัวว่าง ขอบบนหน้าถัดไปตามต้นฉบับ
@@ -165,7 +166,7 @@ def memo_template(src, dst):
     head = doc[:doc.index('<w:body>') + len('<w:body>')]
     sect_break = '<w:p><w:pPr>' + sect + '</w:pPr></w:p>'
     files['word/document.xml'] = (head + memo_body(sect_break) + sect + '</w:body></w:document>').encode('utf8')
-    files[hdr_name] = build_header(hdr_xml).encode('utf8')
+    files[hdr_name] = build_header(hdr_xml, fill).encode('utf8')
     write(dst, files, infos)
 
 
@@ -200,7 +201,7 @@ def write(dst, files, infos):
 
 
 os.makedirs(OUT, exist_ok=True)
-memo_template(f'{ROOT}/{SOURCES["memo"]}', f'{OUT}/memo.docx')
+memo_template(f'{ROOT}/{SOURCES["memo"]}', f'{OUT}/memo.docx', LETTER, 9404)  # 12240 - 1701 - 1134 - 1
 memo_template(f'{ROOT}/{SOURCES["memo_circular"]}', f'{OUT}/memo_circular.docx')
 leading_template(f'{ROOT}/{SOURCES["external"]}', f'{OUT}/external.docx', 'ที่ อว')
 leading_template(f'{ROOT}/{SOURCES["external_circular"]}', f'{OUT}/external_circular.docx', 'ที่ อว')

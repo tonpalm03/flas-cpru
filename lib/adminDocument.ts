@@ -1,7 +1,7 @@
 import type { AdminDocCategory, AdminDocRegistryRecord } from './types';
 import { PAGE_BREAK_XML, blocksToWordXml, loadWordTemplate, renderWordTemplate, xmlImagePara, xmlPara, xmlRun, xmlTab, type TemplateImage, type XmlParaOptions } from './wordTemplate';
 import { INDENT_STEP_MM, INDENT_STEP_TWIPS, getBodyBlocks, newBlock, type RichBlock } from './richBody';
-import { A4_MM, A4_TWIPS, cssMargin, getTemplateSpec, mmToTwips, wordMargin } from './adminTemplateSpec';
+import { cssMargin, getPaper, getTemplateSpec, mmToTwips, wordMargin } from './adminTemplateSpec';
 
 export function garudaPath(category: string, garudaImage?: string) {
   if (garudaImage) return garudaImage;
@@ -244,7 +244,7 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
       font-style: normal;
     }
     @page {
-      size: A4 portrait;
+      size: ${getPaper(r.category).cssSize};
       /* ระยะขอบตามต้นฉบับของประเภทเอกสาร ใช้กับทุกหน้า ไม่ใช่เฉพาะหน้าแรก */
       margin: ${pageMargin};
       ${hasFooterCode ? `
@@ -253,7 +253,7 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
       ` : ''}
     }
     article { page: doc; }
-    @page doc { size: A4 portrait; margin: ${pageMargin}; }
+    @page doc { size: ${getPaper(r.category).cssSize}; margin: ${pageMargin}; }
     ${firstTopMm !== undefined ? `@page doc:first { margin-top: ${MEMO_GARUDA_TOP_MM}mm; }` : ''}
     html {
       -webkit-print-color-adjust: exact;
@@ -300,8 +300,8 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
     }
     article {
       background: white;
-      width: ${A4_MM.width}mm;
-      min-height: ${A4_MM.height}mm;
+      width: ${getPaper(r.category).mm.width}mm;
+      min-height: ${getPaper(r.category).mm.height}mm;
       padding: ${firstTopMm !== undefined ? `${firstTopMm}mm ${spec.margins.right}mm ${spec.margins.bottom}mm ${spec.margins.left}mm` : pageMargin};
       margin: 20px auto;
       box-shadow: 0 4px 16px rgba(0,0,0,0.08);
@@ -892,8 +892,8 @@ export async function buildAdminWord(r: AdminDocRegistryRecord): Promise<Blob> {
   const orderLayout = getTemplateSpec('order').orderLayout!;
   const sigIndent = isMemo || isOrder ? 2835 : 2268;
   const formattedOrderNum = displayNum;
-  const pageWidth = A4_TWIPS.width;
-  const pageHeight = A4_TWIPS.height;
+  const pageWidth = getPaper(r.category).twips.width;
+  const pageHeight = getPaper(r.category).twips.height;
   const pageMargins = wordMargin(getTemplateSpec(r.category).margins);
   const border = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' };
 
