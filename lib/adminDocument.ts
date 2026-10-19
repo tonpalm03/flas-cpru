@@ -1,5 +1,5 @@
 import type { AdminDocCategory, AdminDocRegistryRecord } from './types';
-import { blocksToWordXml, loadWordTemplate, renderWordTemplate, xmlPara, xmlRun, xmlTab } from './wordTemplate';
+import { PAGE_BREAK_XML, blocksToWordXml, loadWordTemplate, renderWordTemplate, xmlImagePara, xmlPara, xmlRun, xmlTab, type TemplateImage, type XmlParaOptions } from './wordTemplate';
 import { INDENT_STEP_MM, INDENT_STEP_TWIPS, getBodyBlocks, newBlock, type RichBlock } from './richBody';
 import { A4_MM, A4_TWIPS, cssMargin, getTemplateSpec, mmToTwips, wordMargin } from './adminTemplateSpec';
 
@@ -659,46 +659,157 @@ export function exportAdminPdf(r: AdminDocRegistryRecord) {
 /**
  * High-fidelity Word (.docx) builder
  */
+/** โหลดรูปลายเซ็น (data URI หรือ URL) เป็นไบต์ สำหรับฝังในแม่แบบ */
+async function loadSignatureImage(url: string): Promise<{ bytes: Uint8Array; ext: 'png' | 'jpg' } | null> {
+  try {
+    if (url.startsWith('data:image/')) {
+      const ext = /^data:image\/jpe?g/i.test(url) ? 'jpg' : 'png';
+      const bin = atob(url.split(',')[1]);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      return { bytes, ext };
+    }
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    return { bytes: new Uint8Array(await res.arrayBuffer()), ext: /\.jpe?g(\?|$)/i.test(url) ? 'jpg' : 'png' };
+  } catch {
+    return null;
+  }
+}
+
 /**
- * บันทึกข้อความ: ส่งออก Word จากไฟล์แม่แบบต้นฉบับของคณะ (ส่วนหัว ตราครุฑ ฟอนต์ หน้ากระดาษตรงต้นฉบับ)
- * คืน null เพื่อให้ใช้ตัวสร้างเดิมแทน เมื่อ: ไม่ใช่บันทึกข้อความ, มีลายเซ็นดิจิทัลฝังรูป,
- * บันทึกข้อความ (ว) ที่มีผู้รับหลายราย (ต้องแยกหลายฉบับ) หรือโหลดแม่แบบไม่ได้
+ * ส่งออก Word จากไฟล์แม่แบบต้นฉบับของคณะ (public/templates/admin/word/<ประเภท>.docx)
+ * ส่วนหัว ตราครุฑ ท้ายกระดาษ ฟอนต์ และหน้ากระดาษมาจากไฟล์ต้นฉบับโดยตรง ระบบแทนเฉพาะค่าและเนื้อหา
+ * ผู้รับหลายรายของหนังสือเวียน = หลายฉบับในไฟล์เดียว คืน null เมื่อโหลดแม่แบบไม่ได้ให้ใช้ตัวสร้างเดิมแทน
  */
-async function buildMemoFromTemplate(r: AdminDocRegistryRecord): Promise<Blob | null> {
-  if (r.category !== 'memo' && r.category !== 'memo_circular') return null;
-  if (r.signatureUrl) return null;
-  const recipients = (r.recipients || []).filter(x => x.trim());
-  if (r.category === 'memo_circular' && recipients.length > 1) return null;
+async function buildFromTemplate(r: AdminDocRegistryRecord): Promise<Blob | null> {
   const template = await loadWordTemplate(r.category);
   if (!template) return null;
   try {
     const digitType = getRecordDigitType(r);
     const display = (t: string) => formatDocDigits(t, digitType);
-    const to = r.category === 'memo_circular' && recipients.length === 1 ? recipients[0] : r.to || '';
+    const isMemo = r.category === 'memo' || r.category === 'memo_circular';
+    const isOrder = r.category === 'order';
+    const isCircular = r.category === 'memo_circular' || r.category === 'external_circular';
+    const recipients = (r.recipients || []).filter(x => x.trim());
+    const targets = isCircular && recipients.length ? recipients : [r.to || ''];
+    const letter = getTemplateSpec(r.category).letter;
+    const orderLayout = getTemplateSpec('order').orderLayout!;
     const reference = sanitizeFieldText(r.referenceDoc || '', 'อ้างถึง');
-    const labelLine = (label: string, text: string, indent: number) =>
-      xmlPara(xmlRun(label) + xmlTab() + xmlRun(display(text)), { left: indent, hanging: indent, tabs: [indent], before: 120 });
-    const extra =
-      (reference ? labelLine('อ้างถึง', reference, 720) : '') +
-      (r.attachmentsList || [])
-        .map((att, i) => labelLine(i === 0 ? 'สิ่งที่ส่งมาด้วย' : '', `${i + 1}. ${att}`, 1417))
-        .join('');
+    const subject = sanitizeFieldText(r.subject, 'เรื่อง');
+    const docNumber = getDisplayDocNumber(r);
     const signatory = formatSignatoryName(r.signedByName || r.signatoryName || '');
     const position = r.signedByPosition || r.signatoryPosition || '';
-    const signature =
-      xmlPara(xmlRun(`(${display(signatory)})`), { align: 'center', left: 2835, before: 2055, keepNext: true }) +
-      xmlPara(xmlRun(display(position)), { align: 'center', left: 2835 });
-    return await renderWordTemplate(template, {
-      from: display(r.from || ''),
-      docNumber: display(getDisplayDocNumber(r)),
-      date: thaiGovDate(r.date, digitType, 'memo'),
-      subject: display(sanitizeFieldText(r.subject, 'เรื่อง')),
-      to: display(to),
-      extra,
-      body: blocksToWordXml(getBodyBlocks(r), display, b => (b.text.startsWith('จึงเรียน') ? 240 : 120)),
-      signature,
-      coordinator: r.coordinatorInfo ? xmlPara(xmlRun(display(r.coordinatorInfo)), { before: 240 }) : ''
+    const blocks = getBodyBlocks(r);
+
+    const images: TemplateImage[] = [];
+    if (r.signatureUrl) {
+      const img = await loadSignatureImage(r.signatureUrl);
+      if (img) images.push({ rId: 'rIdSignature1', ...img });
+    }
+
+    const labelLine = (label: string, text: string, indent: number) =>
+      xmlPara(xmlRun(label) + xmlTab() + xmlRun(display(text)), { left: indent, hanging: indent, tabs: [indent], before: 120 });
+    const attachments = (r.attachmentsList || []).map((att, i) => {
+      if (isMemo) return labelLine(i === 0 ? 'สิ่งที่ส่งมาด้วย' : '', `${i + 1}. ${att}`, 1417);
+      const parsed = parseAttachmentRow(att);
+      const numText = `${display(String(i + 1))}. ${display(parsed.item)}`;
+      return parsed.qty
+        ? xmlPara(xmlRun(i === 0 ? 'สิ่งที่ส่งมาด้วย' : '') + xmlTab() + xmlRun(numText) + xmlTab() + xmlRun(display(parsed.qty)), { left: 1417, hanging: 1417, tabs: [1417, 7200] })
+        : labelLine(i === 0 ? 'สิ่งที่ส่งมาด้วย' : '', numText, 1417);
     });
+
+    // บล็อกลงนาม: ระยะห่างตามต้นฉบับของแต่ละประเภท มีรูปลายเซ็นจะเว้นเท่ารูป
+    const signIndent = isMemo || isOrder ? 2835 : 2268;
+    const signGap = isOrder ? orderLayout.signGapMm : letter ? letter.signGapMm : 0;
+    const signatureXml = () =>
+      (images.length ? xmlImagePara('rIdSignature1', 140, 48, { align: 'center', left: signIndent, before: 240, after: 60, keepNext: true }) : '') +
+      xmlPara(xmlRun(`(${display(signatory)})`), {
+        align: 'center',
+        left: signIndent,
+        before: images.length ? 60 : isMemo ? 2055 : Math.round(signGap * 56.693),
+        keepNext: true
+      }) +
+      xmlPara(xmlRun(display(position)), { align: 'center', left: signIndent });
+    const coordinatorXml = (gapMm?: number) =>
+      r.coordinatorInfo ? xmlPara(xmlRun(display(r.coordinatorInfo)), { before: gapMm ? Math.round(gapMm * 56.693) : 240 }) : '';
+
+    const data: Record<string, unknown> = {};
+    if (isMemo) {
+      Object.assign(data, {
+        from: display(r.from || ''),
+        docNumber: display(docNumber),
+        date: thaiGovDate(r.date, digitType, 'memo'),
+        subject: display(subject)
+      });
+    }
+
+    data.letters = targets.map((to, index) => {
+      const last = index === targets.length - 1;
+      const pageBreak = last ? '' : PAGE_BREAK_XML;
+      if (isMemo) {
+        return {
+          to: display(to),
+          extra: (reference ? labelLine('อ้างถึง', reference, 720) : '') + attachments.join(''),
+          body: blocksToWordXml(blocks, display, b => (b.text.startsWith('จึงเรียน') ? 240 : 120)),
+          signature: signatureXml(),
+          coordinator: coordinatorXml(),
+          notLast: !last
+        };
+      }
+      if (isOrder) {
+        const centered = (text: string, extra: XmlParaOptions = {}) => xmlPara(xmlRun(text, { bold: true }), { align: 'center', ...extra });
+        const headingIndent = Math.round(orderLayout.headingIndentMm * 56.693);
+        const dateIndent = Math.round(orderLayout.dateIndentMm * 56.693);
+        const items = orderItems(blocks);
+        const parts: string[] = [
+          centered('คำสั่ง' + display((r.from || '').trim().replace(/^คำสั่ง\s*/, ''))),
+          centered(display(docNumber)),
+          centered('เรื่อง  ' + display(subject), { left: 1418, hanging: 1418 }),
+          centered('........................................................', { after: 120 })
+        ];
+        for (const { text, block } of items) {
+          const mem = parseCommitteeRow(text);
+          if (mem.isMember) {
+            parts.push(xmlPara(xmlRun(display(mem.name)) + xmlTab() + xmlRun(display(mem.role)), { left: 1843, tabs: [6460] }));
+          } else if (/^[๐-๙0-9]+(?:\.[๐-๙0-9]+)*[\.\s]\s*คณะกรรมการ/.test(text)) {
+            parts.push(xmlPara(xmlRun(display(text), { bold: true }), { left: headingIndent, before: 120, after: 120, keepNext: true }));
+          } else if (text === 'หน้าที่' || text.startsWith('หน้าที่')) {
+            const rest = text.slice('หน้าที่'.length);
+            parts.push(xmlPara(xmlRun('หน้าที่', { bold: true }) + (rest.trim() ? xmlRun(display(rest)) : ''), { left: headingIndent, before: 120, after: 120 }));
+          } else if (/^[๐-๙0-9]+(?:\.[๐-๙0-9]+)*[\.\s]/.test(text)) {
+            parts.push(xmlPara(xmlRun(display(text)), { left: 1843, after: 30 }));
+          } else if (text.startsWith('สั่ง ณ วันที่')) {
+            parts.push(xmlPara(xmlRun(display(text)), { left: dateIndent, before: 180, after: 60, keepNext: true }));
+          } else {
+            parts.push(blocksToWordXml([block], display));
+          }
+        }
+        if (!items.some(i => i.text.startsWith('สั่ง ณ วันที่'))) {
+          parts.push(xmlPara(xmlRun(display(thaiGovDate(r.date, digitType, 'order'))), { left: dateIndent, before: 180, after: 60, keepNext: true }));
+        }
+        parts.push(signatureXml(), coordinatorXml());
+        return { content: parts.join(''), pageBreak };
+      }
+      // หนังสือภายนอก / หนังสือภายนอก (ว)
+      const addr = (r.officeAddress || r.from || '').split('\n').map(x => x.trim()).filter(Boolean);
+      const parts: string[] = [
+        xmlPara(xmlRun(display(docNumber)) + xmlTab() + xmlRun(display(addr[0] || '')), { tabs: [5760] }),
+        ...addr.slice(1).map(l => xmlPara(xmlRun(display(l)), { left: 5760 })),
+        xmlPara(xmlRun(thaiGovDate(r.date, digitType, 'external')), { left: 4252, before: 120, after: 120 }),
+        labelLine('เรื่อง', subject, 720),
+        labelLine('เรียน', to, 720),
+        ...(reference ? [labelLine('อ้างถึง', reference, 720)] : []),
+        ...attachments,
+        blocksToWordXml(blocks, display),
+        xmlPara(xmlRun('ขอแสดงความนับถือ'), { align: 'center', left: signIndent, before: letter ? Math.round(letter.closingGapMm * 56.693) : 240, after: 60, keepNext: true }),
+        signatureXml(),
+        coordinatorXml(letter?.coordinatorGapMm)
+      ];
+      return { content: parts.join(''), pageBreak };
+    });
+
+    return await renderWordTemplate(template, data, images);
   } catch (err) {
     console.warn('แม่แบบ Word ใช้งานไม่ได้ ใช้ตัวสร้างเดิมแทน:', err);
     return null;
@@ -710,7 +821,7 @@ export async function buildAdminWord(r: AdminDocRegistryRecord): Promise<Blob> {
     throw new Error('เอกสารอยู่ในขั้นตอน "รอลงนาม" ไม่อนุญาตให้ดาวน์โหลดไฟล์ Word เพื่อป้องกันการแก้ไขก่อนลงนาม');
   }
 
-  const fromTemplate = await buildMemoFromTemplate(r);
+  const fromTemplate = await buildFromTemplate(r);
   if (fromTemplate) return fromTemplate;
 
   const {

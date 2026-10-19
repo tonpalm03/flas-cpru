@@ -782,7 +782,56 @@ async function runAllTests() {
   assert.ok(signedBlob.size > 1000, 'documents with a digital signature fall back to the generated document');
   console.log(' PASS: Memo Word export renders from the original template and falls back safely.');
 
-  console.log('\n=== ALL 18 CORE TEST GROUPS PASSED WITH 100% ACCURACY! ===');
+  console.log('\n[TEST 19] Word export from templates for all five categories, multi-recipient and e-signature:');
+  const tinyPng = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+  const baseRec = {
+    ...memoRecord,
+    action: 'รอตรวจ',
+    officeAddress: 'คณะศิลปศาสตร์และวิทยาศาสตร์\nมหาวิทยาลัยราชภัฏชัยภูมิ\n167 หมู่ 2',
+    signatureUrl: undefined,
+    referenceDoc: undefined,
+    attachmentsList: ['กำหนดการ  จำนวน ๑ ฉบับ'],
+    bodyParagraphs: ['ด้วยคณะ ทดสอบ', 'จึงเรียนมาเพื่อโปรดพิจารณา'],
+    bodyHtml: undefined
+  };
+  const orderRec = {
+    ...baseRec,
+    category: 'order',
+    from: 'คณะศิลปศาสตร์และวิทยาศาสตร์',
+    bodyParagraphs: ['ด้วยคณะ ทดสอบ', '๑. คณะกรรมการอำนวยการ\n๑. ผู้ช่วยศาสตราจารย์ ดร.สิริศักดิ์ อาจวิชัย  ประธานกรรมการ\nหน้าที่ ให้คำปรึกษา แนะนำ']
+  };
+  for (const cat of ['memo', 'memo_circular', 'external', 'external_circular']) {
+    const z = new PizZip(Buffer.from(await (await buildAdminWord({ ...baseRec, category: cat })).arrayBuffer()));
+    const x = z.file('word/document.xml').asText();
+    assert.equal(/\{\{|\}\}/.test(x), false, cat + ': no unreplaced tags');
+    assert.ok(x.includes('ด้วยคณะ ทดสอบ') && x.includes('ผู้ช่วยศาสตราจารย์ ดร.สิริศักดิ์ อาจวิชัย'), cat + ': body and signatory placed');
+    assert.ok(/w:w="11906"[^>]*w:h="16838"/.test(x), cat + ': A4 page');
+  }
+  const orderZip = new PizZip(Buffer.from(await (await buildAdminWord(orderRec)).arrayBuffer()));
+  const orderXml = orderZip.file('word/document.xml').asText();
+  assert.equal(/\{\{|\}\}/.test(orderXml), false, 'order: no unreplaced tags');
+  assert.ok(orderXml.includes('ประธานกรรมการ') && orderXml.includes('หน้าที่') && orderXml.includes('คำสั่งคณะศิลปศาสตร์'), 'order: committee row, duty label and title placed');
+  assert.ok(orderXml.includes('<wp:anchor'), 'order: floating garuda comes from the original file');
+
+  const circ = await buildAdminWord({ ...baseRec, category: 'external_circular', recipients: ['ผู้รับ หนึ่ง', 'ผู้รับ สอง', 'ผู้รับ สาม'] });
+  const circXml = new PizZip(Buffer.from(await circ.arrayBuffer())).file('word/document.xml').asText();
+  assert.equal((circXml.match(/ผู้รับ (หนึ่ง|สอง|สาม)/g) || []).length, 3, 'one letter per recipient');
+  assert.equal((circXml.match(/w:type="page"/g) || []).length, 2, 'letters separated by page breaks (none after the last)');
+  const ids = circXml.match(/<wp:docPr id="(\d+)"/g) || [];
+  assert.equal(new Set(ids).size, ids.length, 'repeated garuda drawings get unique ids');
+
+  const memoCirc = await buildAdminWord({ ...baseRec, category: 'memo_circular', recipients: ['อาจารย์ ก', 'อาจารย์ ข'] });
+  const memoCircXml = new PizZip(Buffer.from(await memoCirc.arrayBuffer())).file('word/document.xml').asText();
+  assert.equal((memoCircXml.match(/<w:sectPr/g) || []).length, 2, 'each memo recipient gets its own section so the letterhead repeats');
+
+  const signedZip = new PizZip(Buffer.from(await (await buildAdminWord({ ...baseRec, category: 'external', signatureUrl: tinyPng })).arrayBuffer()));
+  assert.ok(signedZip.file('word/media/rIdSignature1.png'), 'e-signature image embedded in the package');
+  assert.ok(signedZip.file('word/_rels/document.xml.rels').asText().includes('rIdSignature1'), 'e-signature relationship registered');
+  assert.ok(signedZip.file('word/document.xml').asText().includes('r:embed="rIdSignature1"'), 'e-signature drawing placed above the signatory name');
+  assert.ok(/Extension="png"/i.test(signedZip.file('[Content_Types].xml').asText()), 'png content type registered');
+  console.log(' PASS: All five categories export from templates; circulars repeat per recipient; e-signature embedded.');
+
+  console.log('\n=== ALL 19 CORE TEST GROUPS PASSED WITH 100% ACCURACY! ===');
 }
 
 runAllTests().catch(err => {

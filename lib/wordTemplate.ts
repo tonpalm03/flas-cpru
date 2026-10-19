@@ -76,8 +76,36 @@ export function blocksToWordXml(blocks: RichBlock[], display: (t: string) => str
     .join('');
 }
 
-/** แทนค่าในแม่แบบ: ค่าธรรมดาใช้ {{tag}} ค่า XML ใช้ {{@tag}} */
-export async function renderWordTemplate(template: Uint8Array | ArrayBuffer, data: Record<string, string>): Promise<Blob> {
+export interface TemplateImage {
+  /** รหัสความสัมพันธ์ที่ใช้ใน XML (r:embed) */
+  rId: string;
+  bytes: Uint8Array;
+  ext: 'png' | 'jpg';
+}
+
+/** ย่อหน้ารูปลายเซ็น (รูปอยู่ในบรรทัด) อ้างรูปที่เพิ่มด้วย TemplateImage */
+export function xmlImagePara(rId: string, widthPx: number, heightPx: number, o: XmlParaOptions = {}): string {
+  const cx = Math.round(widthPx * 9525);
+  const cy = Math.round(heightPx * 9525);
+  const drawing =
+    `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">` +
+    `<wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="9001" name="Signature"/><wp:cNvGraphicFramePr/>` +
+    `<a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">` +
+    `<pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="0" name="signature"/><pic:cNvPicPr/></pic:nvPicPr>` +
+    `<pic:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="${rId}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>` +
+    `<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic>` +
+    `</a:graphicData></a:graphic></wp:inline></w:drawing></w:r>`;
+  return xmlPara(drawing, o);
+}
+
+export const PAGE_BREAK_XML = '<w:p><w:r><w:br w:type="page"/></w:r></w:p>';
+
+/** แทนค่าในแม่แบบ: ค่าธรรมดาใช้ {{tag}} ค่า XML ใช้ {{@tag}} ลูปใช้ {{#list}}...{{/list}} */
+export async function renderWordTemplate(
+  template: Uint8Array | ArrayBuffer,
+  data: Record<string, unknown>,
+  images: TemplateImage[] = []
+): Promise<Blob> {
   const [{ default: PizZip }, { default: Docxtemplater }] = await Promise.all([import('pizzip'), import('docxtemplater')]);
   const zip = new PizZip(template);
   const doc = new Docxtemplater(zip, {
@@ -88,8 +116,31 @@ export async function renderWordTemplate(template: Uint8Array | ArrayBuffer, dat
     nullGetter: () => ''
   });
   doc.render(data);
-  const out = doc.getZip().generate({ type: 'uint8array', mimeType: DOCX_MIME, compression: 'DEFLATE' });
-  return new Blob([out as BlobPart], { type: DOCX_MIME });
+  const out = doc.getZip();
+
+  // ลูปทำให้ตราครุฑซ้ำหลายฉบับ: ทำรหัสวัตถุไม่ซ้ำกันและตัดรหัสที่ Word สร้างเอง
+  let drawingId = 100;
+  const docPath = 'word/document.xml';
+  let xml = out.file(docPath)!.asText();
+  xml = xml.replace(/<wp:docPr id="\d+"/g, () => `<wp:docPr id="${drawingId++}"`).replace(/ wp14:(anchorId|editId)="[^"]*"/g, '');
+  out.file(docPath, xml);
+
+  if (images.length) {
+    let rels = out.file('word/_rels/document.xml.rels')!.asText();
+    let types = out.file('[Content_Types].xml')!.asText();
+    for (const img of images) {
+      const target = `media/${img.rId}.${img.ext}`;
+      out.file(`word/${target}`, img.bytes);
+      rels = rels.replace('</Relationships>', `<Relationship Id="${img.rId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="${target}"/></Relationships>`);
+      if (!new RegExp(`Extension="${img.ext}"`, 'i').test(types)) {
+        types = types.replace('<Override', `<Default Extension="${img.ext}" ContentType="image/${img.ext === 'jpg' ? 'jpeg' : 'png'}"/><Override`);
+      }
+    }
+    out.file('word/_rels/document.xml.rels', rels);
+    out.file('[Content_Types].xml', types);
+  }
+  const bytes = out.generate({ type: 'uint8array', mimeType: DOCX_MIME, compression: 'DEFLATE' });
+  return new Blob([bytes as BlobPart], { type: DOCX_MIME });
 }
 
 /** โหลดไฟล์แม่แบบ: เบราว์เซอร์ใช้ fetch, Node (เทสต์) อ่านจาก public/ */
