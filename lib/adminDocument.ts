@@ -218,6 +218,8 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
     `<div class="body-para" style="text-align: ${b.align};${b.firstLine ? '' : ' text-indent: 0;'}${b.indent ? ` margin-left: ${b.indent * INDENT_STEP_MM}mm;` : ''}">${richRunsHtml(b)}</div>`;
   const spec = getTemplateSpec(r.category);
   const letter = spec.letter;
+  // รหัสท้ายหน้า CPRU-66-001 + เลขหน้า: ต้นฉบับมีเฉพาะบันทึกข้อความ (บันทึกข้อความ (ว) ไม่มีส่วนท้าย) เลขหน้าเป็นเลขอารบิกเสมอ
+  const hasFooterCode = r.category === 'memo';
   const orderLayout = getTemplateSpec('order').orderLayout!;
   const pageMargin = cssMargin(spec.margins);
   const firstTopMm = spec.firstPageTop;
@@ -245,9 +247,9 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
       size: A4 portrait;
       /* ระยะขอบตามต้นฉบับของประเภทเอกสาร ใช้กับทุกหน้า ไม่ใช่เฉพาะหน้าแรก */
       margin: ${pageMargin};
-      ${isMemo ? `
+      ${hasFooterCode ? `
       @bottom-left { content: 'CPRU-66-001'; font-family: 'THSarabunPSK', 'Sarabun', sans-serif; font-size: 15pt; vertical-align: bottom; padding-bottom: 15mm; }
-      @bottom-right { content: counter(page${digitType === 'thai' ? ', thai' : ''}); font-family: 'THSarabunPSK', 'Sarabun', sans-serif; font-size: 15pt; vertical-align: bottom; padding-bottom: 15mm; }
+      @bottom-right { content: counter(page); font-family: 'THSarabunPSK', 'Sarabun', sans-serif; font-size: 15pt; vertical-align: bottom; padding-bottom: 15mm; }
       ` : ''}
     }
     article { page: doc; }
@@ -360,7 +362,7 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
       text-align: left;
     }
     .ext-date {
-      margin: 3mm 0 3mm 75mm;
+      margin: 4mm 0 2.5mm 75mm;
       font-size: 16pt;
       line-height: 1.25;
     }
@@ -439,8 +441,8 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
       text-indent: 25mm;
       text-align: justify;
       text-justify: inter-character;
-      margin: 3mm 0;
-      line-height: 1.35;
+      margin: 2.1mm 0;
+      line-height: 1.33;
     }
     .signature-container {
       margin-top: 17mm;
@@ -543,13 +545,13 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
       </div>
     ` : `
       <div class="ext-header">
-        <div class="ext-header-left">
+        <div class="ext-header-left"${letter ? ` style="top: ${letter.headerTextTopMm}mm;"` : ''}>
           ${escape(displayDigits(displayNum))}
         </div>
         <div class="ext-header-center" ${letter ? `style="left: ${letter.garuda.leftMm}mm; transform: none; width: ${letter.garuda.widthMm}mm;"` : ''}>
           <img class="garuda-ext" ${letter ? `style="width: ${letter.garuda.widthMm}mm; height: ${letter.garuda.heightMm}mm;"` : ''} src="${garudaPath(r.category)}" alt="ครุฑ" />
         </div>
-        <div class="ext-header-right">${escape(displayDigits(r.officeAddress || r.from))}</div>
+        <div class="ext-header-right"${letter ? ` style="padding-top: ${letter.headerTextTopMm}mm;"` : ''}>${escape(displayDigits(r.officeAddress || r.from))}</div>
       </div>
       <div class="ext-date">
         ${escape(thaiGovDate(r.date, digitType, 'external'))}
@@ -563,10 +565,10 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
     ` : ''}
 
     ${(r.attachmentsList || []).length > 0 ? `
-      <div style="margin: 1.2mm 0;">
+      <div style="margin: 0;">
         ${(r.attachmentsList || []).map((att, i) => {
           const parsed = parseAttachmentRow(att);
-          return `<div class="ext-row" style="justify-content: space-between;${i > 0 ? ' margin-top: 0;' : ''}">
+          return `<div class="ext-row" style="justify-content: space-between;${i > 0 || !isMemo ? ' margin-top: 0;' : ''}">
             <div style="display: flex;">
               <b class="ext-label" style="width: 25mm;">${i === 0 ? 'สิ่งที่ส่งมาด้วย' : ''}</b>
               <span>${displayDigits(String(i + 1))}. ${escape(displayDigits(parsed.item))}</span>
@@ -577,7 +579,7 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
       </div>
     ` : ''}
 
-    <div style="margin-top: 4mm;">
+    <div style="margin-top: ${isMemo ? 4 : isOrder ? 1.6 : r.category === 'external_circular' ? 2.8 : 2.2}mm;">
       ${bodyItems.map(({ text: p, block }) => {
         if (isOrder) {
           const mem = parseCommitteeRow(p);
@@ -599,13 +601,13 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
             return `<div style="padding-left: 32.5mm; margin: 0; line-height: 1.35;">${escape(displayDigits(p))}</div>`;
           }
           if (p.startsWith('สั่ง ณ วันที่')) {
-            return `<div style="padding-left: ${orderLayout.dateIndentMm}mm; margin: 5mm 0 3mm; line-height: 1.35;">${escape(displayDigits(p))}</div>`;
+            return `<div style="padding-left: ${orderLayout.dateIndentMm}mm; margin: 3.2mm 0 1mm; line-height: 1.35;">${escape(displayDigits(p))}</div>`;
           }
         }
         return bodyParaHtml(block);
       }).join('')}
       ${isOrder && !bodyItems.some(i => i.text.startsWith('สั่ง ณ วันที่')) ? `
-        <div style="padding-left: ${orderLayout.dateIndentMm}mm; margin: 5mm 0 3mm; line-height: 1.35;">
+        <div style="padding-left: ${orderLayout.dateIndentMm}mm; margin: 3.2mm 0 1mm; line-height: 1.35;">
           ${escape(displayDigits(thaiGovDate(r.date, digitType, 'order')))}
         </div>
       ` : ''}
@@ -627,10 +629,10 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
       </div>
     ` : ''}
 
-    ${isMemo ? `
+    ${hasFooterCode ? `
       <div class="footer-memo">
         <span>CPRU-66-001</span>
-        <span>${displayDigits(String(targetIdx + 1))}</span>
+        <span>${targetIdx + 1}</span>
       </div>
     ` : ''}
   </article>

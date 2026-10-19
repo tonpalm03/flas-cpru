@@ -244,7 +244,7 @@ async function runAllTests() {
     category: 'memo_circular',
     bodyParagraphs: ['ข้อความแจ้งเวียน']
   }, 'http://localhost');
-  assert.equal(memoCircHtml.includes('CPRU-66-001'), true, 'CPRU-66-001 MUST be present in memo_circular footer');
+  assert.equal(memoCircHtml.includes('CPRU-66-001'), false, 'memo_circular follows the original Word file, which has no footer code');
 
   const orderHtml = documentHtml({
     ...signingDoc,
@@ -612,7 +612,7 @@ async function runAllTests() {
   };
   const htmlMemo5 = documentHtml(realMemo5, 'http://localhost');
   assert.ok(htmlMemo5.includes('Pre-CWIE Training'), 'Memo 5 includes CWIE subject');
-  assert.ok(htmlMemo5.includes('CPRU-66-001'), 'Memo circular includes CPRU-66-001');
+  assert.ok(!htmlMemo5.includes('CPRU-66-001'), 'Memo circular has no footer code, like the original Word file');
 
   // Verify Word buildAdminWord compiles successfully for all 5 documents
   const wordBlob1 = await buildAdminWord(realMemo1);

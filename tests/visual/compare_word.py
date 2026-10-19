@@ -83,6 +83,10 @@ def main(orig_dir, ours_dir, out_dir):
         hok = abs(al - hl) <= TOL_MM and abs(ar - hr) <= TOL_MM and abs(top_a - top_h) <= TOL_MM
         failed |= not hok
         print(f"{'PASS' if hok else 'FAIL'} {n} [html]: left {hl:.1f}/{al:.1f} right {hr:.1f}/{ar:.1f} first-text-top {top_h:.1f}/{top_a:.1f} mm")
+        top_b = first_text_top_mm(b)
+        wok = abs(bl - hl) <= TOL_MM and abs(br - hr) <= TOL_MM and abs(top_b - top_h) <= TOL_MM
+        failed |= not wok
+        print(f"{'PASS' if wok else 'FAIL'} {n} [html vs word]: left {hl:.1f}/{bl:.1f} right {hr:.1f}/{br:.1f} first-text-top {top_h:.1f}/{top_b:.1f} mm")
         pa, pb = a.get_pixmap(dpi=80), b.get_pixmap(dpi=80)
         out = fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, pa.width + pb.width + 10, max(pa.height, pb.height)), False)
         out.clear_with(200)

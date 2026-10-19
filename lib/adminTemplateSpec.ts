@@ -38,6 +38,8 @@ export interface LetterSpec {
   closingGapMm: number;
   signGapMm: number;
   coordinatorGapMm: number;
+  /** ตำแหน่งบรรทัด "ที่ ..." และที่อยู่จากขอบบนของตราครุฑ (มม.) ใช้กับ Preview/PDF */
+  headerTextTopMm: number;
 }
 
 export const A4_MM = { width: 210, height: 297 } as const;
@@ -61,12 +63,12 @@ const SPECS: Record<string, AdminTemplateSpec> = {
   // ต้นฉบับตั้งขอบล่างไว้ 0.5 ซม. ซึ่งเป็นความผิดพลาดของไฟล์ ใช้ 2.0 ซม. แทน
   external: {
     margins: { top: 17.5, bottom: 20, ...SIDE },
-    letter: { garuda: { widthMm: 30.4, heightMm: 30, leftMm: 62.3 }, closingGapMm: 15.9, signGapMm: 23.5, coordinatorGapMm: 30 }
+    letter: { garuda: { widthMm: 30.4, heightMm: 30, leftMm: 62.3 }, closingGapMm: 15.9, signGapMm: 23.5, coordinatorGapMm: 30, headerTextTopMm: 26.2 }
   },
   // ต้นฉบับตั้งขอบบน 2.54 ซม. แต่ตราครุฑลอยเหนือขอบ ตำแหน่งจริงเท่ากับหนังสือภายนอกคือ 1.75 ซม.
   external_circular: {
     margins: { top: 17.5, bottom: 17.5, ...SIDE },
-    letter: { garuda: { widthMm: 31, heightMm: 29.4, leftMm: 57.7 }, closingGapMm: 12.1, signGapMm: 30.1, coordinatorGapMm: 19.5 }
+    letter: { garuda: { widthMm: 31, heightMm: 29.4, leftMm: 57.7 }, closingGapMm: 12.1, signGapMm: 30.1, coordinatorGapMm: 19.5, headerTextTopMm: 23.4 }
   }
 };
 
