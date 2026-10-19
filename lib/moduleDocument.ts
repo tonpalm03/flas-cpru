@@ -140,7 +140,7 @@ export async function buildPartsWord(parts: DocPart[]): Promise<Blob> {
     left: AlignmentType.LEFT,
     center: AlignmentType.CENTER,
     right: AlignmentType.RIGHT,
-    justify: AlignmentType.JUSTIFIED
+    justify: AlignmentType.THAI_DISTRIBUTE
   } as const;
 
   const children = parts.flatMap(p => {

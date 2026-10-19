@@ -41,14 +41,14 @@ export function thaiGovDate(
 
   let res = '';
   if (mode === 'order') {
-    res = `สั่ง ณ วันที่  ${day}  เดือน  ${month}  พ.ศ.  ${year}`;
+    res = `สั่ง ณ วันที่ ${day} เดือน ${month} พ.ศ. ${year}`;
   } else if (mode === 'full') {
-    res = `วันที่  ${day}  เดือน  ${month}  พ.ศ.  ${year}`;
+    res = `วันที่ ${day} เดือน ${month} พ.ศ. ${year}`;
   } else if (mode === 'external') {
-    res = `${day}  ${month}  ${year}`;
+    res = `${day} ${month} ${year}`;
   } else {
     // memo format
-    res = `${day}  ${month}  ${year}`;
+    res = `${day} ${month} ${year}`;
   }
   return formatDocDigits(res, digitType);
 }
@@ -60,7 +60,7 @@ export function thaiDate(value: string, digitType: 'thai' | 'arabic' = 'thai') {
 export function formatSignatoryName(name: string): string {
   const trimmed = (name || '').trim();
   if (!trimmed) return '';
-  return trimmed.replace(/([^\s])\s+([^\s])/g, '$1  $2');
+  return trimmed.replace(/\s+/g, ' ');
 }
 
 export function sanitizeFieldText(text: string, keyword?: string): string {
@@ -243,8 +243,8 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
       /* ระยะขอบตามต้นฉบับของประเภทเอกสาร ใช้กับทุกหน้า ไม่ใช่เฉพาะหน้าแรก */
       margin: ${pageMargin};
       ${isMemo ? `
-      @bottom-left { content: 'CPRU-66-001'; font-family: 'THSarabunPSK', 'Sarabun', sans-serif; font-size: 12pt; vertical-align: bottom; }
-      @bottom-right { content: counter(page${digitType === 'thai' ? ', thai' : ''}); font-family: 'THSarabunPSK', 'Sarabun', sans-serif; font-size: 12pt; vertical-align: bottom; }
+      @bottom-left { content: 'CPRU-66-001'; font-family: 'THSarabunPSK', 'Sarabun', sans-serif; font-size: 15pt; vertical-align: bottom; padding-bottom: 15mm; }
+      @bottom-right { content: counter(page${digitType === 'thai' ? ', thai' : ''}); font-family: 'THSarabunPSK', 'Sarabun', sans-serif; font-size: 15pt; vertical-align: bottom; padding-bottom: 15mm; }
       ` : ''}
     }
     article { page: doc; }
@@ -308,8 +308,8 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
       position: absolute;
       left: 0;
       top: -${(firstTopMm ?? MEMO_GARUDA_TOP_MM) - MEMO_GARUDA_TOP_MM}mm;
-      width: 14.25mm;
-      height: 15mm;
+      width: 14.9mm;
+      height: 15.4mm;
       object-fit: contain;
     }
     .garuda-center {
@@ -398,14 +398,15 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
     }
     .memo-row b {
       font-size: 20pt;
-      margin-right: 2.5mm;
+      margin-right: 1.7mm;
       white-space: nowrap;
       flex-shrink: 0;
     }
     .memo-label-regular {
       font-size: 16pt;
       font-weight: normal;
-      margin-right: 2.5mm;
+      margin-right: 0;
+      width: 12.7mm;
       white-space: nowrap;
       flex-shrink: 0;
       color: #000;
@@ -454,12 +455,12 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
     }
     .footer-memo {
       position: absolute;
-      bottom: 12mm;
+      bottom: 15mm;
       left: 30mm;
       right: 20mm;
       display: flex;
       justify-content: space-between;
-      font-size: 12pt;
+      font-size: 15pt;
       color: #000;
     }
     @media print {
@@ -516,7 +517,7 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
       </div>
 
       <div class="memo-row">
-        <b>เรื่อง</b>
+        <b style="width: 12.7mm; margin-right: 0;">เรื่อง</b>
         <div class="memo-val-line ${getLineClass(lineVis.subject)}">
           <span class="val-text">${escape(displayDigits(cleanSubject))}</span>
         </div>
@@ -607,7 +608,7 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
 
     ${!isMemo && !isOrder ? '<div class="ext-closing">ขอแสดงความนับถือ</div>' : ''}
 
-    <div class="signature-container" ${!isMemo && !isOrder ? 'style="margin-left: 40mm; width: 120mm; margin-top: 9mm;"' : ''}>
+    <div class="signature-container" ${!isMemo && !isOrder ? 'style="margin-left: 40mm; width: 120mm; margin-top: 9mm;"' : isMemo ? 'style="margin-top: 20.5mm;"' : ''}>
       ${r.signatureUrl ? `
         <img class="sig-img" src="${r.signatureUrl}" alt="ลายเซ็น" />
       ` : '<div style="height: 14mm;"></div>'}
@@ -661,7 +662,7 @@ export async function buildAdminWord(r: AdminDocRegistryRecord): Promise<Blob> {
   const {
     Document, Paragraph, TextRun, ImageRun, Packer, AlignmentType, Table, TableRow, TableCell,
     BorderStyle, WidthType, LineRuleType, VerticalAlign, TabStopType, UnderlineType,
-    Footer, Header, PageNumber
+    Footer, Header, PageNumber, HorizontalPositionRelativeFrom, VerticalPositionRelativeFrom, TextWrappingType
   } = await import('docx');
 
   // Load garuda image
@@ -754,7 +755,7 @@ export async function buildAdminWord(r: AdminDocRegistryRecord): Promise<Blob> {
     left: AlignmentType.LEFT,
     center: AlignmentType.CENTER,
     right: AlignmentType.RIGHT,
-    justify: AlignmentType.JUSTIFIED
+    justify: AlignmentType.THAI_DISTRIBUTE
   } as const;
 
   const blockRuns = (b: RichBlock) => {
@@ -803,7 +804,7 @@ export async function buildAdminWord(r: AdminDocRegistryRecord): Promise<Blob> {
       alignment: AlignmentType.CENTER,
       indent: { left: sigIndent },
       keepNext: true,
-      spacing: { before: signatureBytes ? 60 : (isOrder ? 1400 : 1000), after: 0, ...SINGLE }
+      spacing: { before: signatureBytes ? 60 : (isOrder ? 1400 : isMemo ? 2055 : 1000), after: 0, ...SINGLE }
     }),
     para(signatoryPos.replace(/\s*ปฏิบัติราชการแทน\s*/, ' ปฏิบัติราชการแทน\n').replace(/\s*รักษาราชการแทน\s*/, ' รักษาราชการแทน\n'), {
       alignment: AlignmentType.CENTER,
@@ -818,21 +819,29 @@ export async function buildAdminWord(r: AdminDocRegistryRecord): Promise<Blob> {
     const solid = { style: BorderStyle.SINGLE, size: 4, color: '000000' };
     const lineBorder = r.headerLineStyle === 'solid' ? solid : r.headerLineStyle === 'none' ? undefined : dotted;
 
-    const field = (label: string, value: string, applyBorder = false, isHalfCell = false) => {
+    // ช่องว่างหลังป้ายหัวข้อตามต้นฉบับ: ส่วนราชการ/ที่/วันที่ เคาะ 2 ครั้งขนาดเล็ก (ต้นฉบับใช้ 11 พอยต์
+    // ตามฟอนต์เริ่มต้นของเอกสาร) ส่วนเรื่องใช้แท็บไปที่ 1.27 ซม.
+    const field = (label: string, value: string, applyBorder = false, isHalfCell = false, gap: 'spaces' | 'tab' = 'spaces') => {
       const underlineStyle = applyBorder && r.headerLineStyle !== 'none'
         ? { type: r.headerLineStyle === 'solid' ? UnderlineType.SINGLE : UnderlineType.DOTTED }
         : undefined;
 
       return new Paragraph({
         children: [
-          new TextRun({ text: label + '  ', font, size: 40, bold: true, sizeComplexScript: 40, language: { value: 'th-TH' } }),
+          new TextRun({ text: label, font, size: 40, bold: true, sizeComplexScript: 40, language: { value: 'th-TH' } }),
+          gap === 'tab'
+            ? new TextRun({ text: '\t', font, size: 40, bold: true, language: { value: 'th-TH' } })
+            : new TextRun({ text: '  ', font, size: 22, sizeComplexScript: 22, language: { value: 'th-TH' } }),
           new TextRun({ text: display(value), font, size: 32, sizeComplexScript: 32, language: { value: 'th-TH' }, underline: underlineStyle }),
           ...(underlineStyle ? [
             new TextRun({ text: '\t', font, size: 32, underline: underlineStyle })
           ] : [])
         ],
-        tabStops: [{ type: TabStopType.RIGHT, position: isHalfCell ? 4500 : 9070 }],
-        spacing: { line: 452, lineRule: LineRuleType.EXACT, after: 0 }
+        tabStops: [
+          ...(gap === 'tab' ? [{ type: TabStopType.LEFT, position: 720 }] : []),
+          { type: TabStopType.RIGHT, position: isHalfCell ? 4500 : 9070 }
+        ],
+        spacing: { line: 520, lineRule: LineRuleType.EXACT, after: 0 }
       });
     };
 
@@ -864,9 +873,9 @@ export async function buildAdminWord(r: AdminDocRegistryRecord): Promise<Blob> {
               children: [
                 new TableCell({
                   width: { size: 50, type: WidthType.PERCENTAGE },
-                  children: [new Paragraph({ children: [new TextRun({ text: 'CPRU-66-001', font, size: 24, language: { value: 'th-TH' } })] })]
+                  children: [new Paragraph({ children: [new TextRun({ text: 'CPRU-66-001', font, size: 30, language: { value: 'th-TH' } })] })]
                 }),
-                new TableCell({ width: { size: 50, type: WidthType.PERCENTAGE }, children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ children: [PageNumber.CURRENT], font, size: 24, language: { value: 'th-TH' } })] })] })
+                new TableCell({ width: { size: 50, type: WidthType.PERCENTAGE }, children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ children: [PageNumber.CURRENT], font, size: 30, language: { value: 'th-TH' } })] })] })
               ]
             })
           ]
@@ -881,7 +890,7 @@ export async function buildAdminWord(r: AdminDocRegistryRecord): Promise<Blob> {
           size: { width: pageWidth, height: pageHeight },
           margin: {
             ...pageMargins,
-            ...(firstTop !== undefined ? { top: mmToTwips(firstTop), header: mmToTwips(4) } : {})
+            ...(firstTop !== undefined ? { top: mmToTwips(firstTop), header: mmToTwips(15), footer: mmToTwips(15) } : {})
           }
         }
       },
@@ -889,7 +898,7 @@ export async function buildAdminWord(r: AdminDocRegistryRecord): Promise<Blob> {
         // หน้าแรกเริ่มหัวเอกสารสูงตามต้นฉบับ หน้าถัดไปดันเนื้อหาลงให้ได้ขอบบนมาตรฐานด้วยหัวกระดาษเปล่า
         headers: {
           first: new Header({ children: [new Paragraph({ spacing: { before: 0, after: 0, line: 20, lineRule: LineRuleType.EXACT }, children: [] })] }),
-          default: new Header({ children: [new Paragraph({ spacing: { before: 0, after: 0, line: mmToTwips(spec.margins.top - 4), lineRule: LineRuleType.EXACT }, children: [] })] })
+          default: new Header({ children: [new Paragraph({ spacing: { before: 0, after: 0, line: mmToTwips(spec.margins.top - 15), lineRule: LineRuleType.EXACT }, children: [] })] })
         }
       } : {}),
       footers: {
@@ -897,40 +906,24 @@ export async function buildAdminWord(r: AdminDocRegistryRecord): Promise<Blob> {
         ...(firstTop !== undefined ? { first: memoFooter() } : {})
       },
       children: [
-        new Table({
-          width: { size: 100, type: WidthType.PERCENTAGE },
-          borders: { top: border, bottom: border, left: border, right: border, insideHorizontal: border, insideVertical: border },
-          margins: { top: 0, bottom: 0, left: 0, right: 0 },
-          rows: [
-            new TableRow({
-              children: [
-                new TableCell({
-                  width: { size: 20, type: WidthType.PERCENTAGE },
-                  verticalAlign: VerticalAlign.TOP,
-                  children: [
-                    new Paragraph({
-                      children: garudaBytes ? [new ImageRun({ type: 'png', data: garudaBytes, transformation: { width: 41, height: 43 } })] : [],
-                      spacing: { after: 0 }
-                    })
-                  ]
-                }),
-                new TableCell({
-                  width: { size: 60, type: WidthType.PERCENTAGE },
-                  verticalAlign: VerticalAlign.CENTER,
-                  children: [
-                    new Paragraph({
-                      alignment: AlignmentType.CENTER,
-                      children: [new TextRun({ text: 'บันทึกข้อความ', font, size: 58, bold: true, language: { value: 'th-TH' } })],
-                      spacing: { line: 700, lineRule: LineRuleType.EXACT, after: 0 }
-                    })
-                  ]
-                }),
-                new TableCell({
-                  width: { size: 20, type: WidthType.PERCENTAGE },
-                  children: [new Paragraph({ children: [] })]
-                })
-              ]
-            })
+        // ตราครุฑลอยอิสระ 1.5 ซม. ตามต้นฉบับ (ลอยขึ้นเหนือบรรทัดหัวเรื่อง ชิดซ้าย อยู่สูงจากขอบกระดาษ 1 ซม.)
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { line: 600, lineRule: LineRuleType.EXACT, after: 0 },
+          children: [
+            ...(garudaBytes ? [new ImageRun({
+              type: 'png',
+              data: garudaBytes,
+              transformation: { width: 56, height: 58 },
+              floating: {
+                horizontalPosition: { relative: HorizontalPositionRelativeFrom.COLUMN, offset: 0 },
+                verticalPosition: { relative: VerticalPositionRelativeFrom.PARAGRAPH, offset: -Math.round(((firstTop ?? 10) - 10) * 36000) },
+                wrap: { type: TextWrappingType.NONE },
+                allowOverlap: true,
+                behindDocument: false
+              }
+            })] : []),
+            new TextRun({ text: 'บันทึกข้อความ', font, size: 58, bold: true, language: { value: 'th-TH' } })
           ]
         }),
         field('ส่วนราชการ', r.from, r.lineVisibility?.govOrg ?? true),
@@ -938,8 +931,12 @@ export async function buildAdminWord(r: AdminDocRegistryRecord): Promise<Blob> {
           field('ที่', displayNum, r.lineVisibility?.docNumber ?? true, true),
           field('วันที่', thaiGovDate(r.date, digitType, 'memo'), r.lineVisibility?.docDate ?? true, true)
         ),
-        field('เรื่อง', cleanSubject, r.lineVisibility?.subject ?? true),
-        para('เรียน  ' + to, { spacing: { before: 120, after: 120, ...SINGLE } }),
+        field('เรื่อง', cleanSubject, r.lineVisibility?.subject ?? true, false, 'tab'),
+        new Paragraph({
+          children: [run('เรียน'), new TextRun({ text: '\t', font, size: 32, language: { value: 'th-TH' } }), run(to)],
+          tabStops: [{ type: TabStopType.LEFT, position: 720 }],
+          spacing: { before: 120, after: 120, ...SINGLE }
+        }),
         ...(!cleanReference ? [] : [para('อ้างถึง  ' + cleanReference)]),
         ...(r.attachmentsList || []).map((item, i) => para((i === 0 ? 'สิ่งที่ส่งมาด้วย  ' : '                  ') + (i + 1) + '. ' + item)),
         ...getBodyBlocks(r).map(b => body(b, { ...SINGLE, before: b.text.startsWith('จึงเรียน') ? 240 : 120, after: 0 })),
