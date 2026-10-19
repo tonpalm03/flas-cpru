@@ -217,6 +217,7 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
     `<div class="body-para" style="text-align: ${b.align};${b.firstLine ? '' : ' text-indent: 0;'}${b.indent ? ` margin-left: ${b.indent * INDENT_STEP_MM}mm;` : ''}">${richRunsHtml(b)}</div>`;
   const spec = getTemplateSpec(r.category);
   const letter = spec.letter;
+  const orderLayout = getTemplateSpec('order').orderLayout!;
   const pageMargin = cssMargin(spec.margins);
   const firstTopMm = spec.firstPageTop;
   const MEMO_GARUDA_TOP_MM = 10; // ตราครุฑบันทึกข้อความอยู่สูงจากขอบกระดาษ 1 ซม. ตามต้นฉบับ
@@ -313,6 +314,7 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
       height: 15.4mm;
       object-fit: contain;
     }
+    .garuda-center, .garuda-ext, .garuda-memo { object-fit: fill !important; }
     .garuda-center {
       display: block;
       width: 28.5mm;
@@ -531,7 +533,7 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
         </div>
       </div>
     ` : isOrder ? `
-      <img class="garuda-center" src="${garudaPath(r.category)}" alt="ครุฑ" />
+      <img class="garuda-center" style="width: ${orderLayout.garuda.widthMm}mm; height: ${orderLayout.garuda.heightMm}mm; margin: ${orderLayout.garuda.topOffsetMm}mm auto ${(orderLayout.headerBlockMm - orderLayout.garuda.heightMm - orderLayout.garuda.topOffsetMm).toFixed(1)}mm;" src="${garudaPath(r.category)}" alt="ครุฑ" />
       <div style="text-align: center; font-weight: bold; font-size: 16pt; line-height: 1.35; margin-bottom: 3mm;">
         <div>คำสั่ง${escape(displayDigits((r.from || '').trim().replace(/^คำสั่ง\s*/, '')))}</div>
         <div>${escape(displayDigits(formattedOrderNum))}</div>
@@ -585,23 +587,24 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
             </div>`;
           }
           if (/^[๐-๙0-9]+(?:\.[๐-๙0-9]+)*[\.\s]\s*คณะกรรมการ/.test(p)) {
-            return `<div style="padding-left: 32.5mm; font-weight: bold; margin: 2mm 0 2mm; line-height: 1.35;">${escape(displayDigits(p))}</div>`;
+            return `<div style="padding-left: ${orderLayout.headingIndentMm}mm; font-weight: bold; margin: 2mm 0 2mm; line-height: 1.35;">${escape(displayDigits(p))}</div>`;
           }
           if (p === 'หน้าที่' || p.startsWith('หน้าที่')) {
-            const dutyText = p.startsWith('หน้าที่') ? p : 'หน้าที่';
-            return `<div style="padding-left: 32.5mm; font-weight: bold; margin: 2mm 0 2mm; line-height: 1.35;">${escape(displayDigits(dutyText))}</div>`;
+            // ตัวหนาเฉพาะคำว่า "หน้าที่" ข้อความต่อท้ายเป็นตัวปกติ ตามต้นฉบับ
+            const dutyRest = p.startsWith('หน้าที่') ? p.slice('หน้าที่'.length) : '';
+            return `<div style="padding-left: ${orderLayout.headingIndentMm}mm; margin: 2mm 0 2mm; line-height: 1.35;"><strong>${escape(displayDigits('หน้าที่'))}</strong>${escape(displayDigits(dutyRest))}</div>`;
           }
           if (/^[๐-๙0-9]+(?:\.[๐-๙0-9]+)*[\.\s]/.test(p) && !mem.isMember) {
             return `<div style="padding-left: 32.5mm; margin: 0; line-height: 1.35;">${escape(displayDigits(p))}</div>`;
           }
           if (p.startsWith('สั่ง ณ วันที่')) {
-            return `<div style="padding-left: 25.4mm; margin: 5mm 0 3mm; line-height: 1.35;">${escape(displayDigits(p))}</div>`;
+            return `<div style="padding-left: ${orderLayout.dateIndentMm}mm; margin: 5mm 0 3mm; line-height: 1.35;">${escape(displayDigits(p))}</div>`;
           }
         }
         return bodyParaHtml(block);
       }).join('')}
       ${isOrder && !bodyItems.some(i => i.text.startsWith('สั่ง ณ วันที่')) ? `
-        <div style="padding-left: 25.4mm; margin: 5mm 0 3mm; line-height: 1.35;">
+        <div style="padding-left: ${orderLayout.dateIndentMm}mm; margin: 5mm 0 3mm; line-height: 1.35;">
           ${escape(displayDigits(thaiGovDate(r.date, digitType, 'order')))}
         </div>
       ` : ''}
@@ -609,7 +612,7 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
 
     ${!isMemo && !isOrder ? `<div class="ext-closing"${letter ? ` style="margin-top: ${(letter.closingGapMm + 0.2).toFixed(1)}mm;"` : ''}>ขอแสดงความนับถือ</div>` : ''}
 
-    <div class="signature-container" ${!isMemo && !isOrder ? `style="margin-left: 40mm; width: 120mm; margin-top: ${letter ? (letter.signGapMm - 15).toFixed(1) : 9}mm;"` : isMemo ? 'style="margin-top: 20.5mm;"' : ''}>
+    <div class="signature-container" ${!isMemo && !isOrder ? `style="margin-left: 40mm; width: 120mm; margin-top: ${letter ? (letter.signGapMm - 15).toFixed(1) : 9}mm;"` : isMemo ? 'style="margin-top: 20.5mm;"' : isOrder ? `style="margin-top: ${(orderLayout.signGapMm - 15.4).toFixed(1)}mm;"` : ''}>
       ${r.signatureUrl ? `
         <img class="sig-img" src="${r.signatureUrl}" alt="ลายเซ็น" />
       ` : '<div style="height: 14mm;"></div>'}
@@ -663,7 +666,7 @@ export async function buildAdminWord(r: AdminDocRegistryRecord): Promise<Blob> {
   const {
     Document, Paragraph, TextRun, ImageRun, Packer, AlignmentType, Table, TableRow, TableCell,
     BorderStyle, WidthType, LineRuleType, VerticalAlign, TabStopType, UnderlineType,
-    Footer, Header, PageNumber, HorizontalPositionRelativeFrom, VerticalPositionRelativeFrom, TextWrappingType
+    Footer, Header, PageNumber, HorizontalPositionRelativeFrom, VerticalPositionRelativeFrom, TextWrappingType, HorizontalPositionAlign
   } = await import('docx');
 
   // Load garuda image
@@ -723,6 +726,7 @@ export async function buildAdminWord(r: AdminDocRegistryRecord): Promise<Blob> {
   const isOrder = r.category === 'order';
   // กึ่งกลางบล็อกลงนามตามต้นฉบับ: หนังสือภายนอก ~10 ซม. จากขอบซ้าย, บันทึกข้อความ/คำสั่ง ~10.5 ซม.
   const letterSpec = getTemplateSpec(r.category).letter;
+  const orderLayout = getTemplateSpec('order').orderLayout!;
   const sigIndent = isMemo || isOrder ? 2835 : 2268;
   const formattedOrderNum = displayNum;
   const pageWidth = A4_TWIPS.width;
@@ -806,7 +810,7 @@ export async function buildAdminWord(r: AdminDocRegistryRecord): Promise<Blob> {
       alignment: AlignmentType.CENTER,
       indent: { left: sigIndent },
       keepNext: true,
-      spacing: { before: signatureBytes ? 60 : (isOrder ? 1400 : isMemo ? 2055 : letterSpec ? mmToTwips(letterSpec.signGapMm) : 1000), after: 0, ...SINGLE }
+      spacing: { before: signatureBytes ? 60 : (isOrder ? mmToTwips(orderLayout.signGapMm) : isMemo ? 2055 : letterSpec ? mmToTwips(letterSpec.signGapMm) : 1000), after: 0, ...SINGLE }
     }),
     para(signatoryPos.replace(/\s*ปฏิบัติราชการแทน\s*/, ' ปฏิบัติราชการแทน\n').replace(/\s*รักษาราชการแทน\s*/, ' รักษาราชการแทน\n'), {
       alignment: AlignmentType.CENTER,
@@ -951,6 +955,8 @@ export async function buildAdminWord(r: AdminDocRegistryRecord): Promise<Blob> {
   }
 
   if (isOrder) {
+    const orderHeadingIndent = mmToTwips(orderLayout.headingIndentMm);
+    const orderDateIndent = mmToTwips(orderLayout.dateIndentMm);
     const orderBody = orderItems(getBodyBlocks(r)).map(({ text: block, block: rich }) => {
       const mem = parseCommitteeRow(block);
       if (mem.isMember) {
@@ -962,12 +968,22 @@ export async function buildAdminWord(r: AdminDocRegistryRecord): Promise<Blob> {
           keepLines: true
         });
       }
-      if (/^[๐-๙0-9]+(?:\.[๐-๙0-9]+)*[\.\s]\s*คณะกรรมการ/.test(block) || block === 'หน้าที่' || block.startsWith('หน้าที่')) {
+      if (/^[๐-๙0-9]+(?:\.[๐-๙0-9]+)*[\.\s]\s*คณะกรรมการ/.test(block)) {
         return new Paragraph({
           children: [run(block, true)],
-          indent: { left: 1843 },
+          indent: { left: orderHeadingIndent },
           spacing: { before: 120, after: 120, ...SINGLE },
           keepNext: true
+        });
+      }
+      if (block === 'หน้าที่' || block.startsWith('หน้าที่')) {
+        // ตัวหนาเฉพาะคำว่า "หน้าที่" ข้อความต่อท้ายเป็นตัวปกติ ตามต้นฉบับ
+        const rest = block.slice('หน้าที่'.length);
+        return new Paragraph({
+          children: [run('หน้าที่', true), ...(rest.trim() ? [run(rest)] : [])],
+          indent: { left: orderHeadingIndent },
+          spacing: { before: 120, after: 120, ...SINGLE },
+          keepNext: !rest.trim()
         });
       }
       if (/^[๐-๙0-9]+(?:\.[๐-๙0-9]+)*[\.\s]/.test(block) && !mem.isMember) {
@@ -980,7 +996,7 @@ export async function buildAdminWord(r: AdminDocRegistryRecord): Promise<Blob> {
       if (block.startsWith('สั่ง ณ วันที่')) {
         return new Paragraph({
           children: [run(block)],
-          indent: { left: 1440 },
+          indent: { left: orderDateIndent },
           spacing: { before: 180, after: 60, ...SINGLE },
           keepNext: true
         });
@@ -998,20 +1014,29 @@ export async function buildAdminWord(r: AdminDocRegistryRecord): Promise<Blob> {
         }
       },
       children: [
-        ...(garudaBytes ? [
-          new Paragraph({
-            alignment: AlignmentType.CENTER,
-            children: [new ImageRun({ type: 'png', data: garudaBytes, transformation: { width: 101, height: 113 } })],
-            spacing: { after: 60 },
-            keepNext: true
-          })
-        ] : []),
+        // ตราครุฑลอยกึ่งกลางตามต้นฉบับ: ย่อหน้าตัวยึดสูงเท่าบล็อกครุฑเพื่อให้หัวคำสั่งอยู่ตำแหน่งเดียวกับต้นฉบับ
+        new Paragraph({
+          spacing: { before: 0, after: 0, line: mmToTwips(orderLayout.headerBlockMm), lineRule: LineRuleType.EXACT },
+          keepNext: true,
+          children: garudaBytes ? [new ImageRun({
+            type: 'png',
+            data: garudaBytes,
+            transformation: { width: Math.round(orderLayout.garuda.widthMm * 96 / 25.4), height: Math.round(orderLayout.garuda.heightMm * 96 / 25.4) },
+            floating: {
+              horizontalPosition: { relative: HorizontalPositionRelativeFrom.MARGIN, align: HorizontalPositionAlign.CENTER },
+              verticalPosition: { relative: VerticalPositionRelativeFrom.PARAGRAPH, offset: Math.round(orderLayout.garuda.topOffsetMm * 36000) },
+              wrap: { type: TextWrappingType.NONE },
+              allowOverlap: true,
+              behindDocument: false
+            }
+          })] : []
+        }),
         new Paragraph({ children: [run('คำสั่ง' + (r.from || '').trim().replace(/^คำสั่ง\s*/, ''), true)], alignment: AlignmentType.CENTER, spacing: { ...SINGLE, after: 0 }, keepNext: true }),
         new Paragraph({ children: [run(formattedOrderNum, true)], alignment: AlignmentType.CENTER, spacing: { ...SINGLE, after: 0 }, keepNext: true }),
         new Paragraph({ children: [run('เรื่อง  ' + cleanSubject, true)], alignment: AlignmentType.CENTER, indent: { left: 1418, hanging: 1418 }, spacing: { ...SINGLE, after: 0 }, keepNext: true }),
         new Paragraph({ children: [run('........................................................', true)], alignment: AlignmentType.CENTER, spacing: { ...SINGLE, after: 120 }, keepNext: true }),
         ...orderBody,
-        ...(!hasDateInBody ? [new Paragraph({ children: [run(thaiGovDate(r.date, digitType, 'order'))], indent: { left: 1440 }, spacing: { before: 180, after: 60, ...SINGLE }, keepNext: true })] : []),
+        ...(!hasDateInBody ? [new Paragraph({ children: [run(thaiGovDate(r.date, digitType, 'order'))], indent: { left: orderDateIndent }, spacing: { before: 180, after: 60, ...SINGLE }, keepNext: true })] : []),
         ...signatureParagraphs,
         ...(r.coordinatorInfo ? [para(r.coordinatorInfo)] : [])
       ]

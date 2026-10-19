@@ -15,6 +15,20 @@ export interface AdminTemplateSpec {
   firstPageTop?: number;
   /** หนังสือภายนอก: ตราครุฑลอยและระยะแนวตั้งของท้ายหนังสือตามต้นฉบับ (วัดจากไฟล์ .docx) */
   letter?: LetterSpec;
+  /** คำสั่ง: ตราครุฑลอยกึ่งกลาง ระยะเยื้องและระยะท้ายคำสั่งตามต้นฉบับ (วัดจากไฟล์ .docx) */
+  orderLayout?: OrderLayoutSpec;
+}
+
+export interface OrderLayoutSpec {
+  garuda: { widthMm: number; heightMm: number; topOffsetMm: number };
+  /** ความสูงของบล็อกครุฑเหนือบรรทัด "คำสั่ง..." (มม.) */
+  headerBlockMm: number;
+  /** เยื้องหัวข้อ "๑. คณะกรรมการ..." และคำว่า "หน้าที่" (มม. จากขอบเนื้อหา) */
+  headingIndentMm: number;
+  /** เยื้องบรรทัด "สั่ง ณ วันที่" (มม. จากขอบเนื้อหา) */
+  dateIndentMm: number;
+  /** ระยะเว้นก่อนชื่อผู้ลงนาม (มม.) */
+  signGapMm: number;
 }
 
 export interface LetterSpec {
@@ -34,7 +48,16 @@ const SIDE = { right: 20, left: 30 };
 const SPECS: Record<string, AdminTemplateSpec> = {
   memo: { margins: { top: 25, bottom: 22.5, ...SIDE }, firstPageTop: 16.5 },
   memo_circular: { margins: { top: 20, bottom: 20, ...SIDE }, firstPageTop: 16 },
-  order: { margins: { top: 17.5, bottom: 20, ...SIDE } },
+  order: {
+    margins: { top: 17.5, bottom: 20, ...SIDE },
+    orderLayout: {
+      garuda: { widthMm: 29.1, heightMm: 30, topOffsetMm: -0.9 },
+      headerBlockMm: 34.9,
+      headingIndentMm: 25.4,
+      dateIndentMm: 38.1,
+      signGapMm: 37.6
+    }
+  },
   // ต้นฉบับตั้งขอบล่างไว้ 0.5 ซม. ซึ่งเป็นความผิดพลาดของไฟล์ ใช้ 2.0 ซม. แทน
   external: {
     margins: { top: 17.5, bottom: 20, ...SIDE },
