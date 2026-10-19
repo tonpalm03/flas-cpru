@@ -260,6 +260,8 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
   const WORD_LH = 1.134;
   const MEMO_GARUDA_TOP_MM = 10;
   const tune = PREVIEW_TUNE[r.category] || PREVIEW_TUNE.memo;
+  // หน้าเอกสารเปิดเป็น blob: ซึ่งหาไฟล์จากพาธ /templates/... ไม่ได้ จึงต้องใส่โดเมนเต็มให้รูปครุฑ
+  const garudaSrc = escape(/^\//.test(garudaPath(r.category)) ? origin + garudaPath(r.category) : garudaPath(r.category));
   const sign = spec.sign;
   // ระยะก่อนชื่อผู้ลงนาม (ไม่มีรูปลายเซ็น) ค่าเดียวกับ Word
   const signGapMm = (isOrder ? orderLayout.signGapMm : letter ? letter.signGapMm : sign.gapMm ?? 36.25) + tune.signAdjMm;
@@ -524,7 +526,7 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
     }
   </style>
 </head>
-<body ${autoPrint ? 'onload="window.print();"' : ''}>
+<body ${autoPrint ? 'onload="document.fonts.ready.then(function () { window.print(); });"' : ''}>
   ${!autoPrint ? `
   <div class="print-bar">
     <button class="print-btn" onclick="window.print();">พิมพ์เอกสาร / บันทึกเป็น PDF</button>
@@ -536,7 +538,7 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
   <article>
     ${isMemo ? `
       <div class="memohead">
-        <img class="garuda-memo" src="${garudaPath(r.category)}" alt="ครุฑ" />
+        <img class="garuda-memo" src="${garudaSrc}" alt="ครุฑ" />
         <span style="position: relative; top: ${tune.memoTitleNudgeMm ?? 0}mm;">บันทึกข้อความ</span>
       </div>
 
@@ -576,7 +578,7 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
         </div>
       </div>
     ` : isOrder ? `
-      <img class="garuda-center" style="width: ${orderLayout.garuda.widthMm}mm; height: ${orderLayout.garuda.heightMm}mm; margin: ${tune.orderGarudaTopMm ?? orderLayout.garuda.topOffsetMm}mm auto ${((tune.orderHeaderBlockMm ?? orderLayout.headerBlockMm) - orderLayout.garuda.heightMm - (tune.orderGarudaTopMm ?? orderLayout.garuda.topOffsetMm)).toFixed(1)}mm;" src="${garudaPath(r.category)}" alt="ครุฑ" />
+      <img class="garuda-center" style="width: ${orderLayout.garuda.widthMm}mm; height: ${orderLayout.garuda.heightMm}mm; margin: ${tune.orderGarudaTopMm ?? orderLayout.garuda.topOffsetMm}mm auto ${((tune.orderHeaderBlockMm ?? orderLayout.headerBlockMm) - orderLayout.garuda.heightMm - (tune.orderGarudaTopMm ?? orderLayout.garuda.topOffsetMm)).toFixed(1)}mm;" src="${garudaSrc}" alt="ครุฑ" />
       <div style="text-align: center; font-weight: bold; font-size: 16pt; line-height: ${WORD_LH}; margin-bottom: 3mm;">
         <div>คำสั่ง${escape(displayDigits((r.from || '').trim().replace(/^คำสั่ง\s*/, '')))}</div>
         <div>${escape(displayDigits(formattedOrderNum))}</div>
@@ -589,7 +591,7 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
           ${escape(displayDigits(displayNum))}
         </div>
         <div class="ext-header-center" ${letter ? `style="left: ${letter.garuda.leftMm}mm; transform: none; width: ${letter.garuda.widthMm}mm;"` : ''}>
-          <img class="garuda-ext" ${letter ? `style="width: ${letter.garuda.widthMm}mm; height: ${letter.garuda.heightMm}mm;"` : ''} src="${garudaPath(r.category)}" alt="ครุฑ" />
+          <img class="garuda-ext" ${letter ? `style="width: ${letter.garuda.widthMm}mm; height: ${letter.garuda.heightMm}mm;"` : ''} src="${garudaSrc}" alt="ครุฑ" />
         </div>
         <div class="ext-header-right" style="padding-top: ${tune.extHeaderTextTopMm ?? letter?.headerTextTopMm ?? 27}mm;">${escape(displayDigits(r.officeAddress || r.from))}</div>
       </div>
