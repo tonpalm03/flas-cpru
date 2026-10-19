@@ -216,6 +216,7 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
   const bodyParaHtml = (b: RichBlock) =>
     `<div class="body-para" style="text-align: ${b.align};${b.firstLine ? '' : ' text-indent: 0;'}${b.indent ? ` margin-left: ${b.indent * INDENT_STEP_MM}mm;` : ''}">${richRunsHtml(b)}</div>`;
   const spec = getTemplateSpec(r.category);
+  const letter = spec.letter;
   const pageMargin = cssMargin(spec.margins);
   const firstTopMm = spec.firstPageTop;
   const MEMO_GARUDA_TOP_MM = 10; // ตราครุฑบันทึกข้อความอยู่สูงจากขอบกระดาษ 1 ซม. ตามต้นฉบับ
@@ -542,8 +543,8 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
         <div class="ext-header-left">
           ${escape(displayDigits(displayNum))}
         </div>
-        <div class="ext-header-center">
-          <img class="garuda-ext" src="${garudaPath(r.category)}" alt="ครุฑ" />
+        <div class="ext-header-center" ${letter ? `style="left: ${letter.garuda.leftMm}mm; transform: none; width: ${letter.garuda.widthMm}mm;"` : ''}>
+          <img class="garuda-ext" ${letter ? `style="width: ${letter.garuda.widthMm}mm; height: ${letter.garuda.heightMm}mm;"` : ''} src="${garudaPath(r.category)}" alt="ครุฑ" />
         </div>
         <div class="ext-header-right">${escape(displayDigits(r.officeAddress || r.from))}</div>
       </div>
@@ -606,9 +607,9 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
       ` : ''}
     </div>
 
-    ${!isMemo && !isOrder ? '<div class="ext-closing">ขอแสดงความนับถือ</div>' : ''}
+    ${!isMemo && !isOrder ? `<div class="ext-closing"${letter ? ` style="margin-top: ${(letter.closingGapMm + 0.2).toFixed(1)}mm;"` : ''}>ขอแสดงความนับถือ</div>` : ''}
 
-    <div class="signature-container" ${!isMemo && !isOrder ? 'style="margin-left: 40mm; width: 120mm; margin-top: 9mm;"' : isMemo ? 'style="margin-top: 20.5mm;"' : ''}>
+    <div class="signature-container" ${!isMemo && !isOrder ? `style="margin-left: 40mm; width: 120mm; margin-top: ${letter ? (letter.signGapMm - 15).toFixed(1) : 9}mm;"` : isMemo ? 'style="margin-top: 20.5mm;"' : ''}>
       ${r.signatureUrl ? `
         <img class="sig-img" src="${r.signatureUrl}" alt="ลายเซ็น" />
       ` : '<div style="height: 14mm;"></div>'}
@@ -617,7 +618,7 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
     </div>
 
     ${r.coordinatorInfo ? `
-      <div style="margin-top: 8mm; font-size: 14pt; line-height: 1.25; white-space: pre-line;">
+      <div style="margin-top: ${letter ? (letter.coordinatorGapMm - 7.3).toFixed(1) : 8}mm; font-size: ${letter ? 16 : 14}pt; line-height: ${letter ? 1.33 : 1.25}; white-space: pre-line;">
         ${escape(displayDigits(r.coordinatorInfo))}
       </div>
     ` : ''}
@@ -721,6 +722,7 @@ export async function buildAdminWord(r: AdminDocRegistryRecord): Promise<Blob> {
   const isMemo = r.category.startsWith('memo');
   const isOrder = r.category === 'order';
   // กึ่งกลางบล็อกลงนามตามต้นฉบับ: หนังสือภายนอก ~10 ซม. จากขอบซ้าย, บันทึกข้อความ/คำสั่ง ~10.5 ซม.
+  const letterSpec = getTemplateSpec(r.category).letter;
   const sigIndent = isMemo || isOrder ? 2835 : 2268;
   const formattedOrderNum = displayNum;
   const pageWidth = A4_TWIPS.width;
@@ -804,7 +806,7 @@ export async function buildAdminWord(r: AdminDocRegistryRecord): Promise<Blob> {
       alignment: AlignmentType.CENTER,
       indent: { left: sigIndent },
       keepNext: true,
-      spacing: { before: signatureBytes ? 60 : (isOrder ? 1400 : isMemo ? 2055 : 1000), after: 0, ...SINGLE }
+      spacing: { before: signatureBytes ? 60 : (isOrder ? 1400 : isMemo ? 2055 : letterSpec ? mmToTwips(letterSpec.signGapMm) : 1000), after: 0, ...SINGLE }
     }),
     para(signatoryPos.replace(/\s*ปฏิบัติราชการแทน\s*/, ' ปฏิบัติราชการแทน\n').replace(/\s*รักษาราชการแทน\s*/, ' รักษาราชการแทน\n'), {
       alignment: AlignmentType.CENTER,
@@ -1035,6 +1037,24 @@ export async function buildAdminWord(r: AdminDocRegistryRecord): Promise<Blob> {
       }
     },
     children: [
+      // ตราครุฑลอยอิสระตามต้นฉบับ: ผูกกับย่อหน้าเหนือตารางเพื่อให้ระยะวัดจากขอบเนื้อหา (ไม่ใช่จากเซลล์)
+      ...(garudaBytes && letterSpec ? [
+        new Paragraph({
+          children: [new ImageRun({
+            type: 'png',
+            data: garudaBytes,
+            transformation: { width: Math.round(letterSpec.garuda.widthMm * 96 / 25.4), height: Math.round(letterSpec.garuda.heightMm * 96 / 25.4) },
+            floating: {
+              horizontalPosition: { relative: HorizontalPositionRelativeFrom.MARGIN, offset: Math.round(letterSpec.garuda.leftMm * 36000) },
+              verticalPosition: { relative: VerticalPositionRelativeFrom.PARAGRAPH, offset: 0 },
+              wrap: { type: TextWrappingType.NONE },
+              allowOverlap: true,
+              behindDocument: false
+            }
+          })],
+          spacing: { before: 0, after: 0, line: 20, lineRule: LineRuleType.EXACT }
+        })
+      ] : []),
       new Table({
         width: { size: 100, type: WidthType.PERCENTAGE },
         margins: { top: 0, bottom: 0, left: 0, right: 0 },
@@ -1053,20 +1073,14 @@ export async function buildAdminWord(r: AdminDocRegistryRecord): Promise<Blob> {
                 ]
               }),
               new TableCell({
-                width: { size: 30, type: WidthType.PERCENTAGE },
+                width: { size: 28.5, type: WidthType.PERCENTAGE },
                 verticalAlign: VerticalAlign.TOP,
                 children: [
-                  ...(garudaBytes ? [
-                    new Paragraph({
-                      alignment: AlignmentType.CENTER,
-                      children: [new ImageRun({ type: 'png', data: garudaBytes, transformation: { width: 107, height: 113 } })],
-                      spacing: { ...SINGLE, after: 0 }
-                    })
-                  ] : [new Paragraph({ children: [] })])
+                  new Paragraph({ children: [] })
                 ]
               }),
               new TableCell({
-                width: { size: 35, type: WidthType.PERCENTAGE },
+                width: { size: 36.5, type: WidthType.PERCENTAGE },
                 verticalAlign: VerticalAlign.TOP,
                 children: [
                   new Paragraph({
@@ -1109,14 +1123,14 @@ export async function buildAdminWord(r: AdminDocRegistryRecord): Promise<Blob> {
         return extField(i === 0 ? 'สิ่งที่ส่งมาด้วย' : '', numText, 1417);
       }),
       ...getBodyBlocks(r).map(b => body(b)),
-      para('ขอแสดงความนับถือ', { alignment: AlignmentType.CENTER, indent: { left: sigIndent }, keepNext: true, spacing: { before: 240, after: 60, ...SINGLE } }),
+      para('ขอแสดงความนับถือ', { alignment: AlignmentType.CENTER, indent: { left: sigIndent }, keepNext: true, spacing: { before: letterSpec ? mmToTwips(letterSpec.closingGapMm) : 240, after: 60, ...SINGLE } }),
       ...signatureParagraphs,
       ...(r.coordinatorInfo ? [new Paragraph({
         children: r.coordinatorInfo.split('\n').flatMap((line, idx) => [
-          ...(idx ? [new TextRun({ break: 1, font, size: 28, language: { value: 'th-TH' } })] : []),
-          new TextRun({ text: display(line), font, size: 28, language: { value: 'th-TH' } })
+          ...(idx ? [new TextRun({ break: 1, font, size: 32, language: { value: 'th-TH' } })] : []),
+          new TextRun({ text: display(line), font, size: 32, sizeComplexScript: 32, language: { value: 'th-TH' } })
         ]),
-        spacing: { before: 240, after: 0, line: 300, lineRule: LineRuleType.EXACT }
+        spacing: { before: letterSpec ? mmToTwips(letterSpec.coordinatorGapMm) : 240, after: 0, ...SINGLE }
       })] : [])
     ]
   }));
