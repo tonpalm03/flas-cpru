@@ -635,6 +635,8 @@ async function runAllTests() {
     assert.ok(html.includes(cat === 'memo' ? 'size: letter portrait' : 'size: A4 portrait'), cat + ' paper follows the original (memo Letter, others A4) regardless of record paperSize');
     assert.ok(html.includes('margin: ' + cssMargin(getTemplateSpec(cat).margins)), cat + ' @page margin must come from spec');
     assert.ok(html.includes("font-family: 'THSarabunIT9'") && html.includes('line-height: 1.134'), cat + ' preview uses the Word font (TH SarabunIT๙) and Word single line spacing');
+    const signedHtml = documentHtml({ ...signingDoc, category: cat, signatureUrl: '/sig/x.png', bodyParagraphs: ['x'] }, 'https://example.test');
+    assert.ok(signedHtml.includes('src="https://example.test/sig/x.png"') && signedHtml.includes('src="https://example.test/templates/admin/garuda-'), cat + ' images use absolute URLs so the blob: print window can load them');
   }
   console.log(' PASS: Template spec drives paper size and margins for all 5 categories.');
 

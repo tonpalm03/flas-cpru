@@ -260,8 +260,9 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
   const WORD_LH = 1.134;
   const MEMO_GARUDA_TOP_MM = 10;
   const tune = PREVIEW_TUNE[r.category] || PREVIEW_TUNE.memo;
-  // หน้าเอกสารเปิดเป็น blob: ซึ่งหาไฟล์จากพาธ /templates/... ไม่ได้ จึงต้องใส่โดเมนเต็มให้รูปครุฑ
-  const garudaSrc = escape(/^\//.test(garudaPath(r.category)) ? origin + garudaPath(r.category) : garudaPath(r.category));
+  // หน้าเอกสารเปิดเป็น blob: ซึ่งหาไฟล์จากพาธ /... ไม่ได้ จึงต้องใส่โดเมนเต็มให้รูปครุฑและรูปลายเซ็น
+  const absUrl = (u: string) => (/^\/(?!\/)/.test(u) ? origin + u : u);
+  const garudaSrc = escape(absUrl(garudaPath(r.category)));
   const sign = spec.sign;
   // ระยะก่อนชื่อผู้ลงนาม (ไม่มีรูปลายเซ็น) ค่าเดียวกับ Word
   const signGapMm = (isOrder ? orderLayout.signGapMm : letter ? letter.signGapMm : sign.gapMm ?? 36.25) + tune.signAdjMm;
@@ -659,7 +660,7 @@ export function documentHtml(r: AdminDocRegistryRecord, origin: string, autoPrin
 
     <!-- ระยะเท่าย่อหน้า Word: มีรูปลายเซ็น = เว้น 12 พอยต์ + รูป 140x48 px + 6 พอยต์ ไม่มีรูป = ระยะก่อนชื่อตาม spec -->
     <div class="signature-container" style="${signBox} margin-top: ${r.signatureUrl ? 4.2 : signGapMm.toFixed(1)}mm;">
-      ${r.signatureUrl ? `<img class="sig-img" src="${r.signatureUrl}" alt="ลายเซ็น" />` : ''}
+      ${r.signatureUrl ? `<img class="sig-img" src="${escape(absUrl(r.signatureUrl))}" alt="ลายเซ็น" />` : ''}
       <p style="font-size: 16pt; font-weight: normal; margin: ${r.signatureUrl ? 1.2 : 0}mm 0 0; line-height: ${WORD_LH}; color: #000;">(${escape(displayDigits(formattedSignatory))})</p>
       <p style="font-size: 16pt; font-weight: normal; margin: ${sign.positionGapMm ?? 0}mm 0 0; white-space: pre-line; line-height: ${WORD_LH}; color: #000;">${escape(displayDigits(signatoryPos))}</p>
     </div>
