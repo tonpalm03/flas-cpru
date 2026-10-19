@@ -123,7 +123,7 @@ export default function RichBodyEditor({ value, onChange, placeholder, minHeight
     }
   });
 
-  // รับค่าจากภายนอก (แม่แบบ ผู้ช่วย AI) โดยไม่วนซ้ำกับค่าที่ตัวแก้ไขส่งออกเอง
+  // รับค่าจากภายนอก (แม่แบบต้นฉบับ) โดยไม่วนซ้ำกับค่าที่ตัวแก้ไขส่งออกเอง
   useEffect(() => {
     if (!editor) return;
     const incoming = sanitizeBodyHtml(value);

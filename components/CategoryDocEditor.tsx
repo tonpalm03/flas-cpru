@@ -14,7 +14,6 @@ import { documentHtml } from "@/lib/adminDocument";
 import { bodyHtmlToParagraphs, paragraphsToBodyHtml, sanitizeBodyHtml } from "@/lib/richBody";
 import RichBodyEditor from "@/components/RichBodyEditor";
 import { getSignatoryPresets, DEFAULT_SIGNATORY_PRESETS } from "@/lib/adminSignatoryService";
-import { draftGovernmentDocument, AiDraftResult } from "@/lib/aiDocumentDrafter";
 import { validateGovernmentDocument, ValidationReport, ValidationIssue } from "@/lib/documentValidationService";
 import { 
   FileText, 
@@ -35,10 +34,7 @@ import {
   ZoomIn, 
   ZoomOut, 
   Maximize2,
-  FileCheck,
-  Sparkles,
   HelpCircle,
-  Wand2,
   ShieldCheck,
   AlertTriangle,
   Info,
@@ -79,137 +75,6 @@ export interface DocumentPreset {
   signatoryPosition?: string;
 }
 
-export const OFFICIAL_CATEGORY_PRESETS: Record<string, DocumentPreset[]> = {
-  memo: [
-    {
-      id: "memo_expert_invitation",
-      title: "ขอเชิญเป็นผู้เชี่ยวชาญตรวจสอบเครื่องมือในการวิจัย (ต้นแบบจริง)",
-      subtitle: "ต้นแบบจริง: ขอเชิญอาจารย์ผู้เชี่ยวชาญตรวจประเมินเครื่องมือวิจัย",
-      from: "มหาวิทยาลัยราชภัฏชัยภูมิ คณะศิลปศาสตร์และวิทยาศาสตร์ โทร ๔๑๐๐",
-      to: "อาจารย์ ดร.วราวุฒิ มหามิตร",
-      subject: "ขอเชิญเป็นผู้เชี่ยวชาญตรวจสอบเครื่องมือในการวิจัย",
-      bodyText: "ด้วยนางสาวกรองทอง เสมารัมย์ และนางสาวน้ำผึ้ง แสนใส นักศึกษา หลักสูตรสาธารณสุขศาสตรบัณฑิต สาขาวิชาการจัดการสุขภาพผู้สูงอายุ ชั้นปีที่ ๓ คณะศิลปศาสตร์และวิทยาศาสตร์ กำลังดำเนินการจัดทำงานวิจัยเรื่อง “การศึกษาพฤติกรรมการดูแลตนเองของผู้สูงอายุโรคเบาหวานชนิดที่ ๒ บ้านห้วยชัน ตำบลนาฝาย อำเภอเมืองชัยภูมิ จังหวัดชัยภูมิ” ซึ่งเป็นส่วนหนึ่งของการศึกษา ในรายวิชา ระเบียบวิธีวิจัยทางสาธารณสุข รหัสวิชา ๑๐๑๒๒๐๔ ประจำภาคภาคการศึกษาที่ ๑ ปีการศึกษา ๒๕๖๙ นั้น\n\nในการนี้ คณะศิลปศาสตร์และวิทยาศาสตร์ พิจารณาแล้วเห็นว่า ท่านเป็นผู้มีความรู้ ความเชี่ยวชาญ และมีประสบการณ์ในเรื่องดังกล่าวเป็นอย่างยิ่ง จึงขอเชิญท่านเป็นผู้เชี่ยวชาญในการตรวจประเมิน และเสนอแนะเพื่อปรับปรุงแก้ไขเครื่องมือที่ใช้ในการวิจัยให้มีความถูกต้องและสมบูรณ์ รายละเอียดตามเอกสารที่แนบมาพร้อมนี้\n\nจึงเรียนมาเพื่อพิจารณา",
-      signatoryName: "ผู้ช่วยศาสตราจารย์ ดร.สิริศักดิ์ อาจวิชัย",
-      signatoryPosition: "คณบดีคณะศิลปศาสตร์และวิทยาศาสตร์"
-    },
-    {
-      id: "memo_project_approval",
-      title: "ขออนุมัติจัดโครงการ / กิจกรรม",
-      subtitle: "ขออนุมัติจัดโครงการและขออนุมัติใช้เงินงบประมาณประจำปี",
-      subject: "ขออนุมัติจัดโครงการ... และขออนุมัติใช้เงินงบประมาณประจำปี...",
-      to: "คณบดีคณะศิลปศาสตร์และวิทยาศาสตร์",
-      bodyText: "ด้วย คณะศิลปศาสตร์และวิทยาศาสตร์ มีความประสงค์จะจัดโครงการ... ในระหว่างวันที่... ณ ... โดยมีวัตถุประสงค์เพื่อพัฒนาทักษะและความรู้ความสามารถของนักศึกษาและบุคลากร\n\nในการนี้ คณะฯ ขออนุมัติจัดโครงการดังกล่าว โดยขออนุมัติใช้เงินงบประมาณ... จำนวนเงินทั้งสิ้น... บาท (...) รายละเอียดตามเอกสารโครงการที่แนบมาพร้อมนี้\n\nจึงเรียนมาเพื่อโปรดพิจารณาอนุมัติ",
-      attachmentsText: "๑. โครงการ... จำนวน ๑ ชุด"
-    },
-    {
-      id: "memo_disbursement",
-      title: "ขออนุมัติเบิกจ่ายเงินงบประมาณ",
-      subtitle: "ขอเบิกจ่ายเงินงบประมาณหลังดำเนินโครงการเสร็จสิ้น",
-      subject: "ขออนุมัติเบิกจ่ายเงินงบประมาณค่าใช้จ่ายในการดำเนินโครงการ...",
-      to: "คณบดีคณะศิลปศาสตร์และวิทยาศาสตร์",
-      bodyText: "ตามที่ คณะศิลปศาสตร์และวิทยาศาสตร์ ได้อนุมัติให้ดำเนินโครงการ... ในระหว่างวันที่... ณ ... นั้น\n\nบัดนี้ การดำเนินโครงการดังกล่าวได้เสร็จสิ้นเป็นที่เรียบร้อยแล้ว จึงขออนุมัติเบิกจ่ายเงินงบประมาณ... จำนวนเงินทั้งสิ้น... บาท (...) ตามใบสำคัญรับเงินและเอกสารประกอบการเบิกจ่ายที่แนบมาพร้อมนี้\n\nจึงเรียนมาเพื่อโปรดพิจารณาอนุมัติ",
-      referenceDoc: "บันทึกข้อความ ที่ อว ๐๖๔๖.๐๒/๑๐๑ ลงวันที่ ๑๐ มกราคม ๒๕๖๙",
-      attachmentsText: "๑. ใบสำคัญรับเงินและหลักฐานการจ่าย  จำนวน ๑ ชุด"
-    }
-  ],
-  memo_circular: [
-    {
-      id: "memo_circ_cwie",
-      title: "ขอความอนุเคราะห์เวลาเรียนของนักศึกษา (Pre-CWIE Training - ต้นแบบจริง)",
-      subtitle: "ต้นแบบจริง: แจ้งเวียนอาจารย์ผู้สอนประจำรายวิชาขอเวลาเรียนนักศึกษา",
-      from: "มหาวิทยาลัยราชภัฏชัยภูมิ คณะศิลปศาสตร์และวิทยาศาสตร์ โทร ๔๑๐๐",
-      to: "อาจารย์ผู้สอนประจำรายวิชา",
-      subject: "ขอความอนุเคราะห์เวลาเรียนของนักศึกษา ชั้นปีที่ 3 เพื่อเข้าร่วมอบรมก่อนการปฏิบัติงาน (Pre-CWIE Training)",
-      bodyText: "ด้วยคณะศิลปศาสตร์และวิทยาศาสตร์ จะดำเนินการจัดกิจกรรมอบรมก่อนการปฏิบัติงาน (Pre-CWIE Training) สำหรับนักศึกษาที่เตรียมออกฝึกประสบการณ์วิชาชีพ หรือฝึกสหกิจศึกษา ซึ่งเป็นกิจกรรมภายใต้โครงการเรียนรู้คู่การทำงาน (Learn & Work Together Project) ตามจุดเน้นยุทธศาสตร์มหาวิทยาลัยราชภัฏชัยภูมิ โดยการจัดกิจกรรมดังกล่าว มีวัตถุประสงค์เพื่อให้นักศึกษาที่เตรียมออกฝึกประสบการณ์วิชาชีพ หรือฝึกสหกิจศึกษาในภาคการศึกษาถัดไป มีความพร้อมในทุกด้าน\n\nในการนี้ คณะศิลปศาสตร์และวิทยาศาสตร์ จึงขอความอนุเคราะห์เวลาเรียนของนักศึกษา ชั้นปีที่ 3 และนักศึกษาที่มีความสนใจเข้าร่วมอบรมก่อนการปฏิบัติงาน (Pre-CWIE Training) ในวันที่ 15 – 16 กันยายน 2569 ณ ห้องประชุมสระหงส์ 1 มหาวิทยาลัยราชภัฏชัยภูมิ และขอความอนุเคราะห์อาจารย์ผู้สอนชดเชยเวลาเรียนให้กับนักศึกษาตามความเหมาะสม\n\nจึงเรียนมาเพื่อพิจารณาให้ความอนุเคราะห์ และขอขอบคุณมา ณ โอกาสนี้",
-      signatoryName: "ผู้ช่วยศาสตราจารย์ ดร.สิริศักดิ์ อาจวิชัย",
-      signatoryPosition: "คณบดีคณะศิลปศาสตร์และวิทยาศาสตร์"
-    },
-    {
-      id: "memo_circ_meeting",
-      title: "บันทึกเวียนแจ้งเข้าร่วมการประชุม",
-      subtitle: "แจ้งเวียนบุคลากรเข้าร่วมประชุมประจำคณะ หรือประชุมสาขาวิชา",
-      subject: "ขอแจ้งเวียนเข้าร่วมการประชุมบุคลากรประจำคณะศิลปศาสตร์และวิทยาศาสตร์",
-      to: "อาจารย์ผู้สอนประจำรายวิชา และบุคลากรทุกท่าน",
-      bodyText: "ด้วย คณะศิลปศาสตร์และวิทยาศาสตร์ กำหนดจัดประชุมบุคลากรประจำคณะ ครั้งที่... ในวัน... ที่... เวลา... น. ณ ...\n\nในการนี้ จึงขอเรียนเชิญท่านและบุคลากรในสังกัดเข้าร่วมการประชุมดังกล่าวโดยพร้อมเพรียงกัน\n\nจึงเรียนมาเพื่อทราบและเข้าร่วมประชุมตามวันและเวลาดังกล่าว"
-    }
-  ],
-  external: [
-    {
-      id: "ext_academic_acceptance",
-      title: "ตอบรับการเผยแพร่ผลงานทางวิชาการ (ที่ ๘๖๔ - ต้นแบบจริง)",
-      subtitle: "ต้นแบบจริง: หนังสือตอบรับการเผยแพร่ผลงานวิชาการ E-Book",
-      from: "คณะศิลปศาสตร์และวิทยาศาสตร์ มหาวิทยาลัยราชภัฏชัยภูมิ",
-      to: "พระมหาพิสุทธิ์ สิทฺธิเมธี (ภารัง), อาจารย์ ดร.",
-      officeAddress: "คณะศิลปศาสตร์และวิทยาศาสตร์\nมหาวิทยาลัยราชภัฏชัยภูมิ\n167 ถนนชัยภูมิ-ตาดโตน ตำบลนาฝาย\nอำเภอเมือง จังหวัดชัยภูมิ 36000",
-      subject: "ตอบรับการเผยแพร่ผลงานทางวิชาการ",
-      referenceDoc: "หนังสือมหาวิทยาลัยมหาจุฬาลงกรณราชวิทยาลัย ที่ อา ๘๐๐๕.๑/ว ๑๒๒ เรื่อง ขอความอนุเคราะห์เผยแพร่ผลงานทางวิชาการ ประเภท หนังสือ เรื่อง การเมืองและการสื่อสารทางการเมือง (ระบบ E-Book) ลงวันที่ ๓๐ กันยายน ๒๕๖๙",
-      bodyText: "ตามหนังสือ คณะสังคมศาสตร์ มหาวิทยาลัยมหาจุฬาลงกรณราชวิทยาลัย เรื่อง ขอความอนุเคราะห์เผยแพร่ผลงานทางวิชาการ ประเภท หนังสือ เรื่อง การเมืองและการสื่อสารทางการเมือง (ระบบ E-Book) โดย พระมหาพิสุทธิ์ สิทธิเมธี (ภารัง), อาจารย์ ดร.อาจารย์ประจำภาควิชารัฐศาสตร์ ได้มอบผลงานทางวิชาการดังกล่าวให้แก่ คณะศิลปศาสตร์และวิทยาศาสตร์ มหาวิทยาลัยราชภัฏชัยภูมิ เพื่อใช้ประโยชน์ในการศึกษา ค้นคว้า และพัฒนาการเรียนการสอน นั้น\n\nในการนี้ คณะศิลปศาสตร์และวิทยาศาสตร์ มหาวิทยาลัยราชภัฏชัยภูมิ ได้รับผลงานทางวิชาการ ประเภท หนังสือ เรื่อง การเมืองและการสื่อสารทางการเมือง (ระบบ E-Book) เป็นที่เรียบร้อยแล้ว และจะได้นำไปเผยแพร่ให้แก่ อาจารย์ เจ้าหน้าที่ และนักศึกษา ได้ใช้ประโยชน์ในการศึกษาค้นคว้าต่อไป\n\nจึงเรียนมาเพื่อโปรดทราบ และขอขอบคุณมา ณ โอกาสนี้",
-      coordinatorInfo: "สำนักงานคณบดี คณะศิลปศาสตร์และวิทยาศาสตร์\nโทร. 0 4481 5111 ต่อ 4100\nไปรษณีย์อิเล็กทรอนิกส์ Officer@cpru.ac.th",
-      signatoryName: "ผู้ช่วยศาสตราจารย์ ดร.สิริศักดิ์ อาจวิชัย",
-      signatoryPosition: "คณบดีคณะศิลปศาสตร์และวิทยาศาสตร์ ปฏิบัติราชการแทน\nอธิการบดีมหาวิทยาลัยราชภัฏชัยภูมิ"
-    },
-    {
-      id: "ext_guest_speaker",
-      title: "หนังสือขอเชิญเป็นวิทยากรบรรยาย",
-      subtitle: "หนังสือภายนอกส่งถึงผู้เชี่ยวชาญเพื่อขอเชิญบรรยายพิเศษ",
-      subject: "ขอเชิญเป็นวิทยากรบรรยายโครงการ...",
-      to: "ท่านผู้เชี่ยวชาญ / (ชื่อ-นามสกุลวิทยากร)",
-      officeAddress: "คณะศิลปศาสตร์และวิทยาศาสตร์\nมหาวิทยาลัยราชภัฏชัยภูมิ\n167 ถนนชัยภูมิ-ตาดโตน ตำบลนาฝาย\nอำเภอเมือง จังหวัดชัยภูมิ 36000",
-      bodyText: "ด้วย คณะศิลปศาสตร์และวิทยาศาสตร์ มหาวิทยาลัยราชภัฏชัยภูมิ กำหนดจัดโครงการ... ในระหว่างวันที่... ณ ... โดยมีวัตถุประสงค์เพื่อ...\n\nในการนี้ คณะฯ เล็งเห็นว่าท่านเป็นผู้มีความรู้ ความสามารถ และประสบการณ์สูง จึงใคร่ขอเรียนเชิญท่านให้เกียรติเป็นวิทยากรบรรยายในหัวข้อ \"...\" ในวัน... ที่... เวลา... น.\n\nจึงเรียนมาเพื่อโปรดพิจารณาให้ความอนุเคราะห์ และขอขอบคุณมา ณ โอกาสนี้",
-      coordinatorInfo: "สำนักงานคณบดีคณะศิลปศาสตร์และวิทยาศาสตร์\nโทรศัพท์ 044 815 111 ต่อ 4100"
-    }
-  ],
-  external_circular: [
-    {
-      id: "ext_circ_speaker",
-      title: "ขอเรียนเชิญเป็นวิทยากร (ที่ ว ๕๒๐ - ๗ รายชื่อ - ต้นแบบจริง)",
-      subtitle: "ต้นแบบจริง: ขอเชิญวิทยากรโครงการหุ่นยนต์แขนกลและโลจิสติกส์",
-      from: "สาขาวิชาวิศวกรรมอุตสาหกรรมและโลจิสติกส์ คณะศิลปศาสตร์และวิทยาศาสตร์",
-      to: "นายสาธาร รวบรัด ครูชำนาญการพิเศษ โรงเรียนบ้านกุดโคลน (และวิทยากรภายนอก 7 ท่าน)",
-      officeAddress: "คณะศิลปศาสตร์และวิทยาศาสตร์\nมหาวิทยาลัยราชภัฏชัยภูมิ\n167 หมู่ 2 ถนนชัยภูมิ-ตาดโตน\nตำบลนาฝาย อำเภอเมือง\nจังหวัดชัยภูมิ 36000",
-      subject: "ขอเรียนเชิญเป็นวิทยากร",
-      attachmentsText: "๑. กำหนดการ  จำนวน ๑ ฉบับ\n๒. แบบตอบรับ  จำนวน ๑ ฉบับ",
-      bodyText: "ด้วยคณะศิลปศาสตร์และวิทยาศาสตร์ มหาวิทยาลัยราชภัฏชัยภูมิ สาขาวิชาวิศวกรรมอุตสาหกรรมและโลจิสติกส์ ได้ดำเนินโครงการพัฒนาศักยภาพบัณฑิต สาขาวิชาวิศวกรรมอุตสาหกรรมและโลจิสติกส์ในยุคไทยแลนด์ 4.0 กิจกรรมที่ ๑ อบรมเชิงปฏิบัติการการออกแบบระบบขนถ่ายวัสดุด้วยหุ่นยนต์อัตโนมัติ และการควบคุมแขนกลเพื่องานอุตสาหกรรม โดยมีวัตถุประสงค์เพื่อพัฒนาความรู้ด้านการออกแบบระบบการขนส่งวัสดุและการเรียนรู้หุ่นยนต์แขนกล ในระหว่างวันที่ 1๕ - ๑๖ สิงหาคม ๒๕๖๙ ณ ห้อง 7113 อาคารปฏิบัติการเทคโนโลยีอุตสาหกรรม มหาวิทยาลัยราชภัฏชัยภูมิ\n\nในการนี้ คณะศิลปศาสตร์และวิทยาศาสตร์ มหาวิทยาลัยราชภัฏชัยภูมิ จึงขอเชิญท่านเป็นวิทยากรโครงการพัฒนาศักยภาพบัณฑิต สาขาวิชาวิศวกรรมอุตสาหกรรมและโลจิสติกส์ในยุคไทยแลนด์ 4.0 ตามวัน เวลา และสถานที่ ดังกล่าวข้างต้น รายละเอียดตามสิ่งที่ส่งมาด้วยนี้\n\nจึงเรียนมาเพื่อโปรดพิจารณา",
-      coordinatorInfo: "ผู้ประสานงาน อาจารย์วราภรณ์ จันทร์เวียง\nโทรศัพท์ ๐๙ ๐๑๑๘ ๙4๓๐",
-      signatoryName: "ผู้ช่วยศาสตราจารย์ ดร.สิริศักดิ์ อาจวิชัย",
-      signatoryPosition: "คณบดีคณะศิลปศาสตร์และวิทยาศาสตร์ ปฏิบัติราชการแทน\nอธิการบดีมหาวิทยาลัยราชภัฏชัยภูมิ"
-    },
-    {
-      id: "ext_circ_publicity",
-      title: "หนังสือเวียนขอความอนุเคราะห์ประชาสัมพันธ์",
-      subtitle: "ส่งถึงหน่วยงานภายนอกหลายแห่งเพื่อประชาสัมพันธ์กิจกรรม",
-      subject: "ขอความอนุเคราะห์ประชาสัมพันธ์การรับสมัครนักศึกษาใหม่",
-      to: "ผู้อำนวยการโรงเรียน / หัวหน้าหน่วยงาน",
-      officeAddress: "คณะศิลปศาสตร์และวิทยาศาสตร์\nมหาวิทยาลัยราชภัฏชัยภูมิ\n167 ถนนชัยภูมิ-ตาดโตน ตำบลนาฝาย\nอำเภอเมือง จังหวัดชัยภูมิ 36000",
-      bodyText: "ด้วย คณะศิลปศาสตร์และวิทยาศาสตร์ มหาวิทยาลัยราชภัฏชัยภูมิ กำหนดเปิดรับสมัครนักศึกษาใหม่ ระดับปริญญาตรี ประจำปีการศึกษา...\n\nในการนี้ คณะศิลปศาสตร์และวิทยาศาสตร์ จึงใคร่ขอความอนุเคราะห์จากท่านในการประชาสัมพันธ์การรับสมัครนักศึกษาดังกล่าว ให้แก่นักเรียนและผู้สนใจในสังกัดของท่านทราบ\n\nจึงเรียนมาเพื่อโปรดพิจารณาให้ความอนุเคราะห์",
-      coordinatorInfo: "สำนักงานคณบดีคณะศิลปศาสตร์และวิทยาศาสตร์\nโทรศัพท์ 044 815 111 ต่อ 4100"
-    }
-  ],
-  order: [
-    {
-      id: "order_comm_3dept",
-      title: "แต่งตั้งคณะกรรมการดำเนินงานโครงการ (ที่ ๗๐/๒๕๖๙ - ต้นแบบจริง)",
-      subtitle: "ต้นแบบจริง: โครงการบูรณาการธุรกิจการค้าสมัยใหม่ ดิจิทัล และสตาร์ทอัพ",
-      from: "คณะศิลปศาสตร์และวิทยาศาสตร์ มหาวิทยาลัยราชภัฏชัยภูมิ",
-      to: "คณะกรรมการดำเนินงานโครงการฯ",
-      subject: "แต่งตั้งคณะกรรมการดำเนินงานโครงการบูรณาการธุรกิจการค้าสมัยใหม่ ดิจิทัล และสตาร์ทอัพท่องเที่ยวเพื่อพัฒนาเศรษฐกิจสร้างสรรค์",
-      bodyText: "ด้วยคณะศิลปศาสตร์และวิทยาศาสตร์ มหาวิทยาลัยราชภัฏชัยภูมิ ได้ดำเนินโครงการบูรณาการธุรกิจการค้าสมัยใหม่ ดิจิทัล และสตาร์ทอัพท่องเที่ยวเพื่อพัฒนาเศรษฐกิจสร้างสรรค์ กิจกรรมที่ ๑ เตรียมความพร้อมและพัฒนาศักยภาพนักศึกษาด้วยกระบวนการวิศวกรสังคม กิจกรรมที่ ๒ อบรมเชิงปฏิบัติการพัฒนาความรู้และทักษะด้านธุรกิจการค้าสมัยใหม่ (Modern Marketing) ให้กับผู้ประกอบการและคนในชุมชนท้องถิ่น กิจกรรมที่ ๓ เพื่อพัฒนาความรู้และทักษะการใช้เทคโนโลยีดิจิทัลขั้นพื้นฐานในชีวิตประจำวัน กิจกรรมที่ ๔ อบรมเชิงปฏิบัติการ พัฒนาศักยภาพการเป็นผู้ประกอบการสตาร์ทอัพด้านการท่องเที่ยวและโรงแรมในระดับชุมชน กิจกรรมที่ ๕ ติดตาม ประเมินผล และสรุปบทเรียน โดยมีวัตถุประสงค์ ๑) เพื่อพัฒนาความรู้และทักษะด้านธุรกิจการค้าสมัยใหม่ (Modern Marketing) ให้กับผู้ประกอบการและคนในชุมชนท้องถิ่น ๒) เพื่อพัฒนาความรู้และทักษะการใช้เทคโนโลยีดิจิทัลขั้นพื้นฐานในชีวิตประจำวัน ๓) เพื่อพัฒนาศักยภาพการเป็นผู้ประกอบการสตาร์ทอัพด้านการท่องเที่ยวและโรงแรมในระดับชุมชน\n\nดังนั้น เพื่อให้การดำเนินงานเป็นไปด้วยความเรียบร้อย อาศัยอำนาจตามความในมาตรา ๓๑ แห่งพระราชบัญญัติมหาวิทยาลัยราชภัฏ พ.ศ. ๒๕๔๗ และคำสั่งมหาวิทยาลัยราชภัฏชัยภูมิ ที่ ๓๔๒๗/๒๕๕๙ เรื่อง มอบอำนาจให้คณบดีปฏิบัติราชการแทนอธิการบดี ลงวันที่ ๒๕ ตุลาคม ๒๕๕๙ จึงแต่งตั้งคณะกรรมการดำเนินงานโครงการบูรณาการธุรกิจการค้าสมัยใหม่ ดิจิทัล และสตาร์ทอัพท่องเที่ยวเพื่อพัฒนาเศรษฐกิจสร้างสรรค์ ดังต่อไปนี้\n\n๑. คณะกรรมการอำนวยการ\n๑. ผู้ช่วยศาสตราจารย์ ดร.สิริศักดิ์ อาจวิชัย  ประธานกรรมการ\n๒. อาจารย์ ดร.รัชวุธ สุทธิ  กรรมการ\n๓. อาจารย์ฤทธิชัย ผานาค  กรรมการ\n๔. อาจารย์ปราชญ์ ผดุงพล  กรรมการ\n๕. อาจารย์ ดร.รจนา เมืองแสน  กรรมการ\n๖. อาจารย์ ดร.วาสนา เจริญวัย  กรรมการ\n๗. ผู้ช่วยศาสตราจารย์ ดร.นิ่มอนงค์ ภูมิคอนสาร  กรรมการและเลขานุการ\nหน้าที่ ให้คำปรึกษา แนะนำ วางแผนการดำเนินงาน กำกับติดตามการดำเนินงานเป็นไปด้วยความเรียบร้อย\n\n๒. คณะกรรมการดำเนินงาน\n๑. ผู้ช่วยศาสตราจารย์ ดร.นิ่มอนงค์ ภูมิคอนสาร  ประธานกรรมการ\n๒. อาจารย์ ดร.รจนา เมืองแสน  กรรมการ\n๓. อาจารย์ ดร.เสกศักดิ์ ปราบพาลา  กรรมการ\n๔. อาจารย์สุภร วรรณสิงห์  กรรมการ\n๕. อาจารย์กฤตเมธ นิติวัฒนะ  กรรมการ\n๖. ผู้ช่วยศาสตราจารย์ ดร.ทัศไนยวรรณ ดวงมาลา  กรรมการ\n๗. อาจารย์ลลนา คลังชำนาญ  กรรมการ\n๘. ผู้ช่วยศาสตราจารย์ ดร.อารีรัตน์ พัฒนะชีวพูล  กรรมการ\n๙. อาจารย์ ดร.วาสนา เจริญวัย  กรรมการและเลขานุการ\nหน้าที่\n๑. ดำเนินงานโครงการให้เกิดผลลัพธ์ตามกิจกรรม ตามที่คณะศิลปศาสตร์และวิทยาศาสตร์ มหาวิทยาลัยราชภัฏชัยภูมิกำหนด\n๒. ลงพื้นที่ดำเนินโครงการตามขอบเขตของโครงการที่กำหนด และดำเนินกิจกรรมตามตัวชี้วัดของโครงการ ให้เป็นไปตามระเบียบของราชการและถูกต้อง ทันต่อเวลา ตลอดโครงการ\n\nให้คณะกรรมการที่ได้รับการแต่งตั้งดังกล่าว ปฏิบัติหน้าที่ที่ได้รับมอบหมายอย่างเต็มความสามารถ ด้วยความวิริยะอุตสาหะ เพื่อให้บังเกิดผลดีต่อทางราชการ",
-      signatoryName: "ผู้ช่วยศาสตราจารย์ ดร.สิริศักดิ์ อาจวิชัย",
-      signatoryPosition: "คณบดีคณะศิลปศาสตร์และวิทยาศาสตร์"
-    },
-    {
-      id: "order_committee_appointment",
-      title: "คำสั่งแต่งตั้งคณะกรรมการดำเนินงานทั่วไป",
-      subtitle: "คำสั่งมหาวิทยาลัย/คณะ แต่งตั้งคณะกรรมการและมอบหมายหน้าที่",
-      subject: "แต่งตั้งคณะกรรมการดำเนินงานโครงการ...",
-      from: "คณะศิลปศาสตร์และวิทยาศาสตร์ มหาวิทยาลัยราชภัฏชัยภูมิ",
-      to: "คณะกรรมการดำเนินงานโครงการฯ",
-      bodyText: "ด้วย คณะศิลปศาสตร์และวิทยาศาสตร์ มหาวิทยาลัยราชภัฏชัยภูมิ กำหนดจัดโครงการ... ในระหว่างวันที่... ณ ...\n\nดังนั้น เพื่อให้การดำเนินงานเป็นไปด้วยความเรียบร้อย มีประสิทธิภาพ และบรรลุวัตถุประสงค์ที่กำหนดไว้ อาศัยอำนาจตามความในมาตรา ๓๑ แห่งพระราชบัญญัติมหาวิทยาลัยราชภัฏ พ.ศ. ๒๕๔๗ จึงแต่งตั้งคณะกรรมการดำเนินงาน ดังต่อไปนี้\n\n๑. คณะกรรมการอำนวยการ\n๑.๑ คณบดีคณะศิลปศาสตร์และวิทยาศาสตร์  ประธานกรรมการ\n๑.๒ รองคณบดีฝ่ายวิชาการและวิจัย  รองประธานกรรมการ\n๑.๓ รองคณบดีฝ่ายบริหารและแผนงาน  กรรมการ\nหน้าที่ ให้คำปรึกษา แนะนำ วางแผน และอำนวยความสะดวกในการดำเนินงาน\n\n๒. คณะกรรมการดำเนินงาน\n๒.๑ อาจารย์ประจำสาขาวิชา...  ประธานกรรมการ\n๒.๒ บุคลากรสำนักงานคณบดี  กรรมการและเลขานุการ\nหน้าที่ ดำเนินงานจัดกิจกรรม ประสานงาน และสรุปผลการดำเนินโครงการ\n\nทั้งนี้ ตั้งแต่บัดนี้เป็นต้นไป",
-      referenceDoc: "คำสั่งมหาวิทยาลัยราชภัฏชัยภูมิ ที่ ๓๔๒๗/๒๕๕๙"
-    }
-  ]
-};
-
 /** รวมเนื้อหา Rich Text กับรายชื่อคณะกรรมการ (คำสั่ง) เป็น HTML และย่อหน้าข้อความล้วนชุดเดียวกัน */
 function composeBody(bodyHtml: string, committeeLines: string[]) {
   let html = bodyHtml || "";
@@ -246,13 +111,7 @@ export default function CategoryDocEditor({
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState("");
   const [zoomScale, setZoomScale] = useState<number>(100);
-  const [showPresetModal, setShowPresetModal] = useState(false);
   const [presetSuccessMessage, setPresetSuccessMessage] = useState("");
-
-  // AI Assistant Drafting State
-  const [showAiModal, setShowAiModal] = useState(false);
-  const [aiPrompt, setAiPrompt] = useState("");
-  const [aiDraftResult, setAiDraftResult] = useState<AiDraftResult | null>(null);
 
   // Pre-Flight Quality Check Validation State
   const [showValidationModal, setShowValidationModal] = useState(false);
@@ -272,7 +131,7 @@ export default function CategoryDocEditor({
   });
   const [to, setTo] = useState<string>(() => initialRecord?.to || "");
   const [subject, setSubject] = useState<string>(() => initialRecord?.subject || "");
-  // เนื้อหา Rich Text เป็นแหล่งข้อมูลหลัก bodyText (ข้อความล้วน) คำนวณจากมันสำหรับ AI/แม่แบบ/ตรวจสอบ
+  // เนื้อหา Rich Text เป็นแหล่งข้อมูลหลัก bodyText (ข้อความล้วน) คำนวณจากมันสำหรับแม่แบบและการตรวจสอบ
   const [bodyHtml, setBodyHtml] = useState<string>(
     () => initialRecord?.bodyHtml || paragraphsToBodyHtml(initialRecord?.bodyParagraphs || [])
   );
@@ -460,7 +319,6 @@ export default function CategoryDocEditor({
     }
 
     setPresetSuccessMessage(`ดึงข้อมูลต้นแบบ "${preset.title}" เข้าสู่ฟอร์มเรียบร้อยแล้ว`);
-    setShowPresetModal(false);
     setTimeout(() => setPresetSuccessMessage(""), 5000);
   }
 
@@ -552,32 +410,26 @@ export default function CategoryDocEditor({
     currentUser
   ]);
 
-  // AI Drafting handlers
-  function handleRunAiDraft(mode: 'generate' | 'formalize' | 'concise' | 'justify' | 'executive' = 'generate') {
-    if (!aiPrompt.trim() && mode === 'generate') return;
-    const res = draftGovernmentDocument({
-      category,
-      userPrompt: aiPrompt,
-      context: {
-        from,
-        to,
-        subject,
-        existingBody: bodyText
-      },
-      mode
+  // ใช้ข้อความจากต้นแบบของหมวด (ไฟล์ Word ต้นฉบับ) ถ้ามีข้อความที่กรอกไว้แล้วให้ยืนยันก่อน
+  function handleUseTemplate() {
+    const p = catConfig?.preset;
+    if (!p) return;
+    if ((subject.trim() || bodyText.trim()) && !window.confirm("ข้อความที่กรอกไว้จะถูกแทนที่ด้วยต้นแบบ ต้องการดำเนินการต่อหรือไม่")) return;
+    handleApplyPreset({
+      id: category,
+      title: categoryTitle,
+      subtitle: "",
+      subject: p.subject || "",
+      to: p.to,
+      from: p.from,
+      bodyText: p.bodyText || "",
+      referenceDoc: p.referenceDoc,
+      attachmentsText: p.attachmentsText,
+      coordinatorInfo: p.coordinatorInfo,
+      officeAddress: p.officeAddress,
+      signatoryName: p.signatoryName,
+      signatoryPosition: p.signatoryPosition
     });
-    setAiDraftResult(res);
-  }
-
-  function handleApplyAiDraft() {
-    if (!aiDraftResult) return;
-    if (aiDraftResult.subject) setSubject(aiDraftResult.subject);
-    if (aiDraftResult.to && !isOrder) setTo(aiDraftResult.to);
-    if (aiDraftResult.bodyText) setBodyText(aiDraftResult.bodyText);
-
-    setShowAiModal(false);
-    setPresetSuccessMessage("นำข้อความร่างจาก AI เข้าสู่แบบฟอร์มเรียบร้อยแล้ว กรุณาตรวจสอบข้อมูลและแทนที่เครื่องหมาย [...]");
-    setTimeout(() => setPresetSuccessMessage(""), 6000);
   }
 
   function handleOpenValidation() {
@@ -819,41 +671,23 @@ export default function CategoryDocEditor({
               </div>
             )}
 
-            {/* Template & AI Assistant Drafting Banner */}
-            <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-blue-950 p-4 rounded-2xl text-white shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
-                  <Wand2 className="w-5 h-5 text-blue-200" />
+            {/* ต้นแบบของหมวดนี้ (จากไฟล์ Word ต้นฉบับของคณะ) */}
+            {catConfig?.preset?.bodyText && (
+              <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 rounded-2xl border border-slate-200 bg-white">
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-slate-900">ต้นแบบ{categoryTitle}</p>
+                  <p className="text-[11px] text-slate-500">ใช้ข้อความจากไฟล์ต้นแบบของคณะเป็นจุดเริ่มต้น แล้วแก้ไขได้ตามต้องการ</p>
                 </div>
-                <div>
-                  <h3 className="text-xs sm:text-sm font-bold text-white tracking-tight">เครื่องมือช่วยร่างเอกสารราชการ</h3>
-                  <p className="text-[11px] text-blue-200 mt-0.5">ใช้ AI ช่วยร่างข้อความด้วยภาษาธรรมชาติ หรือเลือกดึงข้อมูลจากต้นแบบ</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
                 <button
                   type="button"
-                  onClick={() => {
-                    setAiPrompt("");
-                    setAiDraftResult(null);
-                    setShowAiModal(true);
-                  }}
-                  className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all shrink-0 shadow-xs flex items-center gap-1.5"
-                  title="เปิดหน้าต่าง AI ช่วยร่างเนื้อหาตามระเบียบงานสารบรรณ"
+                  onClick={handleUseTemplate}
+                  className="px-3.5 py-2 rounded-xl bg-blue-900 hover:bg-blue-800 text-white text-xs font-bold transition-all shrink-0 flex items-center gap-1.5"
                 >
-                  <Sparkles className="w-3.5 h-3.5 text-blue-200" />
-                  <span>AI ร่างเอกสาร</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowPresetModal(true)}
-                  className="px-3.5 py-2 rounded-xl bg-white text-blue-950 hover:bg-blue-50 text-xs font-bold transition-all shrink-0 shadow-xs flex items-center gap-1.5"
-                >
-                  <FileText className="w-3.5 h-3.5 text-blue-900" />
-                  <span>เลือกต้นแบบ</span>
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>ใช้ข้อความจากต้นแบบ</span>
                 </button>
               </div>
-            </div>
+            )}
 
             {/* Section 1: ข้อมูลหัวหนังสือ (Header Metadata) */}
             <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
@@ -1197,21 +1031,6 @@ export default function CategoryDocEditor({
                     <p className="text-[11px] text-slate-500">Enter ขึ้นย่อหน้าใหม่ (เยื้อง ๒.๕ ซม. อัตโนมัติ) ปรับตัวหนา เอียง จัดแนว และการเยื้องได้จากแถบเครื่องมือ</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAiPrompt(bodyText || subject || "ร่างหนังสือราชการ");
-                      handleRunAiDraft('formalize');
-                      setShowAiModal(true);
-                    }}
-                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-200 text-xs font-semibold transition-all shadow-2xs"
-                    title="เปิดผู้ช่วย AI เพื่อขัดเกลาภาษา ย่อความ หรือเพิ่มเหตุผล"
-                  >
-                    <Wand2 className="w-3.5 h-3.5 text-blue-700" />
-                    <span>ขัดเกลาด้วย AI</span>
-                  </button>
-                </div>
               </div>
 
               <RichBodyEditor
@@ -1422,336 +1241,6 @@ export default function CategoryDocEditor({
             </div>
           </div>
         </div>
-
-      {/* Preset Modal */}
-      {showPresetModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl max-w-xl w-full max-h-[85vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden">
-            
-            {/* Modal Header */}
-            <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-900 flex items-center justify-center">
-                  <Sparkles className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900">เลือกต้นแบบเอกสาร ({categoryTitle})</h3>
-                  <p className="text-[11px] text-slate-500">คลิกเลือกต้นแบบเพื่อดึงข้อความตัวอย่างเข้าสู่แบบฟอร์ม</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowPresetModal(false)}
-                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Modal Content List */}
-            <div className="p-5 overflow-y-auto space-y-3">
-              {/* Cloud / Built-in Category Default Preset */}
-              {catConfig?.preset && (
-                <div 
-                  onClick={() => {
-                    const p = catConfig.preset!;
-                    handleApplyPreset({
-                      id: "cat_default",
-                      title: `ต้นแบบหลักประจำหมวด (${categoryTitle})`,
-                      subtitle: "แม่แบบมาตรฐานของคณะศิลปศาสตร์และวิทยาศาสตร์",
-                      subject: p.subject || "",
-                      to: p.to,
-                      from: p.from,
-                      bodyText: p.bodyText || "",
-                      referenceDoc: p.referenceDoc,
-                      attachmentsText: p.attachmentsText,
-                      coordinatorInfo: p.coordinatorInfo,
-                      officeAddress: p.officeAddress,
-                      signatoryName: p.signatoryName,
-                      signatoryPosition: p.signatoryPosition
-                    });
-                  }}
-                  className="p-4 rounded-2xl border border-blue-200 bg-blue-50/40 hover:bg-blue-50 hover:border-blue-400 cursor-pointer transition-all space-y-1.5 group"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-blue-950 group-hover:text-blue-900 flex items-center gap-1.5">
-                      <FileCheck className="w-3.5 h-3.5 text-blue-700" />
-                      ต้นแบบหลักประจำหมวด ({categoryTitle})
-                    </span>
-                    <span className="text-[10px] font-semibold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
-                      แม่แบบหลัก
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-600 line-clamp-2">
-                    {catConfig.preset.subject || catConfig.preset.bodyText?.slice(0, 100)}
-                  </p>
-                </div>
-              )}
-
-              {/* Predefined Category Templates */}
-              {(OFFICIAL_CATEGORY_PRESETS[category] || []).map((preset) => (
-                <div
-                  key={preset.id}
-                  onClick={() => handleApplyPreset(preset)}
-                  className="p-4 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50/80 hover:border-blue-300 cursor-pointer transition-all space-y-1.5 group"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-900 group-hover:text-blue-900">
-                      {preset.title}
-                    </span>
-                    <span className="text-[10px] font-medium text-slate-500">
-                      คลิกเพื่อดึงข้อมูล
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-500">
-                    {preset.subtitle}
-                  </p>
-                  <div className="bg-slate-100/70 p-2 rounded-xl text-[11px] text-slate-700 font-mono line-clamp-2">
-                    {preset.subject}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Modal Footer */}
-            <div className="p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
-              <span className="text-[11px] text-slate-500">
-                คุณสามารถแก้ไขข้อความหลังดึงต้นแบบได้เสมอ
-              </span>
-              <button
-                type="button"
-                onClick={() => setShowPresetModal(false)}
-                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl text-xs font-semibold transition-colors"
-              >
-                ปิด
-              </button>
-            </div>
-
-          </div>
-        </div>
-      )}
-
-      {/* AI Drafting Assistant Modal */}
-      {showAiModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden">
-            
-            {/* Modal Header */}
-            <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-blue-50/70 via-indigo-50/50 to-white">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-blue-900 text-white flex items-center justify-center shadow-xs">
-                  <Wand2 className="w-5 h-5" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-bold text-slate-900">ผู้ช่วย AI ร่างเอกสารราชการ</h3>
-                    <span className="text-[10px] font-bold bg-blue-100 text-blue-900 px-2 py-0.5 rounded-full">
-                      {categoryTitle}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
-                    ประมวลผลตามระเบียบงานสารบรรณ พ.ศ. ๒๕๒๖ ปลอดภัยฝั่งไคลเอนต์ (Zero Cloud Leakage)
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowAiModal(false)}
-                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div className="p-5 overflow-y-auto space-y-4">
-              
-              {/* Natural Language Prompt Input */}
-              <div className="space-y-2">
-                <label className="block text-xs font-bold text-slate-800">
-                  อธิบายความต้องการด้วยภาษาธรรมชาติ
-                </label>
-                <textarea
-                  rows={3}
-                  className="w-full text-xs rounded-xl border border-slate-200 p-3 text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600 bg-slate-50/60 leading-relaxed"
-                  placeholder="เช่น ขอเชิญ นายสาธาร รวบรัด ครูชำนาญการพิเศษ โรงเรียนบ้านกุดโคลน เป็นวิทยากร โครงการพัฒนาศักยภาพบัณฑิต ในวันที่ ๑๕-๑๖ สิงหาคม ๒๕๖๙ ณ ห้อง 7113 อาคารปฏิบัติการเทคโนโลยีอุตสาหกรรม..."
-                  value={aiPrompt}
-                  onChange={e => setAiPrompt(e.target.value)}
-                />
-                
-                {/* Prompt Quick Chips */}
-                <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                  <span className="text-[11px] text-slate-400 mr-1">ตัวอย่าง:</span>
-                  <button
-                    type="button"
-                    onClick={() => setAiPrompt("ขอเชิญเป็นวิทยากรโครงการพัฒนาศักยภาพบัณฑิต ในระหว่างวันที่ ๑๕ - ๑๖ สิงหาคม ๒๕๖๙ ณ ห้อง 7113")}
-                    className="text-[10px] font-semibold px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-blue-50 hover:text-blue-900 text-slate-700 transition-colors"
-                  >
-                    ขอเชิญวิทยากร
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setAiPrompt("ขอเชิญเป็นผู้เชี่ยวชาญในการตรวจประเมินและเสนอแนะเพื่อปรับปรุงแก้ไขเครื่องมือที่ใช้ในการวิจัย")}
-                    className="text-[10px] font-semibold px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-blue-50 hover:text-blue-900 text-slate-700 transition-colors"
-                  >
-                    ขอเชิญผู้เชี่ยวชาญตรวจเครื่องมือ
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setAiPrompt("ขอความอนุเคราะห์เวลาเรียนของนักศึกษา ชั้นปีที่ 3 เพื่อเข้าร่วมอบรมก่อนการปฏิบัติงาน (Pre-CWIE Training) ในวันที่ 15 - 16 กันยายน 2569")}
-                    className="text-[10px] font-semibold px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-blue-50 hover:text-blue-900 text-slate-700 transition-colors"
-                  >
-                    ขอความอนุเคราะห์เวลาเรียน
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setAiPrompt("แต่งตั้งคณะกรรมการดำเนินงานโครงการบูรณาการธุรกิจการค้าสมัยใหม่ ดิจิทัล และสตาร์ทอัพท่องเที่ยวเพื่อพัฒนาเศรษฐกิจสร้างสรรค์")}
-                    className="text-[10px] font-semibold px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-blue-50 hover:text-blue-900 text-slate-700 transition-colors"
-                  >
-                    คำสั่งแต่งตั้งคณะกรรมการ
-                  </button>
-                </div>
-
-                <div className="pt-2 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => handleRunAiDraft('generate')}
-                    disabled={!aiPrompt.trim()}
-                    className="px-4 py-2 rounded-xl bg-blue-900 hover:bg-blue-800 disabled:opacity-40 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5"
-                  >
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span>สร้างร่างเอกสารราชการ</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* AI Draft Result Section */}
-              {aiDraftResult && (
-                <div className="space-y-4 pt-3 border-t border-slate-100 animate-in fade-in duration-200">
-                  
-                  {/* Missing Variables Alert Banner */}
-                  {aiDraftResult.missingVariables.length > 0 && (
-                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl text-xs space-y-1.5 text-amber-900">
-                      <div className="flex items-center gap-2 font-bold text-amber-950">
-                        <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                        <span>ข้อมูลสำคัญที่ต้องระบุเพิ่ม ({aiDraftResult.missingVariables.length} จุด)</span>
-                      </div>
-                      <p className="text-[11px] text-amber-800">
-                        ระบบจัดโครงสร้างให้เรียบร้อยแล้ว โดยทำเครื่องหมาย [...] ไว้เพื่อให้ตรวจสอบและกรอกข้อมูลจริง:
-                      </p>
-                      <div className="flex flex-wrap gap-1 pt-1">
-                        {aiDraftResult.missingVariables.map((v, i) => (
-                          <span key={i} className="px-2 py-0.5 rounded-md bg-amber-100 font-mono text-[10px] text-amber-900 font-semibold">
-                            {v}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Draft Metadata Summary */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs">
-                    <div>
-                      <span className="font-bold text-slate-500 block text-[10px] uppercase">เรื่อง (Subject)</span>
-                      <span className="font-semibold text-slate-900">{aiDraftResult.subject}</span>
-                    </div>
-                    {!isOrder && (
-                      <div>
-                        <span className="font-bold text-slate-500 block text-[10px] uppercase">เรียน (To)</span>
-                        <span className="font-semibold text-slate-900">{aiDraftResult.to || "-"}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Refinement Toolbar */}
-                  <div className="space-y-1.5">
-                    <span className="text-[11px] font-bold text-slate-600 block">
-                      เครื่องมือปรับแต่งข้อความร่าง (Tone & Style Refinement):
-                    </span>
-                    <div className="flex flex-wrap gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => handleRunAiDraft('formalize')}
-                        className="px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-blue-50 hover:text-blue-900 text-slate-700 text-[11px] font-semibold transition-all shadow-2xs flex items-center gap-1"
-                      >
-                        <RefreshCw className="w-3 h-3 text-blue-700" />
-                        <span>ปรับภาษาให้เป็นทางการ</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleRunAiDraft('concise')}
-                        className="px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-blue-50 hover:text-blue-900 text-slate-700 text-[11px] font-semibold transition-all shadow-2xs flex items-center gap-1"
-                      >
-                        <RefreshCw className="w-3 h-3 text-blue-700" />
-                        <span>ย่อเนื้อหาให้กระชับ</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleRunAiDraft('justify')}
-                        className="px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-blue-50 hover:text-blue-900 text-slate-700 text-[11px] font-semibold transition-all shadow-2xs flex items-center gap-1"
-                      >
-                        <RefreshCw className="w-3 h-3 text-blue-700" />
-                        <span>เพิ่มเหตุผลความจำเป็น</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleRunAiDraft('executive')}
-                        className="px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-blue-50 hover:text-blue-900 text-slate-700 text-[11px] font-semibold transition-all shadow-2xs flex items-center gap-1"
-                      >
-                        <RefreshCw className="w-3 h-3 text-blue-700" />
-                        <span>ปรับสำหรับระดับผู้บริหาร</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Body Preview */}
-                  <div className="space-y-1.5">
-                    <span className="text-[11px] font-bold text-slate-700 block">
-                      ตัวอย่างเนื้อหาข้อความ (จัด ๔ ส่วนตามระเบียบงานสารบรรณ):
-                    </span>
-                    <div className="p-3.5 rounded-2xl bg-white border border-blue-200 font-sans text-xs text-slate-800 space-y-2 max-h-52 overflow-y-auto leading-relaxed shadow-2xs">
-                      {aiDraftResult.bodyParagraphs.map((p, i) => (
-                        <p key={i} className="indent-6 text-justify">
-                          {p}
-                        </p>
-                      ))}
-                    </div>
-                  </div>
-
-                </div>
-              )}
-
-            </div>
-
-            {/* Modal Footer */}
-            <div className="p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
-              <span className="text-[11px] text-slate-500">
-                คุณสามารถแก้ไขข้อความเพิ่มเติมหลังนำเข้าฟอร์มได้เสมอ
-              </span>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowAiModal(false)}
-                  className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl text-xs font-semibold transition-colors"
-                >
-                  ยกเลิก
-                </button>
-                {aiDraftResult && (
-                  <button
-                    type="button"
-                    onClick={handleApplyAiDraft}
-                    className="px-4 py-2 bg-blue-900 hover:bg-blue-800 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5"
-                  >
-                    <Check className="w-3.5 h-3.5" />
-                    <span>นำข้อความร่างเข้าสู่แบบฟอร์ม</span>
-                  </button>
-                )}
-              </div>
-            </div>
-
-          </div>
-        </div>
-      )}
 
       {/* Pre-Flight Document Quality Check & Validation Modal */}
       {showValidationModal && validationReport && (

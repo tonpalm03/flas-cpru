@@ -20,21 +20,7 @@ export const BUILTIN_CATEGORIES: AdminDocCategoryConfig[] = [
     orderIndex: 1,
     isBuiltIn: true,
     isActive: true,
-    preset: (rawTemplates.find(t => t.category === 'memo')?.preset as any) || {
-      from: 'มหาวิทยาลัยราชภัฏชัยภูมิ คณะศิลปศาสตร์และวิทยาศาสตร์ โทร ๔๑๐๐',
-      to: '',
-      subject: '',
-      action: 'รอตรวจ',
-      remarks: '',
-      referenceDoc: '',
-      attachmentsText: '',
-      bodyText: 'ด้วย คณะศิลปศาสตร์และวิทยาศาสตร์ มีความประสงค์...\n\nในการนี้ จึงขอเชิญ/ขออนุมัติ...\n\nจึงเรียนมาเพื่อโปรดพิจารณา',
-      signatoryName: 'ผู้ช่วยศาสตราจารย์ ดร.สิริศักดิ์ อาจวิชัย',
-      signatoryPosition: 'คณบดีคณะศิลปศาสตร์และวิทยาศาสตร์',
-      coordinatorInfo: '',
-      recipients: [],
-      officeAddress: 'คณะศิลปศาสตร์และวิทยาศาสตร์\nมหาวิทยาลัยราชภัฏชัยภูมิ\n167 หมู่ 2 ถนนชัยภูมิ-ตาดโตน\nตำบลนาฝาย อำเภอเมือง จังหวัดชัยภูมิ 36000'
-    }
+    preset: officialPreset('memo')
   },
   {
     id: 'memo_circular',
@@ -51,21 +37,7 @@ export const BUILTIN_CATEGORIES: AdminDocCategoryConfig[] = [
     orderIndex: 2,
     isBuiltIn: true,
     isActive: true,
-    preset: (rawTemplates.find(t => t.category === 'memo_circular')?.preset as any) || {
-      from: 'มหาวิทยาลัยราชภัฏชัยภูมิ คณะศิลปศาสตร์และวิทยาศาสตร์ โทร ๔๑๐๐',
-      to: 'อาจารย์ผู้สอนประจำรายวิชา / บุคลากรทุกท่าน',
-      subject: '',
-      action: 'รอตรวจ',
-      remarks: '',
-      referenceDoc: '',
-      attachmentsText: '',
-      bodyText: 'ด้วย คณะศิลปศาสตร์และวิทยาศาสตร์ ได้ดำเนินโครงการ...\n\nในการนี้ จึงขอความอนุเคราะห์แจ้งเวียน...\n\nจึงเรียนมาเพื่อพิจารณา',
-      signatoryName: 'ผู้ช่วยศาสตราจารย์ ดร.สิริศักดิ์ อาจวิชัย',
-      signatoryPosition: 'คณบดีคณะศิลปศาสตร์และวิทยาศาสตร์',
-      coordinatorInfo: '',
-      recipients: ['อาจารย์ผู้สอนประจำรายวิชา'],
-      officeAddress: 'คณะศิลปศาสตร์และวิทยาศาสตร์\nมหาวิทยาลัยราชภัฏชัยภูมิ\n167 หมู่ 2 ถนนชัยภูมิ-ตาดโตน\nตำบลนาฝาย อำเภอเมือง จังหวัดชัยภูมิ 36000'
-    }
+    preset: officialPreset('memo_circular')
   },
   {
     id: 'external',
@@ -80,21 +52,7 @@ export const BUILTIN_CATEGORIES: AdminDocCategoryConfig[] = [
     orderIndex: 3,
     isBuiltIn: true,
     isActive: true,
-    preset: (rawTemplates.find(t => t.category === 'external')?.preset as any) || {
-      from: 'คณะศิลปศาสตร์และวิทยาศาสตร์ มหาวิทยาลัยราชภัฏชัยภูมิ',
-      to: '',
-      subject: '',
-      action: 'รอตรวจ',
-      remarks: '',
-      referenceDoc: '',
-      attachmentsText: '',
-      bodyText: 'ตามที่ หน่วยงานของท่านได้มีหนังสือ...\n\nคณะศิลปศาสตร์และวิทยาศาสตร์ พิจารณาแล้ว ยินดี...\n\nจึงเรียนมาเพื่อโปรดทราบ/พิจารณา',
-      signatoryName: 'ผู้ช่วยศาสตราจารย์ ดร.สิริศักดิ์ อาจวิชัย',
-      signatoryPosition: 'คณบดีคณะศิลปศาสตร์และวิทยาศาสตร์ ปฏิบัติราชการแทน\nอธิการบดีมหาวิทยาลัยราชภัฏชัยภูมิ',
-      coordinatorInfo: 'สำนักงานคณบดีคณะศิลปศาสตร์และวิทยาศาสตร์\nโทรศัพท์ 044 815 111 ต่อ 4100\nไปรษณีย์อิเล็กทรอนิกส์ officer@cpru.ac.th',
-      recipients: [],
-      officeAddress: 'คณะศิลปศาสตร์และวิทยาศาสตร์\nมหาวิทยาลัยราชภัฏชัยภูมิ\n167 ถนนชัยภูมิ-ตาดโตน ตำบลนาฝาย\nอำเภอเมือง จังหวัดชัยภูมิ 36000'
-    }
+    preset: officialPreset('external')
   },
   {
     id: 'external_circular',
@@ -109,21 +67,7 @@ export const BUILTIN_CATEGORIES: AdminDocCategoryConfig[] = [
     orderIndex: 4,
     isBuiltIn: true,
     isActive: true,
-    preset: (rawTemplates.find(t => t.category === 'external_circular')?.preset as any) || {
-      from: 'คณะศิลปศาสตร์และวิทยาศาสตร์ มหาวิทยาลัยราชภัฏชัยภูมิ',
-      to: '',
-      subject: '',
-      action: 'รอตรวจ',
-      remarks: '',
-      referenceDoc: '',
-      attachmentsText: '๑. กำหนดการโครงการ  จำนวน ๑ ฉบับ',
-      bodyText: 'ด้วย คณะศิลปศาสตร์และวิทยาศาสตร์ มหาวิทยาลัยราชภัฏชัยภูมิ กำหนดจัดโครงการ...\n\nในการนี้ คณะศิลปศาสตร์และวิทยาศาสตร์ จึงใคร่ขอเรียนเชิญท่าน...\n\nจึงเรียนมาเพื่อโปรดพิจารณาให้ความอนุเคราะห์',
-      signatoryName: 'ผู้ช่วยศาสตราจารย์ ดร.สิริศักดิ์ อาจวิชัย',
-      signatoryPosition: 'คณบดีคณะศิลปศาสตร์และวิทยาศาสตร์ ปฏิบัติราชการแทน\nอธิการบดีมหาวิทยาลัยราชภัฏชัยภูมิ',
-      coordinatorInfo: 'สำนักงานคณบดีคณะศิลปศาสตร์และวิทยาศาสตร์\nโทรศัพท์ 044 815 111 ต่อ 4100\nไปรษณีย์อิเล็กทรอนิกส์ officer@cpru.ac.th',
-      recipients: [],
-      officeAddress: 'คณะศิลปศาสตร์และวิทยาศาสตร์\nมหาวิทยาลัยราชภัฏชัยภูมิ\n167 ถนนชัยภูมิ-ตาดโตน ตำบลนาฝาย\nอำเภอเมือง จังหวัดชัยภูมิ 36000'
-    }
+    preset: officialPreset('external_circular')
   },
   {
     id: 'order',
@@ -138,25 +82,22 @@ export const BUILTIN_CATEGORIES: AdminDocCategoryConfig[] = [
     orderIndex: 5,
     isBuiltIn: true,
     isActive: true,
-    preset: (rawTemplates.find(t => t.category === 'order')?.preset as any) || {
-      from: 'คณะศิลปศาสตร์และวิทยาศาสตร์ มหาวิทยาลัยราชภัฏชัยภูมิ',
-      to: 'คณะกรรมการดำเนินงานโครงการฯ',
-      subject: 'แต่งตั้งคณะกรรมการดำเนินงาน...',
-      action: 'รอตรวจ',
-      remarks: '',
-      referenceDoc: 'คำสั่งมหาวิทยาลัยราชภัฏชัยภูมิ ที่ ๓๔๒๗/๒๕๕๙',
-      attachmentsText: '',
-      bodyText: 'ด้วย คณะศิลปศาสตร์และวิทยาศาสตร์ มหาวิทยาลัยราชภัฏชัยภูมิ ได้ดำเนินโครงการ...\n\nดังนั้น เพื่อให้การดำเนินงานเป็นไปด้วยความเรียบร้อย อาศัยอำนาจตามความในมาตรา ๓๑ แห่งพระราชบัญญัติมหาวิทยาลัยราชภัฏ พ.ศ. ๒๕๔๗ จึงแต่งตั้งคณะกรรมการดังต่อไปนี้\n\n๑. คณะกรรมการอำนวยการ\n๑. ผู้ช่วยศาสตราจารย์ ดร.สิริศักดิ์ อาจวิชัย  ประธานกรรมการ\n๒. อาจารย์ ดร.รัชวุธ สุทธิ  กรรมการ\n๓. อาจารย์ศศิธร ถีสูงเนิน  กรรมการและเลขานุการ\nหน้าที่ ให้คำปรึกษา แนะนำ วางแผนการดำเนินงาน\n\nทั้งนี้ ตั้งแต่บัดนี้เป็นต้นไป',
-      signatoryName: 'ผู้ช่วยศาสตราจารย์ ดร.สิริศักดิ์ อาจวิชัย',
-      signatoryPosition: 'คณบดีคณะศิลปศาสตร์และวิทยาศาสตร์',
-      coordinatorInfo: '',
-      recipients: ['คณะกรรมการดำเนินงานโครงการฯ'],
-      officeAddress: 'คณะศิลปศาสตร์และวิทยาศาสตร์\nมหาวิทยาลัยราชภัฏชัยภูมิ\n167 หมู่ 2 ถนนชัยภูมิ-ตาดโตน\nตำบลนาฝาย อำเภอเมือง จังหวัดชัยภูมิ 36000'
-    }
+    preset: officialPreset('order')
   }
 ];
 
 const LOCAL_STORAGE_KEY = 'faculty_erp_admin_categories_cache';
+
+/** ต้นแบบของแต่ละหมวดมาจากไฟล์ Word ต้นฉบับเท่านั้น (lib/adminTemplates.json) */
+function officialPreset(category: string): any {
+  const found = (rawTemplates as Array<{ category: string; preset: unknown }>).find(t => t.category === category);
+  return found ? found.preset : {};
+}
+
+/** หมวดมาตรฐานใช้ต้นแบบจากไฟล์ Word เสมอ ไม่รับต้นแบบเก่าที่ค้างในแคชหรือคลาวด์ */
+function withOfficialPresets(list: AdminDocCategoryConfig[]): AdminDocCategoryConfig[] {
+  return list.map(c => (c.isBuiltIn ? { ...c, preset: officialPreset(c.id) } : c));
+}
 
 export async function getAdminCategories(): Promise<AdminDocCategoryConfig[]> {
   const defaults = [...BUILTIN_CATEGORIES];
@@ -164,7 +105,7 @@ export async function getAdminCategories(): Promise<AdminDocCategoryConfig[]> {
     if (typeof window !== 'undefined') {
       try {
         const cached = localStorage.getItem(LOCAL_STORAGE_KEY);
-        if (cached) return JSON.parse(cached);
+        if (cached) return withOfficialPresets(JSON.parse(cached));
       } catch {}
     }
     return defaults;
@@ -187,10 +128,7 @@ export async function getAdminCategories(): Promise<AdminDocCategoryConfig[]> {
         return {
           ...def,
           ...cloudConfigs[def.id],
-          preset: {
-            ...def.preset,
-            ...(cloudConfigs[def.id].preset || {})
-          }
+          preset: def.preset
         };
       }
       return def;
@@ -211,7 +149,7 @@ export async function getAdminCategories(): Promise<AdminDocCategoryConfig[]> {
       } catch {}
     }
 
-    return mergedList;
+    return withOfficialPresets(mergedList);
   } catch (err) {
     console.warn('getAdminCategories fallback to builtins/cache:', err);
     if (typeof window !== 'undefined') {

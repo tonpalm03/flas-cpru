@@ -50,7 +50,6 @@ const {
   parseCommitteeRow
 } = require('../lib/adminDocument.ts');
 
-const { draftGovernmentDocument } = require('../lib/aiDocumentDrafter.ts');
 const { validateGovernmentDocument } = require('../lib/documentValidationService.ts');
 
 async function runAllTests() {
@@ -382,51 +381,28 @@ async function runAllTests() {
   assert.equal(computedBE, 2569, 'Gregorian 2026 maps to Buddhist Era 2569');
   console.log(' PASS: Year calculation verified.');
 
-  // Test 12: AI Document Drafting Engine
-  console.log('\n[TEST 12] AI Document Drafting Engine (Natural Language to Official Correspondence):');
-  const aiSpeakerDraft = draftGovernmentDocument({
-    category: 'external_circular',
-    userPrompt: 'ขอเชิญ นายสาธาร รวบรัด ครูชำนาญการพิเศษ เป็นวิทยากร โครงการพัฒนาศักยภาพบัณฑิต วันที่ ๑๕ - ๑๖ สิงหาคม ๒๕๖๙ ณ ห้อง 7113'
-  });
-  assert.ok(aiSpeakerDraft.subject.includes('วิทยากร'), 'AI Subject extracted correctly');
-  assert.ok(aiSpeakerDraft.bodyParagraphs.length >= 3, 'AI structured in 3+ official paragraphs');
-  assert.ok(aiSpeakerDraft.bodyParagraphs[0].startsWith('ด้วย'), 'Official opening with ด้วย');
-  assert.ok(aiSpeakerDraft.bodyParagraphs[aiSpeakerDraft.bodyParagraphs.length - 1].startsWith('จึงเรียน'), 'Official closing with จึงเรียน');
-  assert.equal(aiSpeakerDraft.isAiGenerated, true, 'Flagged as AI generated');
+  // Test 12: Official templates come only from the faculty's Word files
+  console.log('\n[TEST 12] Official Templates (Word files only, no AI drafting):');
+  const officialTemplates = require('../lib/adminTemplates.json');
+  assert.equal(officialTemplates.length, 5, 'exactly five templates, one per category');
+  const emojiPattern = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u;
+  for (const cat of ['memo', 'memo_circular', 'external', 'external_circular', 'order']) {
+    const t = officialTemplates.find(x => x.category === cat);
+    assert.ok(t, cat + ' template exists');
+    assert.ok(/\.docx$/.test(t.sourceFile), cat + ' template comes from a Word file');
+    assert.ok(t.preset.subject && t.preset.subject.length > 5, cat + ' has a subject');
+    assert.ok(t.preset.bodyText && t.preset.bodyText.length > 100, cat + ' has body text');
+    assert.ok(t.preset.signatoryName && t.preset.signatoryPosition, cat + ' has a signatory');
+    assert.equal(emojiPattern.test(JSON.stringify(t)), false, cat + ' contains no emoji');
+    assert.equal(JSON.stringify(t).includes('&amp;'), false, cat + ' has decoded entities');
+  }
+  const orderTemplate = officialTemplates.find(x => x.category === 'order').preset;
+  assert.ok(orderTemplate.bodyText.includes('ประธานกรรมการ') && orderTemplate.bodyText.includes('หน้าที่'), 'order template keeps committee rows and duties');
+  assert.ok(officialTemplates.find(x => x.category === 'external').preset.officeAddress.includes('ชัยภูมิ'), 'external template keeps office address');
+  assert.ok(officialTemplates.find(x => x.category === 'external_circular').preset.attachmentsText.includes('จำนวน'), 'circular template keeps attachments');
+  assert.equal(require('fs').existsSync(require('path').join(__dirname, '..', 'lib', 'aiDocumentDrafter.ts')), false, 'AI drafting engine is removed');
+  console.log(' PASS: Five official templates from Word files verified; AI engine removed.');
 
-  const aiOrderDraft = draftGovernmentDocument({
-    category: 'order',
-    userPrompt: 'แต่งตั้งคณะกรรมการดำเนินงานโครงการบูรณาการธุรกิจการค้าสมัยใหม่ ดิจิทัล และสตาร์ทอัพท่องเที่ยวเพื่อพัฒนาเศรษฐกิจสร้างสรรค์'
-  });
-  assert.ok(aiOrderDraft.subject.includes('แต่งตั้งคณะกรรมการ'), 'Order subject generated');
-  assert.ok(aiOrderDraft.bodyText.includes('อาศัยอำนาจตามความในมาตรา ๓๑'), 'Order statutory authority included');
-
-  // AI Refinements
-  const refinedFormal = draftGovernmentDocument({
-    category: 'memo',
-    userPrompt: '',
-    context: {
-      existingBody: 'พวกเราอยากจะขอส่งเอกสารจัดขึ้นวันที่ ๑๕ ตุลาคม',
-      subject: 'ทดสอบ'
-    },
-    mode: 'formalize'
-  });
-  assert.ok(!refinedFormal.bodyText.includes('พวกเรา'), 'Colloquial removed in formalize');
-  assert.ok(!refinedFormal.bodyText.includes('อยากจะขอ'), 'Formalized to official tone');
-
-  const refinedJustify = draftGovernmentDocument({
-    category: 'memo',
-    userPrompt: '',
-    context: {
-      existingBody: 'ด้วยคณะมีโครงการ\n\nจึงเรียนมาเพื่อโปรดทราบ',
-      subject: 'ทดสอบ'
-    },
-    mode: 'justify'
-  });
-  assert.ok(refinedJustify.bodyText.includes('พันธกิจยุทธศาสตร์'), 'Rationale added in justify');
-  console.log(' PASS: AI Drafting Engine and 4-Part Structure verified.');
-
-  // Test 13: Pre-Flight Document Validation Engine
   console.log('\n[TEST 13] Pre-Flight Document Validation Engine:');
   const invalidDoc = {
     category: 'memo',

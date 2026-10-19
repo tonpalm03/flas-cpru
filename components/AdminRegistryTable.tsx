@@ -11,7 +11,6 @@ import type {
   DocumentWorkflowConfig,
   SequentialSignerStep
 } from '@/lib/types';
-import templates from '@/lib/adminTemplates.json';
 import { 
   ADMIN_ACTIONS, 
   bangkokDate, 
@@ -100,11 +99,9 @@ export default function AdminRegistryTable({
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<AdminDocRegistryRecord | null>(null);
   const [busy, setBusy] = useState(false);
-  const [showSource, setShowSource] = useState(false);
   const [catConfig, setCatConfig] = useState<AdminDocCategoryConfig | null>(null);
   const [workflowConfig, setWorkflowConfig] = useState<DocumentWorkflowConfig | null>(null);
 
-  const staticTemplate: any = (templates as Record<string, any>)[category] || null;
 
   // Load category settings and workflow configuration
   useEffect(() => {
@@ -475,43 +472,8 @@ export default function AdminRegistryTable({
             </>
           )}
 
-          {staticTemplate && (
-            <button className={buttonClass} onClick={() => setShowSource(!showSource)}>
-              {showSource ? 'ซ่อนต้นฉบับ' : 'ดูต้นฉบับเอกสารจริง'}
-            </button>
-          )}
         </div>
       </div>
-
-      {/* Built-in source inspection */}
-      {staticTemplate && (
-        <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="font-bold text-slate-800 text-sm">
-                ต้นแบบจริงที่ใช้เทียบ: {staticTemplate.sourceDocNumber} — {staticTemplate.preset.subject}
-              </p>
-              <p className="text-xs text-slate-500 mt-0.5">
-                {staticTemplate.pageCount} หน้า • ลงวันที่ {staticTemplate.sourceDate} • แยกจากทะเบียนจริง
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <a href={staticTemplate.pdf} target="_blank" rel="noreferrer" className={buttonClass}>เปิด PDF ต้นฉบับ</a>
-              <a href={staticTemplate.pdf} download className={buttonClass}>ดาวน์โหลดต้นฉบับ</a>
-            </div>
-          </div>
-
-          {showSource && (
-            <div className="pt-3 border-t border-slate-100 space-y-3">
-              <iframe title={`ต้นแบบ${categoryTitle}`} src={staticTemplate.pdf} className="w-full h-[600px] rounded-xl border border-slate-200" />
-              <details className="text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-200">
-                <summary className="cursor-pointer font-semibold text-slate-800">อ่านข้อความต้นฉบับสกัดครบทุกหน้า</summary>
-                <pre className="whitespace-pre-wrap leading-relaxed mt-2 font-mono text-[11px]">{staticTemplate.sourceText}</pre>
-              </details>
-            </div>
-          )}
-        </section>
-      )}
 
       {/* 3-Step Lifecycle Visual Info Bar */}
       <div className="grid sm:grid-cols-3 gap-3 p-3.5 rounded-2xl bg-gradient-to-r from-blue-50/70 via-indigo-50/50 to-emerald-50/70 border border-slate-200 text-xs">

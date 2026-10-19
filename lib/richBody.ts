@@ -143,7 +143,7 @@ export function sanitizeBodyHtml(html: string): string {
   return blocksToBodyHtml(parseBodyHtml(html));
 }
 
-/** ย่อหน้าข้อความล้วน (ข้อมูลเดิม, AI, แม่แบบ) เป็น HTML */
+/** ย่อหน้าข้อความล้วน (ข้อมูลเดิมและแม่แบบ) เป็น HTML */
 export function paragraphsToBodyHtml(paragraphs: string[]): string {
   return blocksToBodyHtml(paragraphs.map(p => newBlock(p)));
 }

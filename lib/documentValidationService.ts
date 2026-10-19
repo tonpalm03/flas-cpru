@@ -136,10 +136,10 @@ export function validateGovernmentDocument(
       severity: 'error',
       title: 'ยังไม่ได้ระบุเนื้อหาข้อความในเอกสาร',
       message: 'เอกสารยังไม่มีเนื้อหาข้อความจริงสำหรับจัดพิมพ์',
-      recommendation: 'พิมพ์ข้อความเนื้อหา หรือใช้ปุ่ม "ผู้ช่วย AI ร่างเอกสาร" หรือเลือกต้นแบบสำเร็จรูป'
+      recommendation: 'พิมพ์ข้อความเนื้อหา หรือกดปุ่ม "ใช้ข้อความจากต้นแบบ"'
     });
   } else {
-    // 6. Check Incomplete Placeholders & AI Hallucination Markers
+    // 6. Check Incomplete Placeholders & Unfinished Text Markers
     const placeholderMatches = combinedBody.match(/\[(.*?)\]|\.{3,}|_{3,}/g);
     if (placeholderMatches && placeholderMatches.length > 0) {
       const uniquePlaceholders = Array.from(new Set(placeholderMatches)).slice(0, 5);
