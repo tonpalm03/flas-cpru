@@ -162,6 +162,7 @@ export function orderItems(blocks: RichBlock[]): { text: string; block: RichBloc
 export type OrderParaKind = 'intro' | 'prose' | 'closing' | 'heading' | 'member' | 'duty' | 'dutyItem' | 'date' | 'break';
 export interface OrderParaStyle { kind: OrderParaKind; firstLine: number; left: number; before: number; after: number; line: number }
 const ORDER_INTRO_FIRST_LINE = 1106; // 16 วรรคของ TH SarabunIT๙ 16 พอยต์
+const ORDER_PROSE_FIRST_LINE = 1418 + 69; // ต้นฉบับ "ดังนั้น..." เยื้อง 2.5 ซม. แล้วเคาะอีก 1 วรรค
 export function orderParaStyles(texts: string[], headingIndent: number, dateIndent: number): OrderParaStyle[] {
   let seenList = false;
   let prose = 0;
@@ -180,7 +181,7 @@ export function orderParaStyles(texts: string[], headingIndent: number, dateInde
     if (seenList) return s('closing', { firstLine: 1418, before: 240, after: 160 });
     return prose++ === 0
       ? s('intro', { firstLine: ORDER_INTRO_FIRST_LINE, before: 120, after: 160, line: 259 })
-      : s('prose', { firstLine: 1418, before: 120 });
+      : s('prose', { firstLine: ORDER_PROSE_FIRST_LINE, before: 120 });
   });
 }
 
