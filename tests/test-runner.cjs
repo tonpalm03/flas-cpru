@@ -899,7 +899,80 @@ async function runAllTests() {
   assert.ok(/Extension="png"/i.test(signedZip.file('[Content_Types].xml').asText()), 'png content type registered');
   console.log(' PASS: All five categories export from templates; circulars repeat per recipient; e-signature embedded.');
 
-  console.log('\n=== ALL 19 CORE TEST GROUPS PASSED WITH 100% ACCURACY! ===');
+  console.log('\n[TEST GROUP 20] Plan Module: Proposal Form Validation & Review Workflow');
+  {
+    const plan = require('../lib/planModel.ts');
+    const config = plan.getFiscalYearConfig(2570);
+    assert.ok(config && config.university_plan.missions.length > 0, 'FY2570 config is bundled');
+    assert.equal(plan.getFiscalYearConfig(2569), null, 'a year that is not set up is not filled in from another year');
+    assert.equal(plan.fiscalYearOf(new Date('2026-09-30T12:00:00Z')), 2569, 'September belongs to the fiscal year that ends then');
+    assert.equal(plan.fiscalYearOf(new Date('2026-10-01T00:00:00Z')), 2570, 'October starts the next fiscal year');
+    assert.deepEqual(plan.quartersOf(12, 2), [1, 2], 'months spanning the new year cover both quarters');
+    assert.equal(plan.periodText(10, 3, 2570), 'ตุลาคม 69 – มีนาคม 70', 'period text uses the two-digit Buddhist year of each month');
+
+    const teacher = { id: 'u-teacher', name: 'อาจารย์ ทดสอบ', role: 'lecturer', roles: ['อาจารย์'], department: 'สาขาวิชาเทคโนโลยีสารสนเทศ' };
+    const officer = { id: 'u-plan', name: 'เจ้าหน้าที่แผน', role: 'gov_officer', roles: ['แผนงาน'] };
+    const dean = { id: 'u-dean', name: 'คณบดี', role: 'dean', roles: ['คณบดี'] };
+    const other = { id: 'u-other', name: 'อาจารย์อื่น', role: 'lecturer', roles: ['อาจารย์'] };
+
+    const form = plan.emptyPlanForm(teacher, config);
+    assert.equal(form.title, '', 'new form has no sample content');
+    assert.equal(form.department, teacher.department, 'department comes from the proposer profile');
+    assert.ok(form.supervisor.name.includes('สิริศักดิ์'), 'supervisor defaults to the dean named in the faculty plan');
+    assert.equal(plan.validatePlanForm(form, config).step, 1, 'an empty form stops at step 1');
+
+    const act = form.activities[0];
+    const filled = {
+      ...form,
+      projectCategoryCode: 'plan_policy',
+      title: 'โครงการพัฒนาทักษะดิจิทัล',
+      startDate: '2026-12-01', endDate: '2026-12-02', targetGroup: 'นักศึกษา',
+      backgroundProblem: 'ก', backgroundSolution: 'ข', backgroundImpact: 'ค',
+      universityMissionIds: [1], universityStrategyIds: [3], facultyMissionIds: [1], facultyStrategyIds: [3],
+      okrs: [{ id: 'o1', objective: 'วัตถุประสงค์', keyResult: 'ผลลัพธ์', target: 'ร้อยละ 80' }],
+      activities: [{ ...act, name: 'อบรม', location: 'ห้องประชุม', methods: ['วางแผน', ''], kpi: 'ผู้เข้าร่วม 50 คน' }],
+      budgetItems: [
+        { ...plan.emptyBudgetItem(act.id, config), name: 'ค่าอาหารว่าง', targetQty: 50, durationQty: 2, unitRate: 35, frequencyQty: 1 },
+        { ...plan.emptyBudgetItem('', config), name: 'ค่าวิทยากร', category: 'compensation', targetQty: 1, durationQty: 6, unitRate: 600, frequencyQty: 1, fundSource: 'revenue' },
+      ],
+      impacts: ['ผู้เข้าร่วมนำความรู้ไปใช้'],
+      evaluations: ['แบบประเมินความพึงพอใจ'],
+      leader: { name: teacher.name, position: 'อาจารย์', phone: '' },
+    };
+    assert.equal(plan.budgetItemTotal({ ...filled.budgetItems[0], unitRate: 0.1, targetQty: 3, durationQty: 1 }), 0.3, 'multiplier totals are exact to the satang');
+    assert.equal(plan.planTotal(filled), 7100, 'grand total adds all multiplier rows');
+    assert.deepEqual(plan.totalsBySource(filled), { national: 3500, revenue: 3600 }, 'totals split by budget source');
+    assert.equal(plan.activityTotal(filled, act.id), 7100, 'with one activity, unassigned rows count toward it');
+    assert.equal(plan.validatePlanForm(filled, config), null, 'a complete form passes every step');
+    assert.ok(plan.validatePlanStep(4, { ...filled, budgetItems: [{ ...filled.budgetItems[0], fundSource: 'off_budget' }] }, config)
+      .some(e => e.includes('อื่น ๆ')), 'off-budget money needs its source named');
+    const two = { ...filled, activities: [...filled.activities, { ...plan.emptyActivity(), name: 'ลงพื้นที่', location: 'ชุมชน', methods: ['สำรวจ'], kpi: 'ชุมชน 1 แห่ง' }] };
+    assert.ok(plan.validatePlanStep(4, two, config).some(e => e.includes('เลือกกิจกรรม')), 'with several activities each budget row must name its activity');
+    assert.ok(plan.validatePlanStep(3, { ...filled, okrs: [{ id: 'x', objective: 'a', keyResult: '', target: '' }] }, config)[0].includes('แถวที่ 1'), 'incomplete OKR rows are named');
+    assert.deepEqual(plan.cleanPlanForm(filled).activities[0].methods, ['วางแผน'], 'blank rows are dropped before submitting');
+
+    const project = { id: 'p1', fiscalYear: 2570, status: 'DRAFT', form: filled, totalAmount: 7100, ownerId: teacher.id, ownerName: teacher.name, department: '', history: [], createdAt: '', revision: 1 };
+    assert.deepEqual(plan.availablePlanActions(project, teacher), ['submit'], 'the proposer can only submit a draft');
+    assert.deepEqual(plan.availablePlanActions(project, officer), [], 'the plan officer cannot act on a draft');
+    assert.throws(() => plan.decidePlanAction(project, 'submit', other), /สิทธิ์/, 'someone else cannot submit the draft');
+    const pending = { ...project, status: 'PENDING_REVIEW' };
+    assert.deepEqual(plan.availablePlanActions(pending, officer), ['approve', 'request_revision', 'reject'], 'the plan officer reviews pending projects');
+    assert.deepEqual(plan.availablePlanActions(pending, teacher), [], 'the proposer waits while it is reviewed');
+    assert.deepEqual(plan.availablePlanActions(pending, dean), [], 'executives can view but do not review in place of the plan officer');
+    assert.throws(() => plan.decidePlanAction(pending, 'request_revision', officer, '  '), /เหตุผล/, 'sending back needs a reason');
+    assert.equal(plan.decidePlanAction(pending, 'request_revision', officer, 'แก้งบ'), 'REVISION_REQUESTED');
+    assert.equal(plan.decidePlanAction(pending, 'approve', officer), 'APPROVED_FOR_PRINT');
+    assert.equal(plan.decidePlanAction({ ...project, status: 'REVISION_REQUESTED' }, 'submit', teacher), 'PENDING_REVIEW', 'a returned project can be resubmitted');
+    assert.throws(() => plan.decidePlanAction({ ...project, status: 'REJECTED' }, 'submit', teacher), /สถานะ/, 'a rejected project is final');
+    assert.ok(plan.canEditPlan(teacher, project) && !plan.canEditPlan(teacher, pending), 'the proposer edits only drafts and returned projects');
+    assert.ok(plan.canEditPlan(officer, pending), 'the plan officer can correct a pending project');
+    assert.ok(plan.canViewPlan(dean, project) && !plan.canViewPlan(other, project), 'executives see all projects; other lecturers do not');
+    assert.ok(plan.canDeletePlan(teacher, project) && !plan.canDeletePlan(teacher, { ...project, code: 'PRJ-2570-001' }), 'only never-submitted drafts can be deleted by the proposer');
+    assert.equal(plan.planCode(2570, 7), 'PRJ-2570-007');
+  }
+  console.log(' PASS: Plan proposal validation, budget totals, and review permissions follow the plan office rules.');
+
+  console.log('\n=== ALL 20 CORE TEST GROUPS PASSED WITH 100% ACCURACY! ===');
 }
 
 runAllTests().catch(err => {

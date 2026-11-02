@@ -319,6 +319,45 @@ service cloud.firestore {
       );
     }
 
+    // ระบบแผน: แบบเสนอโครงการ
+    function isPlanOfficer() {
+      return isAuthenticated() && (
+        getUserData().role in ['admin', 'staff_plan'] ||
+        getUserData().get('roles', []).hasAny(['แอดมิน', 'แผนงาน']) ||
+        isAdmin()
+      );
+    }
+
+    function canViewAllPlans() {
+      return isPlanOfficer() || getUserData().role == 'dean' ||
+        getUserData().get('roles', []).hasAny(['คณบดี', 'รองคณบดี', 'ผู้บริหาร']);
+    }
+
+    match /plan_projects/{projectId} {
+      allow read: if isAuthenticated() && (resource.data.ownerId == request.auth.uid || canViewAllPlans());
+      allow create: if isAuthenticated() &&
+        request.resource.data.ownerId == request.auth.uid &&
+        request.resource.data.status == 'DRAFT';
+      // เจ้าของเปลี่ยนเจ้าของโครงการหรือข้ามขั้นตรวจเองไม่ได้
+      allow update: if isAuthenticated() &&
+        request.resource.data.ownerId == resource.data.ownerId && (
+          isPlanOfficer() || (
+            resource.data.ownerId == request.auth.uid &&
+            resource.data.status in ['DRAFT', 'REVISION_REQUESTED'] &&
+            request.resource.data.status in ['DRAFT', 'REVISION_REQUESTED', 'PENDING_REVIEW']
+          )
+        );
+      allow delete: if isAdmin() || (
+        resource.data.ownerId == request.auth.uid &&
+        resource.data.status == 'DRAFT' &&
+        !('code' in resource.data)
+      );
+    }
+
+    match /plan_counters/{year} {
+      allow read, write: if isAuthenticated();
+    }
+
     // 21. Dynamic System Roles
     match /system_roles/{roleId} {
       allow read: if isAuthenticated();
