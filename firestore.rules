@@ -358,6 +358,41 @@ service cloud.firestore {
       allow read, write: if isAuthenticated();
     }
 
+    // ระบบแผน (/plan/): โครงการตามแบบฟอร์ม มรภ.ชัยภูมิ — ลำดับขั้นอยู่ใน plan-web/src/backend/workflow.ts
+    match /plan_proposals/{code} {
+      allow read: if isAuthenticated() && (resource.data.owner_uid == request.auth.uid || canViewAllPlans());
+      allow create: if isAuthenticated() &&
+        request.resource.data.owner_uid == request.auth.uid &&
+        request.resource.data.status == 'DRAFT';
+      // เจ้าของ: แก้ร่าง/ที่ถูกตีกลับ ส่งตรวจ ถอน/ลบก่อนอนุมัติ และบันทึกว่าเปิดไฟล์สแกนแล้ว — อนุมัติหรือข้ามขั้นเองไม่ได้
+      allow update: if isAuthenticated() &&
+        request.resource.data.owner_uid == resource.data.owner_uid && (
+          isPlanOfficer() || (
+            resource.data.owner_uid == request.auth.uid && (
+              request.resource.data.diff(resource.data).affectedKeys().hasOnly(['documents']) || (
+                resource.data.status in ['DRAFT', 'REVISION_REQUESTED'] &&
+                request.resource.data.status in ['DRAFT', 'REVISION_REQUESTED', 'PENDING_REVIEW']
+              ) || (
+                resource.data.status == 'PENDING_REVIEW' &&
+                request.resource.data.diff(resource.data).affectedKeys()
+                  .hasOnly(['deleted_at', 'deleted_by', 'delete_reason', 'updated_at', 'audit_logs'])
+              )
+            )
+          )
+        );
+      allow delete: if false;
+    }
+
+    match /plan_documents/{docId} {
+      allow read: if isAuthenticated() && (resource.data.owner_uid == request.auth.uid || canViewAllPlans());
+      allow create: if isPlanOfficer();
+      allow update, delete: if false;
+    }
+
+    match /plan_proposal_counters/{year} {
+      allow read, write: if isAuthenticated();
+    }
+
     // 21. Dynamic System Roles
     match /system_roles/{roleId} {
       allow read: if isAuthenticated();

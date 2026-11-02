@@ -17,9 +17,10 @@ import { getAdminCategories } from "@/lib/adminCategoryService";
 import { NavSection, NavItem } from "@/lib/navigationTypes";
 import type { AdminDocCategoryConfig } from "@/lib/types";
 
+// ระบบแผน (plan-web) เป็นหน้าแยกที่ /plan/ ไม่ใช่หน้า Next — เปิดด้วยลิงก์ธรรมดา
 const PLAN_MENU = [
-  { id: "plan_projects", title: "โครงการทั้งหมด", href: "/projects" },
-  { id: "plan_new", title: "เสนอโครงการใหม่", href: "/projects/edit" },
+  { id: "plan_system", title: "ระบบแผนและโครงการ", href: "/plan/", external: true },
+  { id: "plan_new", title: "เสนอโครงการใหม่", href: "/plan/#proposal", external: true },
 ];
 
 export default function Sidebar() {
@@ -131,7 +132,7 @@ export default function Sidebar() {
             const isOpen = openSections[section.key] ?? false;
 
             // Merge dynamic custom categories into the admin section if present
-            let subItemsToRender: Array<{ id?: string; title: string; href: string; badge?: string }> = [
+            let subItemsToRender: Array<{ id?: string; title: string; href: string; badge?: string; external?: boolean }> = [
               ...(section.subItems || [])
             ];
 
@@ -197,8 +198,9 @@ export default function Sidebar() {
                   <div className="pl-6 pr-1 space-y-0.5">
                     {subItemsToRender.map((sub, idx) => {
                       const isActive = pathname === sub.href;
+                      const ItemLink = sub.external ? "a" : Link;
                       return (
-                        <Link
+                        <ItemLink
                           key={sub.id || `${sub.href}_${idx}`}
                           href={sub.href}
                           className={`flex items-center justify-between px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
@@ -219,7 +221,7 @@ export default function Sidebar() {
                               {sub.badge}
                             </span>
                           )}
-                        </Link>
+                        </ItemLink>
                       );
                     })}
                   </div>

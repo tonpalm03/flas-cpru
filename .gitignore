@@ -34,3 +34,9 @@ next-env.d.ts
 /tmp/
 firestore-debug.log
 *-debug.log
+
+# plan-web (ระบบแผน, Vite)
+/plan-web/node_modules/
+/plan-web/dist/
+/plan-web/test-results/
+/plan-web/playwright-report/
