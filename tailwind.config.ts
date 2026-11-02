@@ -9,7 +9,35 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        background: "#F8FAFC",
+        // ธีมเดียวกับระบบแผน (plan-web/src/index.css) ไล่จากสีโลโก้คณะ: หน้าเว็บทั้งระบบใช้คลาส blue-* / slate-*
+        // จึงเปลี่ยนสองชุดนี้ที่นี่ที่เดียว — blue = เขียวอมฟ้าของคณะ, slate = เทาอมเขียว
+        blue: {
+          50: "#eef8f7",
+          100: "#e2f3f1",
+          200: "#c3e4e1",
+          300: "#95cfca",
+          400: "#5fb3ad",
+          500: "#2f9e9a",
+          600: "#1a8a8c",
+          700: "#11787c",
+          800: "#0f7176",
+          900: "#0e6b70",
+          950: "#0a4a4f",
+        },
+        slate: {
+          50: "#f3f8f8",
+          100: "#e9f1f1",
+          200: "#dfebea",
+          300: "#c3d6d5",
+          400: "#8fa6a7",
+          500: "#6b8486",
+          600: "#577073",
+          700: "#3d5659",
+          800: "#253f44",
+          900: "#143036",
+          950: "#0b1f23",
+        },
+        background: "#f3f8f8",
         surface: "#FFFFFF",
         primary: {
           50: "#EFF6FF",
@@ -35,7 +63,7 @@ const config: Config = {
       },
       fontFamily: {
         sans: [
-          "var(--font-prompt)",
+          "var(--font-ui)",
           "system-ui",
           "-apple-system",
           "BlinkMacSystemFont",
