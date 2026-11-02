@@ -17,6 +17,11 @@ import { getAdminCategories } from "@/lib/adminCategoryService";
 import { NavSection, NavItem } from "@/lib/navigationTypes";
 import type { AdminDocCategoryConfig } from "@/lib/types";
 
+const PLAN_MENU = [
+  { id: "plan_projects", title: "โครงการทั้งหมด", href: "/projects" },
+  { id: "plan_new", title: "เสนอโครงการใหม่", href: "/projects/edit" },
+];
+
 export default function Sidebar() {
   const pathname = usePathname();
   const { currentUser } = useRole();
@@ -136,6 +141,13 @@ export default function Sidebar() {
                 if (!subItemsToRender.some((s) => s.href === mod.href)) {
                   subItemsToRender.push({ id: `mod_${mod.key}`, title: mod.title, href: mod.href });
                 }
+              }
+            }
+
+            // เมนูระบบแผน: แสดงเสมอ ผังเมนูที่บันทึกไว้เดิมไม่มีรายการในหมวดนี้
+            if (section.key === "projects") {
+              for (const item of PLAN_MENU) {
+                if (!subItemsToRender.some((s) => s.href === item.href)) subItemsToRender.push(item);
               }
             }
 
